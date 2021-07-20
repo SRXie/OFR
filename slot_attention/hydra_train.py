@@ -1,5 +1,7 @@
 from typing import Optional
 
+import hydra
+import logging
 import os
 from time import localtime, strftime
 import pytorch_lightning.loggers as pl_loggers
@@ -34,7 +36,7 @@ class _Workplace(object):
             [
                 transforms.ToTensor(),
                 transforms.Lambda(rescale),  # rescale between -1 and 1
-                transforms.Resize(cfg.resolution),
+                transforms.Resize(tuple(cfg.resolution)),
             ]
         )
 
@@ -58,12 +60,12 @@ class _Workplace(object):
             empty_cache=cfg.empty_cache,
         )
 
-        method = SlotAttentionMethod(model=model, datamodule=clevr_datamodule, params=cfg)
+        self.method = SlotAttentionMethod(model=model, datamodule=clevr_datamodule, params=cfg)
 
         logger_name = "slot-attention-clevr6"
         logger = pl_loggers.TensorBoardLogger("./logs/"+logger_name+strftime("-%Y%m%d%H%M%S", localtime()))
 
-        trainer = Trainer(
+        self.trainer = Trainer(
             logger=logger if cfg.is_logger_enabled else False,
             accelerator="ddp" if cfg.gpus > 1 else None,
             num_sanity_val_steps=cfg.num_sanity_val_steps,
@@ -74,11 +76,11 @@ class _Workplace(object):
         )
 
     def run_training(self):
-        trainer.fit(method)
+        self.trainer.fit(self.method)
 
-@hydra.main(config_path='hydra_cfg/experiment.yaml')
+@hydra.main(config_path='hydra_cfg', config_name='experiment')
 def main(cfg):
-    logging.info(cfg.pretty())
+    logging.info(cfg)
 
     logging.info("Base directory: %s", os.getcwd())
 
