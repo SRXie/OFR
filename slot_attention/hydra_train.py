@@ -42,12 +42,14 @@ class _Workplace(object):
 
         clevr_datamodule = CLEVRDataModule(
             data_root=cfg.data_root,
+            test_root=cfg.test_root,
             max_n_objects=cfg.num_slots - 1,
             train_batch_size=cfg.batch_size,
             val_batch_size=cfg.val_batch_size,
             clevr_transforms=clevr_transforms,
             num_train_images=cfg.num_train_images,
             num_val_images=cfg.num_val_images,
+            num_test_images=cfg.num_test_images,
             num_workers=cfg.num_workers,
         )
 

@@ -13,6 +13,7 @@ from torch.utils.data import Dataset
 from torchvision.transforms import transforms
 
 from slot_attention.utils import compact
+from clevr_obj_test.test_generation import obj_algebra_test, attr_algebra_test
 
 
 class CLEVRDataset(Dataset):
@@ -60,11 +61,63 @@ class CLEVRDataset(Dataset):
             i += 1
         return sorted(compact(paths))
 
+class CLEVRAlgebraTestset(Dataset):
+    def __init__(
+        self,
+        data_root: str,
+        max_num_images: Optional[int],
+        clevr_transforms: Callable,
+        max_n_objects: int = 10,
+        test_type: str = "obj", # or "attr"
+    ):
+        super().__init__()
+        self.data_root = data_root
+        self.clevr_transforms = clevr_transforms
+        self.max_num_main_scenes = max_num_images
+        self.test_root =  os.path.join(data_root, f"{test_type}_test")
+        self.data_path = os.path.join(self.test_root, "images")
+        self.max_n_objects = max_n_objects
+        self.test_type = test_type
+        assert os.path.exists(self.data_root), f"Path {self.data_root} does not exist"
+        assert self.test_type == "obj" or self.test_type == "attr"
+        assert os.path.exists(self.data_path), f"Path {self.data_path} does not exist"
+        self.img_files = self.get_files()
+
+    def __getitem__(self, index: int):
+        image_paths = self.img_files[index]
+        imgs = [Image.open(image_path) for image_path in image_paths]
+        imgs = [img.convert("RGB") for img in imgs]
+        return [self.clevr_transforms(img) for img in imgs]
+
+    def __len__(self):
+        return len(self.img_files)
+
+    def get_files(self) -> List[str]:
+        with open(os.path.join(self.test_root, "CLEVR_scenes.json")) as f:
+            scene = json.load(f)
+        paths: List[List[Optional[str]]] = []
+        total_num_main_scenes = len(scene["scenes"])
+        i = 0 
+        while (self.max_num_main_scenes is None or i < self.max_num_main_scenes) and i < total_num_main_scenes:
+            num_objects_in_scene = len(scene["scenes"][i+1]["objects"])
+            if num_objects_in_scene <= self.max_n_objects:
+                # First, call obj_algebra_test with this scene to generate path tuples for A-B+C=D
+                image_paths = obj_algebra_test(self.test_root, i) 
+                # Then, assert the existence of these paths
+                for image_path in image_paths:
+                    for path in image_path:
+                        assert os.path.exists(path), f"{path} does not exist" 
+                # Last, append these path tuples into paths. 
+                paths+=image_paths
+            i += 1
+        return paths
+
 
 class CLEVRDataModule(pl.LightningDataModule):
     def __init__(
         self,
         data_root: str,
+        test_root: str,
         train_batch_size: int,
         val_batch_size: int,
         clevr_transforms: Callable,
@@ -72,9 +125,11 @@ class CLEVRDataModule(pl.LightningDataModule):
         num_workers: int,
         num_train_images: Optional[int] = None,
         num_val_images: Optional[int] = None,
+        num_test_images: Optional[int] = None,
     ):
         super().__init__()
         self.data_root = data_root
+        self.test_root = test_root
         self.train_batch_size = train_batch_size
         self.val_batch_size = val_batch_size
         self.clevr_transforms = clevr_transforms
@@ -82,6 +137,7 @@ class CLEVRDataModule(pl.LightningDataModule):
         self.num_workers = num_workers
         self.num_train_images = num_train_images
         self.num_val_images = num_val_images
+        self.num_test_images = num_test_images
 
         self.train_dataset = CLEVRDataset(
             data_root=self.data_root,
@@ -98,6 +154,14 @@ class CLEVRDataModule(pl.LightningDataModule):
             max_n_objects=self.max_n_objects,
         )
 
+        self.test_dataset = CLEVRAlgebraTestset(
+            data_root = self.test_root,
+            max_num_images=self.num_test_images,
+            clevr_transforms = self.clevr_transforms,
+            max_n_objects = self.max_n_objects,
+            test_type = "obj", # or "attr"
+        )
+
     def train_dataloader(self):
         return DataLoader(
             self.train_dataset,
@@ -111,6 +175,15 @@ class CLEVRDataModule(pl.LightningDataModule):
         return DataLoader(
             self.val_dataset,
             batch_size=self.val_batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            pin_memory=True,
+        )
+
+    def test_dataloader(self):
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.train_batch_size, # TODO: change it later
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,

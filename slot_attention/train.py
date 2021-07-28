@@ -40,12 +40,14 @@ def main(params: Optional[SlotAttentionParams] = None):
 
     clevr_datamodule = CLEVRDataModule(
         data_root=params.data_root,
+        test_root=params.test_root,
         max_n_objects=params.num_slots - 1,
         train_batch_size=params.batch_size,
         val_batch_size=params.val_batch_size,
         clevr_transforms=clevr_transforms,
         num_train_images=params.num_train_images,
         num_val_images=params.num_val_images,
+        num_test_images=params.num_test_images,
         num_workers=params.num_workers,
     )
 

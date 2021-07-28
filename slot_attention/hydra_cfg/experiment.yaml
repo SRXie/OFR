@@ -9,6 +9,7 @@ resolution: [64, 64] # Tuple[int, int]
 num_slots: 7
 num_iterations: 4
 data_root: /datasets01/CLEVR_v1.0/060817/
+test_root: /checkpoint/siruixie/clevr_obj_test/output/
 gpus: 1
 max_epochs: 100
 num_sanity_val_steps: 1
@@ -16,6 +17,7 @@ scheduler_gamma: 0.5
 weight_decay: 0.0
 num_train_images: null # Optional[int]
 num_val_images: null  # Optional[int]
+num_test_images: 1
 empty_cache: True
 is_logger_enabled: True
 is_verbose: True
@@ -24,13 +26,7 @@ n_samples: 5
 warmup_steps_pct: 0.02
 decay_steps_pct: 0.2
 
-#hydra:
-#  launcher:
-#    params:
-#      queue_parameters:
-#        slurm:
-#          partition: "learnfair"
-#          max_num_timeout: 10
-#          mem: ${mem_requirement}
-#          time: 4300  # 72 hours, max limit on learnfair
-#          job_name: "slot-attn"
+hydra:
+  run: 
+    dir: outputs/${hydra.job.override_dirname}
+

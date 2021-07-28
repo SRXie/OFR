@@ -14,8 +14,6 @@ class SlotAttentionMethod(pl.LightningModule):
         super().__init__()
         self.model = model
         self.datamodule = datamodule
-        self.train_dataloader = datamodule.train_dataloader
-        self.val_dataloader = datamodule.val_dataloader
         self.params = params
         self.save_hyperparameters('params')
 
@@ -62,10 +60,68 @@ class SlotAttentionMethod(pl.LightningModule):
 
     def validation_epoch_end(self, outputs):
         avg_loss = torch.stack([x["loss"] for x in outputs]).mean()
+        # Algebra Test starts here
+        dl = self.datamodule.test_dataloader()
+        test_losses = []
+        for batch in dl:
+            # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
+            batch_size = batch[0].shape[0]
+            cat_batch = torch.cat(batch, 0)
+            if self.params.gpus > 0:
+                cat_batch = cat_batch.to(self.device)
+            cat_slots = self.model.forward(cat_batch, slots_only=True).unsqueeze(1)
+            slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, batch_size, 0)
+
+            batch_size, _, num_slots, slot_size = slots_A.shape
+            # the full set of possible permutation might be too large ((7!)^3 for 7 slots...)
+            # I sample 100000 permutation tuples as an approximation
+            emb_losses = []
+            # TODO: make it parallel
+            # for _ in range(10):
+            #     rand = torch.rand(100*4, num_slots)
+            #     batch_rand_perm = rand.argsort(dim=1)
+            #     if self.params.gpus > 0:
+            #         batch_rand_perm = batch_rand_perm.to(self.device)
+            #     slots_A = slots_A.repeat(1, 100, 1, 1)
+            #     slots_B = slots_B.repeat(1, 100, 1, 1)
+            #     slots_C = slots_C.repeat(1, 100, 1, 1)
+            #     slots_D = slots_D.repeat(1, 100, 1, 1)
+
+            #     emb_A =slots_A[batch_rand_perm[:100]].view(batch_size, 1, -1)
+            #     emb_B =slots_B[batch_rand_perm[100:200]].view(batch_size, 1, -1)
+            #     emb_C =slots_C[batch_rand_perm[200:300]].view(batch_size, 1, -1)
+            #     emb_D =slots_D[batch_rand_perm[300:400]].view(batch_size, 1, -1)
+            #     emb_loss = torch.square(emb_A-emb_B+emb_C-emb_D).mean(dim=2)
+            #     emb_loss, _ = torch.min(emb_loss, 1)
+            #     print(emb_loss.data.tolist())
+            #     emb_losses.append(emb_loss)
+            # test_loss = torch.cat(emb_losses, 1)
+            # test_loss, _ = torch.min(emb_loss, 1)
+
+            for _ in range(1, 10000):
+
+                perm_A = torch.randperm(num_slots)
+                emb_A = slots_A[:, :, perm_A].view(batch_size, 1, -1)
+                perm_B = torch.randperm(num_slots)
+                emb_B = slots_B[:, :, perm_B].view(batch_size, 1, -1)
+                perm_C = torch.randperm(num_slots)
+                emb_C = slots_C[:,:, perm_C].view(batch_size, 1, -1)
+                perm_D = torch.randperm(num_slots)
+                emb_D = slots_D[:, :, perm_D].view(batch_size, 1, -1)
+
+                emb_loss = torch.square(emb_A-emb_B+emb_C-emb_D).mean(dim=2)
+                emb_losses.append(emb_loss)
+            
+            test_loss = torch.cat(emb_losses, 1)
+            test_loss, _ = torch.min(test_loss, 1)
+            test_losses.append(test_loss)
+        avg_test_loss = torch.cat(test_losses, 0).mean()
         logs = {
             "avg_val_loss": avg_loss,
+            "avg_test_loss": avg_test_loss,
         }
         self.log_dict(logs, sync_dist=True)
+
         print("; ".join([f"{k}: {v.item():.6f}" for k, v in logs.items()]))
 
     def configure_optimizers(self):

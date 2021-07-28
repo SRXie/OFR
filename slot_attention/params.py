@@ -15,6 +15,7 @@ class SlotAttentionParams:
     num_slots: int = 7
     num_iterations: int = 4
     data_root: str = "/datasets01/CLEVR_v1.0/060817/"
+    test_root: str = "/checkpoint/siruixie/clevr_obj_test/output/"
     gpus: int = 1
     max_epochs: int = 100
     num_sanity_val_steps: int = 1
@@ -22,6 +23,7 @@ class SlotAttentionParams:
     weight_decay: float = 0.0
     num_train_images: Optional[int] = None
     num_val_images: Optional[int] = None
+    num_test_images: Optional[int] = 1
     empty_cache: bool = True
     is_logger_enabled: bool = True
     is_verbose: bool = True

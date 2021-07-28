@@ -201,7 +201,7 @@ class SlotAttentionModel(nn.Module):
             mlp_hidden_size=128,
         )
 
-    def forward(self, x):
+    def forward(self, x, slots_only=False):
         if self.empty_cache:
             torch.cuda.empty_cache()
 
@@ -221,6 +221,8 @@ class SlotAttentionModel(nn.Module):
         assert_shape(slots.size(), (batch_size, self.num_slots, self.slot_size))
         # `slots` has shape: [batch_size, num_slots, slot_size].
         batch_size, num_slots, slot_size = slots.shape
+        if slots_only:
+            return slots
 
         slots = slots.view(batch_size * num_slots, slot_size, 1, 1)
         decoder_in = slots.repeat(1, 1, self.decoder_resolution[0], self.decoder_resolution[1])
