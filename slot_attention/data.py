@@ -5,6 +5,7 @@ from typing import Callable
 from typing import List
 from typing import Optional
 from typing import Tuple
+from csv import writer
 
 import pytorch_lightning as pl
 from PIL import Image
@@ -69,6 +70,7 @@ class CLEVRAlgebraTestset(Dataset):
         clevr_transforms: Callable,
         max_n_objects: int = 10,
         test_type: str = "obj", # or "attr"
+        test_cases: List[List[Optional[str]]] = None,
     ):
         super().__init__()
         self.data_root = data_root
@@ -81,7 +83,10 @@ class CLEVRAlgebraTestset(Dataset):
         assert os.path.exists(self.data_root), f"Path {self.data_root} does not exist"
         assert self.test_type == "obj" or self.test_type == "attr"
         assert os.path.exists(self.data_path), f"Path {self.data_path} does not exist"
-        self.img_files = self.get_files()
+        if test_cases:
+            self.img_files = test_cases
+        else:
+            self.img_files = self.get_files()
 
     def __getitem__(self, index: int):
         image_paths = self.img_files[index]
@@ -99,7 +104,7 @@ class CLEVRAlgebraTestset(Dataset):
         total_num_main_scenes = len(scene["scenes"])
         i = 0 
         while (self.max_num_main_scenes is None or i < self.max_num_main_scenes) and i < total_num_main_scenes:
-            num_objects_in_scene = len(scene["scenes"][i+1]["objects"])
+            num_objects_in_scene = len(scene["scenes"][i]["objects"])
             if num_objects_in_scene <= self.max_n_objects:
                 # First, call obj_algebra_test with this scene to generate path tuples for A-B+C=D
                 image_paths = obj_algebra_test(self.test_root, i) 
@@ -110,6 +115,9 @@ class CLEVRAlgebraTestset(Dataset):
                 # Last, append these path tuples into paths. 
                 paths+=image_paths
             i += 1
+        with open(os.path.join(self.test_root, "CLEVR_test_cases.csv"), "w") as f:
+            wr = writer(f)
+            wr.writerows(paths)
         return paths
 
 
@@ -126,6 +134,8 @@ class CLEVRDataModule(pl.LightningDataModule):
         num_train_images: Optional[int] = None,
         num_val_images: Optional[int] = None,
         num_test_images: Optional[int] = None,
+        test_type: Optional[str] = "obj", # or "attr"
+        algebra_test_cases: List[List[Optional[str]]] = None,
     ):
         super().__init__()
         self.data_root = data_root
@@ -159,7 +169,8 @@ class CLEVRDataModule(pl.LightningDataModule):
             max_num_images=self.num_test_images,
             clevr_transforms = self.clevr_transforms,
             max_n_objects = self.max_n_objects,
-            test_type = "obj", # or "attr"
+            test_type = test_type,
+            test_cases = algebra_test_cases,
         )
 
     def train_dataloader(self):

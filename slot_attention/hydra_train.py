@@ -3,6 +3,7 @@ from typing import Optional
 import hydra
 import logging
 import os
+from csv import reader
 from time import localtime, strftime
 import pytorch_lightning.loggers as pl_loggers
 from pytorch_lightning import Trainer
@@ -40,6 +41,14 @@ class _Workplace(object):
             ]
         )
 
+        if os.path.exists(os.path.join(cfg.test_root, f"{cfg.test_type}_test", "CLEVR_test_cases.csv")):
+            with open(os.path.join(cfg.test_root, f"{cfg.test_type}_test", "CLEVR_test_cases.csv"), "r") as f:
+                csv_reader = reader(f)
+                algebra_test_cases = list(csv_reader)
+        else:
+            print(os.path.join(cfg.test_root, f"{cfg.test_type}_test", "CLEVR_test_cases.csv")+" does not exist.")
+            algebra_test_cases = None
+
         clevr_datamodule = CLEVRDataModule(
             data_root=cfg.data_root,
             test_root=cfg.test_root,
@@ -51,6 +60,8 @@ class _Workplace(object):
             num_val_images=cfg.num_val_images,
             num_test_images=cfg.num_test_images,
             num_workers=cfg.num_workers,
+            test_type=cfg.test_type,
+            algebra_test_cases = algebra_test_cases,
         )
 
         print(f"Training set size (images must have {cfg.num_slots - 1} objects):", len(clevr_datamodule.train_dataset))
