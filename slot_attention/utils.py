@@ -6,7 +6,7 @@ from typing import Union
 import torch
 from pytorch_lightning import Callback
 
-# import wandb
+import wandb
 
 Tensor = TypeVar("torch.tensor")
 T = TypeVar("T")
@@ -60,7 +60,9 @@ class ImageLogCallback(Callback):
             with torch.no_grad():
                 pl_module.eval()
                 images = pl_module.sample_images()
-                trainer.logger.experiment.add_images('eval_images', images, self.step, dataformats='CHW')
+                trainer.logger.experiment.log({"images": [wandb.Image(images)]}, commit=False)
+                # Uset this line for tensorboard
+                # trainer.logger.experiment.add_images('eval_images', images, self.step, dataformats='CHW')
             self.step += 1
 
 
