@@ -1,7 +1,7 @@
 # A yaml version of params.py
 
 seed: 3
-gpu_id: '0'
+gpu_id: '0, 1'
 lr: 0.0004
 batch_size: 64
 val_batch_size: 64
@@ -10,14 +10,14 @@ num_slots: 7
 num_iterations: 4
 data_root: /datasets01/CLEVR_v1.0/060817/
 test_root: /checkpoint/siruixie/clevr_obj_test/output/
-gpus: 1
+gpus: 2
 max_epochs: 100
 num_sanity_val_steps: 1
 scheduler_gamma: 0.5
 weight_decay: 0.0
 num_train_images: null # Optional[int]
 num_val_images: null  # Optional[int]
-num_test_images: 1
+num_test_images: 1000
 empty_cache: True
 is_logger_enabled: True
 is_verbose: True
