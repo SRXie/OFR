@@ -66,6 +66,12 @@ class SlotAttentionMethod(pl.LightningModule):
         rand_aggr_losses = []
         greedy_losses = []
         sample_losses = []
+        sample_size = 10000
+        rand = torch.rand(self.params.batch_size*sample_size*3, self.params.num_slots)
+        batch_rand_perm = rand.argsort(dim=1)
+        del rand
+        if self.params.gpus > 0:
+            batch_rand_perm = batch_rand_perm.to(self.device)
         for batch in dl:
             # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
             batch_size = batch[0].shape[0]
@@ -108,13 +114,6 @@ class SlotAttentionMethod(pl.LightningModule):
             greedy_losses.append(greedy_loss)
             
             # 3. sampling based approximation 
-            emb_losses = []
-            sample_size = 10000
-            rand = torch.rand(batch_size*sample_size*3, num_slots)
-            batch_rand_perm = rand.argsort(dim=1)
-            del rand
-            if self.params.gpus > 0:
-                batch_rand_perm = batch_rand_perm.to(self.device)
             slots_A = slots_A.repeat(sample_size, 1, 1)
             slots_B = slots_B.repeat(sample_size, 1, 1)
             slots_C = slots_C.repeat(sample_size, 1, 1)
