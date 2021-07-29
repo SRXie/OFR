@@ -16,6 +16,7 @@ class SlotAttentionMethod(pl.LightningModule):
         self.datamodule = datamodule
         self.params = params
         self.save_hyperparameters('params')
+        self.random_projection_init = False
 
     def forward(self, input: Tensor, **kwargs) -> Tensor:
         return self.model(input, **kwargs)
@@ -62,63 +63,82 @@ class SlotAttentionMethod(pl.LightningModule):
         avg_loss = torch.stack([x["loss"] for x in outputs]).mean()
         # Algebra Test starts here
         dl = self.datamodule.test_dataloader()
-        test_losses = []
+        rand_aggr_losses = []
+        greedy_losses = []
+        sample_losses = []
         for batch in dl:
             # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
             batch_size = batch[0].shape[0]
             cat_batch = torch.cat(batch, 0)
             if self.params.gpus > 0:
                 cat_batch = cat_batch.to(self.device)
-            cat_slots = self.model.forward(cat_batch, slots_only=True).unsqueeze(1)
+            cat_slots = self.model.forward(cat_batch, slots_only=True)#.unsqueeze(1)
             slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, batch_size, 0)
 
-            batch_size, _, num_slots, slot_size = slots_A.shape
+            batch_size, num_slots, slot_size = slots_A.shape
+
             # the full set of possible permutation might be too large ((7!)^3 for 7 slots...)
-            # I sample 100000 permutation tuples as an approximation
-            emb_losses = []
-            # TODO: make it parallel
-            # for _ in range(10):
-            #     rand = torch.rand(100*4, num_slots)
-            #     batch_rand_perm = rand.argsort(dim=1)
-            #     if self.params.gpus > 0:
-            #         batch_rand_perm = batch_rand_perm.to(self.device)
-            #     slots_A = slots_A.repeat(1, 100, 1, 1)
-            #     slots_B = slots_B.repeat(1, 100, 1, 1)
-            #     slots_C = slots_C.repeat(1, 100, 1, 1)
-            #     slots_D = slots_D.repeat(1, 100, 1, 1)
+            # below implement three different approximation
+            # 1. random projection to a high-dim space and then aggregate
+            if not self.random_projection_init:
+                self.random_projection = torch.rand(slot_size, slot_size*128)
+                self.random_projection_init = True
+                if self.params.gpus > 0:
+                    self.random_projection = self.random_projection.to(self.device)
+            proj_A = torch.matmul(slots_A, self.random_projection).mean(dim=-2) # average to make the scale invarint to slot number
+            proj_B = torch.matmul(slots_B, self.random_projection).mean(dim=-2)
+            proj_C = torch.matmul(slots_C, self.random_projection).mean(dim=-2)
+            proj_D = torch.matmul(slots_D, self.random_projection).mean(dim=-2)
+            rand_aggr_loss = torch.square(proj_A-proj_B+proj_C-proj_D).mean(dim=-1)
+            rand_aggr_losses.append(rand_aggr_loss.squeeze(-1))
 
-            #     emb_A =slots_A[batch_rand_perm[:100]].view(batch_size, 1, -1)
-            #     emb_B =slots_B[batch_rand_perm[100:200]].view(batch_size, 1, -1)
-            #     emb_C =slots_C[batch_rand_perm[200:300]].view(batch_size, 1, -1)
-            #     emb_D =slots_D[batch_rand_perm[300:400]].view(batch_size, 1, -1)
-            #     emb_loss = torch.square(emb_A-emb_B+emb_C-emb_D).mean(dim=2)
-            #     emb_loss, _ = torch.min(emb_loss, 1)
-            #     print(emb_loss.data.tolist())
-            #     emb_losses.append(emb_loss)
-            # test_loss = torch.cat(emb_losses, 1)
-            # test_loss, _ = torch.min(emb_loss, 1)
+            # 2. greedy assignment regardless of re-assignment
+            # TODO: check if there is a trivial solution to this assignment
+            ext_A = slots_A.view(batch_size, num_slots, 1, 1, 1, slot_size)
+            ext_B = slots_B.view(batch_size, 1, num_slots, 1, 1, slot_size)
+            ext_C = slots_C.view(batch_size, 1, 1, num_slots, 1, slot_size)
+            ext_D = slots_D.view(batch_size, 1, 1, 1, num_slots, slot_size)
+            greedy_criterion = torch.square(ext_A-ext_B+ext_C-ext_D).sum(dim=-1)
+            # backtrace for greedy matching (3 times)
+            greedy_criterion, _ = greedy_criterion.min(-1)
+            greedy_criterion, _ = greedy_criterion.min(-1)
+            greedy_criterion, _ = greedy_criterion.min(-1)
 
-            for _ in range(1, 10000):
-
-                perm_A = torch.randperm(num_slots)
-                emb_A = slots_A[:, :, perm_A].view(batch_size, 1, -1)
-                perm_B = torch.randperm(num_slots)
-                emb_B = slots_B[:, :, perm_B].view(batch_size, 1, -1)
-                perm_C = torch.randperm(num_slots)
-                emb_C = slots_C[:,:, perm_C].view(batch_size, 1, -1)
-                perm_D = torch.randperm(num_slots)
-                emb_D = slots_D[:, :, perm_D].view(batch_size, 1, -1)
-
-                emb_loss = torch.square(emb_A-emb_B+emb_C-emb_D).mean(dim=2)
-                emb_losses.append(emb_loss)
+            greedy_loss = greedy_criterion.sum(dim=-1)/(num_slots*slot_size)
+            greedy_losses.append(greedy_loss)
             
-            test_loss = torch.cat(emb_losses, 1)
-            test_loss, _ = torch.min(test_loss, 1)
-            test_losses.append(test_loss)
-        avg_test_loss = torch.cat(test_losses, 0).mean()
+            # 3. sampling based approximation 
+            emb_losses = []
+            sample_size = 10000
+            rand = torch.rand(batch_size*sample_size*3, num_slots)
+            batch_rand_perm = rand.argsort(dim=1)
+            del rand
+            if self.params.gpus > 0:
+                batch_rand_perm = batch_rand_perm.to(self.device)
+            slots_A = slots_A.repeat(sample_size, 1, 1)
+            slots_B = slots_B.repeat(sample_size, 1, 1)
+            slots_C = slots_C.repeat(sample_size, 1, 1)
+            slots_D = slots_D.repeat(sample_size, 1, 1)
+
+            # batch random permutation of slots https://discuss.pytorch.org/t/batch-version-of-torch-randperm/111121/3
+            emb_A =slots_A.view(batch_size*sample_size, -1)
+            emb_B =slots_B[torch.arange(slots_B.shape[0]).unsqueeze(-1), batch_rand_perm[:batch_size*sample_size]].view(batch_size*sample_size, -1)
+            emb_C =slots_C[torch.arange(slots_C.shape[0]).unsqueeze(-1), batch_rand_perm[batch_size*sample_size:2*batch_size*sample_size]].view(batch_size*sample_size, -1)
+            emb_D =slots_D[torch.arange(slots_D.shape[0]).unsqueeze(-1), batch_rand_perm[2*batch_size*sample_size:3*batch_size*sample_size]].view(batch_size*sample_size, -1)
+            sample_loss = emb_A-emb_B+emb_C-emb_D
+            sample_loss = torch.stack(torch.split(sample_loss, batch_size, 0), 1)
+            sample_loss = torch.square(sample_loss).mean(dim=-1)
+            sample_loss, _ = torch.min(sample_loss, 1)
+            sample_losses.append(sample_loss)
+        
+        avg_aggr_loss = torch.cat(rand_aggr_losses, 0).mean()
+        avg_greedy_loss = torch.cat(greedy_losses, 0).mean()
+        avg_sample_loss = torch.cat(sample_losses, 0).mean()
         logs = {
             "avg_val_loss": avg_loss,
-            "avg_test_loss": avg_test_loss,
+            "avg_aggr_loss": avg_aggr_loss,
+            "avg_greedy_loss": avg_greedy_loss,
+            "avg_sample_loss": avg_sample_loss,
         }
         self.log_dict(logs, sync_dist=True)
 
