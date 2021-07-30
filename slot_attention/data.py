@@ -99,7 +99,7 @@ class CLEVRAlgebraTestset(Dataset):
         return len(self.img_files)
 
     def get_files(self) -> List[str]:
-        print("creating file path")
+        print("creating file path for "+f"{self.test_type}_test")
         with open(os.path.join(self.test_root, "CLEVR_scenes.json")) as f:
             scene = json.load(f)
         paths: List[List[Optional[str]]] = []
@@ -110,7 +110,6 @@ class CLEVRAlgebraTestset(Dataset):
             if num_objects_in_scene <= self.max_n_objects:
                 # First, call obj_algebra_test or attr_algebra_test with this scene to generate path tuples for A-B+C=D
                 if self.test_type == 'obj':
-                    print(self.test_root)
                     image_paths = obj_algebra_test(self.test_root, i)
                 elif self.test_type == 'attr':
                     image_paths = attr_algebra_test(self.test_root, i)

@@ -103,10 +103,7 @@ class Obj(object):
                 for cp in itertools.product(attrs_enumeration[level], prod):
                     obj1 = deepcopy(self)
                     cp = flatten(cp)
-                    # print(prod)
-                    # print(cp)
                     for i, attr in enumerate(attributes):
-                        # print(cp[i])
                         attr_str = '"'+cp[i]+'"'
                         exec('obj1.'+attr+'='+ attr_str)
                     objs.append(obj1)

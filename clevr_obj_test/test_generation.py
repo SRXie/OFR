@@ -26,12 +26,12 @@ def create_scene_from_path(test_root, main_scene_idx, sub_scene_idx=0):
     # TODO: open json from path and create Scene with it
     with open(scene_path) as f1:
         scene_dict = json.load(f1)
-    
+
     with open(meta_path) as f2:
-        if "obj" in meta_path:
+        if "/obj_test/" in meta_path:
             objs2img = json.load(f2)
             attrs2img = None
-        elif "attr" in meta_path:
+        if "/attr_test/" in meta_path:
             objs2img = None
             attrs2img = json.load(f2)
         else:
@@ -89,7 +89,6 @@ def attr_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0):
     # create algebra tuples A-B+C=D: Scene - Edit_complementary + Edit_all = Edit_selected
     image_A_path = create_path(test_root, main_scene_idx) 
     for num_edit in range(1, len(scene.get_obj_attrs())):
-        print(num_edit)
         # iterate through attribute combinations of the scene
         for attr_subset in combinations(scene.get_obj_attrs(), num_edit):
             attr_complementary = scene.get_obj_attrs().difference(attr_subset)
