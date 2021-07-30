@@ -62,17 +62,22 @@ class SlotAttentionMethod(pl.LightningModule):
     def validation_epoch_end(self, outputs):
         avg_loss = torch.stack([x["loss"] for x in outputs]).mean()
         # Algebra Test starts here
-        dl = self.datamodule.test_dataloader()
-        rand_aggr_losses = []
-        greedy_losses = []
-        sample_losses = []
+        odl = self.datamodule.obj_test_dataloader()
+        adl = self.datamodule.attr_test_dataloader()
         sample_size = 10000
+        obj_rand_aggr_losses_epoch, obj_greedy_losses_epoch, obj_sample_losses_epoch = [], [], []
+        attr_rand_aggr_losses_epoch, attr_greedy_losses_epoch, attr_sample_losses_epoch = [], [], []
+
         rand = torch.rand(self.params.batch_size*sample_size*3, self.params.num_slots)
         batch_rand_perm = rand.argsort(dim=1)
         del rand
         if self.params.gpus > 0:
             batch_rand_perm = batch_rand_perm.to(self.device)
-        for batch in dl:
+
+        def compute_test_losses(batch):
+            rand_aggr_losses = []
+            greedy_losses = []
+            sample_losses = []
             # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
             batch_size = batch[0].shape[0]
             cat_batch = torch.cat(batch, 0)
@@ -112,8 +117,8 @@ class SlotAttentionMethod(pl.LightningModule):
 
             greedy_loss = greedy_criterion.sum(dim=-1)/(num_slots*slot_size)
             greedy_losses.append(greedy_loss)
-            
-            # 3. sampling based approximation 
+
+            # 3. sampling based approximation
             slots_A = slots_A.repeat(sample_size, 1, 1)
             slots_B = slots_B.repeat(sample_size, 1, 1)
             slots_C = slots_C.repeat(sample_size, 1, 1)
@@ -129,15 +134,35 @@ class SlotAttentionMethod(pl.LightningModule):
             sample_loss = torch.square(sample_loss).mean(dim=-1)
             sample_loss, _ = torch.min(sample_loss, 1)
             sample_losses.append(sample_loss)
-        
-        avg_aggr_loss = torch.cat(rand_aggr_losses, 0).mean()
-        avg_greedy_loss = torch.cat(greedy_losses, 0).mean()
-        avg_sample_loss = torch.cat(sample_losses, 0).mean()
+
+            return rand_aggr_losses, greedy_losses, sample_losses
+
+        for batch in odl:
+            rand_aggr_losses, greedy_losses, sample_losses = compute_test_losses(batch)
+            obj_rand_aggr_losses_epoch += rand_aggr_losses
+            obj_greedy_losses_epoch += greedy_losses
+            obj_sample_losses_epoch += sample_losses
+
+        for batch in adl:
+            rand_aggr_losses, greedy_losses, sample_losses = compute_test_losses(batch)
+            attr_rand_aggr_losses_epoch += rand_aggr_losses
+            attr_greedy_losses_epoch += greedy_losses
+            attr_sample_losses_epoch += sample_losses
+
+        avg_obj_aggr_loss = torch.cat(obj_rand_aggr_losses_epoch, 0).mean()
+        avg_obj_greedy_loss = torch.cat(obj_greedy_losses_epoch, 0).mean()
+        avg_obj_sample_loss = torch.cat(obj_sample_losses_epoch, 0).mean()
+        avg_attr_aggr_loss = torch.cat(attr_rand_aggr_losses_epoch, 0).mean()
+        avg_attr_greedy_loss = torch.cat(attr_greedy_losses_epoch, 0).mean()
+        avg_attr_sample_loss = torch.cat(attr_sample_losses_epoch, 0).mean()
         logs = {
             "avg_val_loss": avg_loss,
-            "avg_aggr_loss": avg_aggr_loss,
-            "avg_greedy_loss": avg_greedy_loss,
-            "avg_sample_loss": avg_sample_loss,
+            "avg_obj_aggr_loss": avg_obj_aggr_loss,
+            "avg_obj_greedy_loss": avg_obj_greedy_loss,
+            "avg_obj_sample_loss": avg_obj_sample_loss,
+            "avg_attr_aggr_loss": avg_attr_aggr_loss,
+            "avg_attr_greedy_loss": avg_attr_greedy_loss,
+            "avg_attr_sample_loss": avg_attr_sample_loss,
         }
         self.log_dict(logs, sync_dist=True)
 

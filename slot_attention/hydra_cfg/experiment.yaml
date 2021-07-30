@@ -25,9 +25,8 @@ num_workers: 4
 n_samples: 5
 warmup_steps_pct: 0.02
 decay_steps_pct: 0.2
-test_type: obj # or "attr"
+test_type: [obj, attr]
 
 hydra:
-  run: 
+  run:
     dir: outputs/${hydra.job.override_dirname}
-

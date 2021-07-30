@@ -31,4 +31,4 @@ class SlotAttentionParams:
     n_samples: int = 5
     warmup_steps_pct: float = 0.02
     decay_steps_pct: float = 0.2
-    test_type: str = "obj" # or "attr"
+    test_type: Tuple[str] = ("obj" , "attr")

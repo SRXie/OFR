@@ -39,13 +39,14 @@ def main(params: Optional[SlotAttentionParams] = None):
         ]
     )
 
-    if os.path.exists(os.path.join(params.test_root, f"{params.test_type}_test", "CLEVR_test_cases.csv")):
-        with open(os.path.join(params.test_root, f"{params.test_type}_test", "CLEVR_test_cases.csv"), "r") as f:
-            csv_reader = reader(f)
-            algebra_test_cases = list(csv_reader)
-    else:
-        print(os.path.join(params.test_root, f"{params.test_type}_test", "CLEVR_test_cases.csv")+" does not exist.")
-        algebra_test_cases = None
+    obj_algebra_test_cases, attr_algebra_test_cases = None, None
+    for test_type in params.test_type:
+        if os.path.exists(os.path.join(params.test_root, f"{test_type}_test", "CLEVR_test_cases.csv")):
+            with open(os.path.join(params.test_root, f"{test_type}_test", "CLEVR_test_cases.csv"), "r") as f:
+                csv_reader = reader(f)
+                exec(test_type+"_algebra_test_cases = list(csv_reader)")
+        else:
+            print(os.path.join(params.test_root, f"{test_type}_test", "CLEVR_test_cases.csv")+" does not exist.")
 
     clevr_datamodule = CLEVRDataModule(
         data_root=params.data_root,
@@ -58,8 +59,8 @@ def main(params: Optional[SlotAttentionParams] = None):
         num_val_images=params.num_val_images,
         num_test_images=params.num_test_images,
         num_workers=params.num_workers,
-        test_type=params.test_type,
-        algebra_test_cases = algebra_test_cases,
+        obj_algebra_test_cases = obj_algebra_test_cases,
+        attr_algebra_test_cases = attr_algebra_test_cases,
     )
 
     print(f"Training set size (images must have {params.num_slots - 1} objects):", len(clevr_datamodule.train_dataset))

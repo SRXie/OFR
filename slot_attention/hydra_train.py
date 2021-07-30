@@ -41,13 +41,15 @@ class _Workplace(object):
             ]
         )
 
-        if os.path.exists(os.path.join(cfg.test_root, f"{cfg.test_type}_test", "CLEVR_test_cases.csv")):
-            with open(os.path.join(cfg.test_root, f"{cfg.test_type}_test", "CLEVR_test_cases.csv"), "r") as f:
-                csv_reader = reader(f)
-                algebra_test_cases = list(csv_reader)
-        else:
-            print(os.path.join(cfg.test_root, f"{cfg.test_type}_test", "CLEVR_test_cases.csv")+" does not exist.")
-            algebra_test_cases = None
+        obj_algebra_test_cases, attr_algebra_test_cases = None, None
+        for test_type in cfg.test_type:
+            if os.path.exists(os.path.join(cfg.test_root, f"{test_type}_test", "CLEVR_test_cases.csv")):
+                with open(os.path.join(cfg.test_root, f"{est_type}_test", "CLEVR_test_cases.csv"), "r") as f:
+                    csv_reader = reader(f)
+                    exec(test_type+"_algebra_test_cases = list(csv_reader)")
+            else:
+                print(os.path.join(cfg.test_root, f"{test_type}_test", "CLEVR_test_cases.csv")+" does not exist.")
+
 
         clevr_datamodule = CLEVRDataModule(
             data_root=cfg.data_root,
@@ -60,8 +62,8 @@ class _Workplace(object):
             num_val_images=cfg.num_val_images,
             num_test_images=cfg.num_test_images,
             num_workers=cfg.num_workers,
-            test_type=cfg.test_type,
-            algebra_test_cases = algebra_test_cases,
+            obj_algebra_test_cases = obj_algebra_test_cases,
+            attr_algebra_test_cases = attr_algebra_test_cases,
         )
 
         print(f"Training set size (images must have {cfg.num_slots - 1} objects):", len(clevr_datamodule.train_dataset))
