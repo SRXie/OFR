@@ -60,6 +60,7 @@ class _Workplace(object):
             max_n_objects=cfg.num_slots - 1,
             train_batch_size=cfg.batch_size,
             val_batch_size=cfg.val_batch_size,
+            test_batch_size=cfg.test_batch_size,
             clevr_transforms=clevr_transforms,
             num_train_images=cfg.num_train_images,
             num_val_images=cfg.num_val_images,

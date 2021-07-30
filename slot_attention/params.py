@@ -11,6 +11,7 @@ class SlotAttentionParams:
     lr: float = 0.0004
     batch_size: int = 64
     val_batch_size: int = 64
+    test_batch_size: int = 1024
     resolution: Tuple[int, int] = (64, 64)
     num_slots: int = 7
     num_iterations: int = 4

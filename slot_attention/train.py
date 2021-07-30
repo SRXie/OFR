@@ -54,6 +54,7 @@ def main(params: Optional[SlotAttentionParams] = None):
         max_n_objects=params.num_slots - 1,
         train_batch_size=params.batch_size,
         val_batch_size=params.val_batch_size,
+        test_batch_size=params.test_batch_size,
         clevr_transforms=clevr_transforms,
         num_train_images=params.num_train_images,
         num_val_images=params.num_val_images,

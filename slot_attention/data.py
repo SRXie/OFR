@@ -135,6 +135,7 @@ class CLEVRDataModule(pl.LightningDataModule):
         test_root: str,
         train_batch_size: int,
         val_batch_size: int,
+        test_batch_size: int,
         clevr_transforms: Callable,
         max_n_objects: int,
         num_workers: int,
@@ -149,6 +150,7 @@ class CLEVRDataModule(pl.LightningDataModule):
         self.test_root = test_root
         self.train_batch_size = train_batch_size
         self.val_batch_size = val_batch_size
+        self.test_batch_size = test_batch_size
         self.clevr_transforms = clevr_transforms
         self.max_n_objects = max_n_objects
         self.num_workers = num_workers
@@ -210,7 +212,7 @@ class CLEVRDataModule(pl.LightningDataModule):
     def obj_test_dataloader(self):
         return DataLoader(
             self.obj_test_dataset,
-            batch_size=self.train_batch_size, # TODO: change it later
+            batch_size=self.test_batch_size,
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,
@@ -219,7 +221,7 @@ class CLEVRDataModule(pl.LightningDataModule):
     def attr_test_dataloader(self):
         return DataLoader(
             self.attr_test_dataset,
-            batch_size=self.train_batch_size, # TODO: change it later
+            batch_size=self.test_batch_size,
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,
