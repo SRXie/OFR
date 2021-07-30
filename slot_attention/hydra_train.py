@@ -44,7 +44,7 @@ class _Workplace(object):
         obj_algebra_test_cases, attr_algebra_test_cases = None, None
         for test_type in cfg.test_type:
             if os.path.exists(os.path.join(cfg.test_root, f"{test_type}_test", "CLEVR_test_cases.csv")):
-                with open(os.path.join(cfg.test_root, f"{est_type}_test", "CLEVR_test_cases.csv"), "r") as f:
+                with open(os.path.join(cfg.test_root, f"{test_type}_test", "CLEVR_test_cases.csv"), "r") as f:
                     csv_reader = reader(f)
                     exec(test_type+"_algebra_test_cases = list(csv_reader)")
             else:
