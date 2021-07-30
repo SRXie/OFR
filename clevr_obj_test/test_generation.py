@@ -31,18 +31,18 @@ def create_scene_from_path(test_root, main_scene_idx, sub_scene_idx=0):
         if "/obj_test/" in meta_path:
             objs2img = json.load(f2)
             attrs2img = None
-        if "/attr_test/" in meta_path:
+        elif "/attr_test/" in meta_path:
             objs2img = None
             attrs2img = json.load(f2)
         else:
             raise NotImplementedError
-    
-    scene = Scene(split=scene_dict["split"], image_index=scene_dict["image_index"], 
-        image_filename=scene_dict["image_filename"], objects=[], 
-        directions=scene_dict["directions"],objs_idx=scene_dict["objs_idx"], 
+
+    scene = Scene(split=scene_dict["split"], image_index=scene_dict["image_index"],
+        image_filename=scene_dict["image_filename"], objects=[],
+        directions=scene_dict["directions"],objs_idx=scene_dict["objs_idx"],
         objs2img=objs2img,bg_image_index=scene_dict["bg_image_index"])
     for od in scene_dict["objects"]:
-        obj = Obj(index=od["index"], shape=od["shape"], size=od["size"], 
+        obj = Obj(index=od["index"], shape=od["shape"], size=od["size"],
         scale=od["scale"], material=od["material"], threed_coords=od["threed_coords"],
         rotation=od["rotation"], pixel_coords=od["pixel_coords"], color=od["color"],
         attrs2img=attrs2img,)
@@ -52,11 +52,11 @@ def create_scene_from_path(test_root, main_scene_idx, sub_scene_idx=0):
 def obj_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0, decomposed=None):
     # We first create scene from json
     scene = create_scene_from_path(test_root, main_scene_idx, sub_scene_idx)
-    
+
     num_objs = len(scene.objs_idx)
     if num_objs==1:
         return []
-        
+
     if not decomposed:
         decomposed = []
     tuples = [] # path tuples
@@ -79,7 +79,7 @@ def obj_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0, decomposed=No
 
     return tuples
 
-def attr_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0): 
+def attr_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0):
     # there are four attributes of interest, we edit at most 3
 
     # We first create scene from json
@@ -87,12 +87,12 @@ def attr_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0):
     tuples = [] # path tuples
 
     # create algebra tuples A-B+C=D: Scene - Edit_complementary + Edit_all = Edit_selected
-    image_A_path = create_path(test_root, main_scene_idx) 
+    image_A_path = create_path(test_root, main_scene_idx)
     for num_edit in range(1, len(scene.get_obj_attrs())):
         # iterate through attribute combinations of the scene
         for attr_subset in combinations(scene.get_obj_attrs(), num_edit):
             attr_complementary = scene.get_obj_attrs().difference(attr_subset)
-            
+
             image_D_idxs = scene.objects[0].edit_attrs(list(attr_subset), return_imgs=True) # converst set to list to enforce order for matching itertools.prod(D, B) and C
             image_B_idxs = scene.objects[0].edit_attrs(list(attr_complementary), return_imgs=True)
             image_C_idxs = scene.objects[0].edit_attrs(list(attr_subset)+list(attr_complementary), return_imgs=True)
@@ -107,7 +107,3 @@ def attr_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0):
                     i+=1
             assert i == len(image_C_idxs)
     return tuples
-
-
-
-
