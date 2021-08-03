@@ -68,3 +68,19 @@ class ImageLogCallback(Callback):
 
 def to_rgb_from_tensor(x: Tensor):
     return (x * 0.5 + 0.5).clamp(0, 1)
+
+def compute_rank_correlation(x: Tensor, y: Tensor):
+    """
+    Function that measures Spearman’s correlation coefficient between target logits and output logits:
+    https://www.programmersought.com/article/94895532714/
+    """
+    def _rank_correlation_(x, y):
+        n = torch.tensor(x.shape[1])
+        upper = 6 * torch.sum((y - x).pow(2), dim=1)
+        down = n * (n.pow(2) - 1.0)
+        return (1.0 - (upper / down)).mean(dim=-1).reshape(1)
+
+    x = x.sort(dim=1)[1]
+    y = y.sort(dim=1)[1]
+    correlation = _rank_correlation_(x.float(), y.float())
+    return correlation

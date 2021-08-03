@@ -60,6 +60,8 @@ class SlotAttention(nn.Module):
         slots_init = torch.randn((batch_size, self.num_slots, self.slot_size))
         slots_init = slots_init.type_as(inputs)
         slots = self.slots_mu + self.slots_log_sigma.exp() * slots_init
+        attns = None
+        attns_init = False
 
         # Multiple rounds of attention.
         for _ in range(self.num_iterations):
@@ -73,6 +75,10 @@ class SlotAttention(nn.Module):
             attn_norm_factor = self.slot_size ** -0.5
             attn_logits = attn_norm_factor * torch.matmul(k, q.transpose(2, 1))
             attn = F.softmax(attn_logits, dim=-1)
+            if not torch.is_tensor(attns):
+                attns = attn.clone().detach()
+            else:
+                attns = attns + attn
             # `attn` has shape: [batch_size, num_inputs, num_slots].
             assert_shape(attn.size(), (batch_size, num_inputs, self.num_slots))
 
@@ -94,7 +100,7 @@ class SlotAttention(nn.Module):
             slots = slots + self.mlp(self.norm_mlp(slots))
             assert_shape(slots.size(), (batch_size, self.num_slots, self.slot_size))
 
-        return slots
+        return slots, attns/self.num_iterations
 
 
 class SlotAttentionModel(nn.Module):
@@ -201,6 +207,9 @@ class SlotAttentionModel(nn.Module):
             mlp_hidden_size=128,
         )
 
+        self.mean_slot = None
+        self.blank_slot = None
+
     def forward(self, x, slots_only=False):
         if self.empty_cache:
             torch.cuda.empty_cache()
@@ -217,12 +226,17 @@ class SlotAttentionModel(nn.Module):
         encoder_out = self.encoder_out_layer(encoder_out)
         #  `encoder_out` has shape: [batch_size, height*width, filter_size]
 
-        slots = self.slot_attention(encoder_out)
+        slots, attn = self.slot_attention(encoder_out)
         assert_shape(slots.size(), (batch_size, self.num_slots, self.slot_size))
         # `slots` has shape: [batch_size, num_slots, slot_size].
         batch_size, num_slots, slot_size = slots.shape
         if slots_only:
-            return slots
+            return slots, attn
+
+        slots_mean = slots.view(-1, slot_size).mean(0)
+        if not torch.is_tensor(self.mean_slot):
+            self.mean_slot = torch.rand_like(slots_mean)
+        self.mean_slot = 0.995*self.mean_slot + 0.005*slots_mean
 
         slots = slots.view(batch_size * num_slots, slot_size, 1, 1)
         decoder_in = slots.repeat(1, 1, self.decoder_resolution[0], self.decoder_resolution[1])
@@ -236,11 +250,19 @@ class SlotAttentionModel(nn.Module):
         recons = out[:, :, :num_channels, :, :]
         masks = out[:, :, -1:, :, :]
         masks = F.softmax(masks, dim=1)
+        masks_sum = masks.view(batch_size*num_slots, height*width).sum(-1)
+        blank_masks = masks_sum < height*width*0.0001
+        index = torch.nonzero(blank_masks).squeeze(1)
+        if not torch.is_tensor(self.blank_slot):
+            self.blank_slot = torch.rand_like(self.mean_slot)
+        if not index.shape[0] == 0:
+            blank_slots = slots.view(batch_size*num_slots, -1)[index].mean(0)
+            self.blank_slot = 0.995 * self.blank_slot + 0.005*blank_slots
         recon_combined = torch.sum(recons * masks, dim=1)
-        return recon_combined, recons, masks, slots
+        return recon_combined, recons, masks, slots, attn
 
     def loss_function(self, input):
-        recon_combined, recons, masks, slots = self.forward(input)
+        recon_combined, recons, masks, slots, attn = self.forward(input)
         loss = F.mse_loss(recon_combined, input)
         return {
             "loss": loss,

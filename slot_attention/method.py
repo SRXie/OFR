@@ -7,7 +7,7 @@ from slot_attention.model import SlotAttentionModel
 from slot_attention.params import SlotAttentionParams
 from slot_attention.utils import Tensor
 from slot_attention.utils import to_rgb_from_tensor
-
+from utils import compute_rank_correlation
 
 class SlotAttentionMethod(pl.LightningModule):
     def __init__(self, model: SlotAttentionModel, datamodule: pl.LightningDataModule, params: SlotAttentionParams):
@@ -34,7 +34,10 @@ class SlotAttentionMethod(pl.LightningModule):
         batch = next(iter(dl))[idx]
         if self.params.gpus > 0:
             batch = batch.to(self.device)
-        recon_combined, recons, masks, slots = self.model.forward(batch)
+        recon_combined, recons, masks, slots, attns = self.model.forward(batch)
+
+        attn = attns.permute(0, 2, 1).view(recons.shape[0], recons.shape[1], recons.shape[3], recons.shape[4])
+        recons[:,:,0,:,:] = recons[:,:,0,:,:]+attn # highlight the attention map in the red channel
 
         # combine images in a nice way so we can display all outputs in one grid, output rescaled to be between 0 and 1
         out = to_rgb_from_tensor(
@@ -43,6 +46,7 @@ class SlotAttentionMethod(pl.LightningModule):
                     batch.unsqueeze(1),  # original images
                     recon_combined.unsqueeze(1),  # reconstructions
                     recons * masks + (1 - masks),  # each slot
+                    attn.unsqueeze(2).repeat(1,1,3,1,1), # attention map for each slot
                 ],
                 dim=1,
             )
@@ -66,6 +70,7 @@ class SlotAttentionMethod(pl.LightningModule):
         adl = self.datamodule.attr_test_dataloader()
         sample_size = 10000
         obj_greedy_losses, attr_greedy_losses = [], []
+        obj_kendall_taus, attr_kendall_taus = [], []
 
         # rand = torch.rand(self.params.batch_size*sample_size*3, self.params.num_slots)
         # batch_rand_perm = rand.argsort(dim=1)
@@ -83,10 +88,29 @@ class SlotAttentionMethod(pl.LightningModule):
                 cat_batch = torch.cat(batch, 0)
                 if self.params.gpus > 0:
                     cat_batch = cat_batch.to(self.device)
-                cat_slots = self.model.forward(cat_batch, slots_only=True)#.unsqueeze(1)
-                slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, batch_size, 0)
+                cat_slots, cat_attns = self.model.forward(cat_batch, slots_only=True)
 
-                batch_size, num_slots, slot_size = slots_A.shape
+                _, num_slots, slot_size = cat_slots.shape
+                # cat_attns have shape (4*batch_size, H*W, num_slots)
+
+                # calculate intra-image slots similarity in the pixel space:
+                attns_norm = torch.norm(cat_attns, p=2, dim=-1).detach()
+                attns_normed = cat_attns.div(attns_norm.unsqueeze(-1).repeat(1,1,num_slots))
+                attns_normed = attns_normed.permute(0,2,1)
+                # cat_attns have shape (4*batch_size, num_slots, H*W)
+                # https://stats.stackexchange.com/questions/146221/is-cosine-similarity-identical-to-l2-normalized-euclidean-distance
+                cos_dis_pixel = torch.cdist(attns_normed, attns_normed, p=2)/2
+
+                # calculate intra-image slots similarity in the feature space:
+                slots_norm = torch.norm(cat_slots, p=2, dim=1).detach()
+                slots_normed = cat_slots.div(slots_norm.unsqueeze(1).repeat(1,num_slots,1))
+                # https://stats.stackexchange.com/questions/146221/is-cosine-similarity-identical-to-l2-normalized-euclidean-distance
+                cos_dis_feature = torch.cdist(slots_normed, slots_normed, p=2)/2
+
+                kendall_tau = compute_rank_correlation(cos_dis_pixel.view(-1,num_slots), cos_dis_feature.view(-1,num_slots))
+                kendall_taus.append(kendall_tau)
+
+                slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, batch_size, 0)
 
                 # the full set of possible permutation might be too large ((7!)^3 for 7 slots...)
                 # below implement three different approximation
@@ -140,10 +164,15 @@ class SlotAttentionMethod(pl.LightningModule):
 
         avg_obj_greedy_loss = torch.cat(obj_greedy_losses, 0).mean()
         avg_attr_greedy_loss = torch.cat(attr_greedy_losses, 0).mean()
+        avg_obj_kendall_tau = torch.stack(obj_kendall_taus).mean()
+        avg_attr_kendall_tau = torch.stack(attr_kendall_taus).mean()
         logs = {
             "avg_val_loss": avg_loss,
             "avg_obj_greedy_loss": avg_obj_greedy_loss,
             "avg_attr_greedy_loss": avg_attr_greedy_loss,
+            "avg_obj_rank_corr": avg_obj_kendall_tau,
+            "avg_attr_rank_corr": avg_attr_kendall_tau,
+            "blank_mean_l2": torch.dist(self.model.blank_slot, self.model.mean_slot, p=2),
         }
         self.log_dict(logs, sync_dist=True)
 
