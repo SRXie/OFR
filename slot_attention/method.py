@@ -10,7 +10,7 @@ from datetime import datetime
 from slot_attention.model import SlotAttentionModel
 from slot_attention.params import SlotAttentionParams
 from slot_attention.utils import Tensor
-from slot_attention.utils import to_rgb_from_tensor, to_tensor_from_rgb,
+from slot_attention.utils import to_rgb_from_tensor, to_tensor_from_rgb
 from slot_attention.utils import compute_cos_distance ,compute_rank_correlation
 
 
