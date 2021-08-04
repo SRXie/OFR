@@ -207,8 +207,8 @@ class SlotAttentionModel(nn.Module):
             mlp_hidden_size=128,
         )
 
-        self.mean_slot = None
-        self.blank_slot = None
+        self.slots_mu = self.slot_attention.slots_mu
+        self.slots_log_sigma = self.slot_attention.slots_log_sigma
 
     def forward(self, x, slots_only=False):
         if self.empty_cache:
@@ -233,11 +233,6 @@ class SlotAttentionModel(nn.Module):
         if slots_only:
             return slots, attn
 
-        slots_mean = slots.view(-1, slot_size).mean(0)
-        if not torch.is_tensor(self.mean_slot):
-            self.mean_slot = torch.rand_like(slots_mean)
-        self.mean_slot = 0.995*self.mean_slot + 0.005*slots_mean
-
         slots = slots.view(batch_size * num_slots, slot_size, 1, 1)
         decoder_in = slots.repeat(1, 1, self.decoder_resolution[0], self.decoder_resolution[1])
 
@@ -254,7 +249,7 @@ class SlotAttentionModel(nn.Module):
         blank_masks = masks_sum < height*width*0.001
         index = torch.nonzero(blank_masks).squeeze(1)
         if not torch.is_tensor(self.blank_slot):
-            self.blank_slot = torch.rand_like(self.mean_slot)
+            self.blank_slot = torch.rand_like(self.slots_mu.squeeze(0).squeeze(0))
         if not index.shape[0] == 0:
             blank_slots = slots.view(batch_size*num_slots, -1)[index].mean(0)
             self.blank_slot = 0.995 * self.blank_slot + 0.005*blank_slots

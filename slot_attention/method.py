@@ -11,7 +11,7 @@ from slot_attention.model import SlotAttentionModel
 from slot_attention.params import SlotAttentionParams
 from slot_attention.utils import Tensor
 from slot_attention.utils import to_rgb_from_tensor, to_tensor_from_rgb
-from slot_attention.utils import compute_cos_distance ,compute_rank_correlation
+from slot_attention.utils import compute_cos_distance, compute_rank_correlation
 
 
 class SlotAttentionMethod(pl.LightningModule):
@@ -197,7 +197,7 @@ class SlotAttentionMethod(pl.LightningModule):
             "avg_attr_greedy_loss": avg_attr_greedy_loss,
             "avg_obj_rank_corr": avg_obj_kendall_tau,
             "avg_attr_rank_corr": avg_attr_kendall_tau,
-            "blank_mean_l2": torch.dist(self.model.blank_slot, self.model.mean_slot, p=2),
+            "blank_mean_l2": torch.norm(self.model.blank_slot-self.model.slots_mu.squeeze(0).squeeze(0), p=2)/self.model.blank_slot.shape[0],
         }
         self.log_dict(logs, sync_dist=True)
 
