@@ -59,7 +59,7 @@ class SlotAttentionMethod(pl.LightningModule):
             for j in range(masked_recons.shape[1]):
                 img = transforms.ToPILImage()(masked_recons[i,j])
                 draw = ImageDraw.Draw(img)
-                font = ImageFont.truetype("/usr/share/fonts/truetype/ubuntu/Ubuntu-L.ttf", 8)
+                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 8)
                 pixel_text = "attn: "+str(pixel_dup_idx[i,j].item())+" - {:.4f}".format(pixel_dup_sim[i,j].item())
                 feature_text = "feat: "+str(feature_dup_idx[i,j].item())+" - {:.4f}".format(feature_dup_sim[i,j].item())
                 draw.text((4,0), pixel_text, (0, 0, 0), font=font)
