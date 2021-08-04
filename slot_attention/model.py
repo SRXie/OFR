@@ -251,7 +251,7 @@ class SlotAttentionModel(nn.Module):
         masks = out[:, :, -1:, :, :]
         masks = F.softmax(masks, dim=1)
         masks_sum = masks.view(batch_size*num_slots, height*width).sum(-1)
-        blank_masks = masks_sum < height*width*0.0001
+        blank_masks = masks_sum < height*width*0.001
         index = torch.nonzero(blank_masks).squeeze(1)
         if not torch.is_tensor(self.blank_slot):
             self.blank_slot = torch.rand_like(self.mean_slot)
