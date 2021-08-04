@@ -1,11 +1,11 @@
 # A yaml version of params.py
 
-seed: 3
+seed: 8
 gpu_id: '0, 1'
 lr: 0.0004
 batch_size: 64
 val_batch_size: 64
-test_batch_size: 1024
+test_batch_size: 512
 resolution: [64, 64] # Tuple[int, int]
 num_slots: 7
 num_iterations: 4
@@ -22,7 +22,7 @@ num_test_images: 1000
 empty_cache: True
 is_logger_enabled: True
 is_verbose: True
-num_workers: 4
+num_workers: 10
 n_samples: 5
 warmup_steps_pct: 0.02
 decay_steps_pct: 0.2

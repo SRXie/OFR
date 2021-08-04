@@ -2,12 +2,12 @@ import pytorch_lightning as pl
 import torch
 from torch import optim
 from torchvision import utils as vutils
+from datetime import datetime
 
 from slot_attention.model import SlotAttentionModel
 from slot_attention.params import SlotAttentionParams
 from slot_attention.utils import Tensor
-from slot_attention.utils import to_rgb_from_tensor
-from utils import compute_rank_correlation
+from slot_attention.utils import to_rgb_from_tensor, compute_rank_correlation
 
 class SlotAttentionMethod(pl.LightningModule):
     def __init__(self, model: SlotAttentionModel, datamodule: pl.LightningDataModule, params: SlotAttentionParams):
@@ -78,8 +78,10 @@ class SlotAttentionMethod(pl.LightningModule):
         # if self.params.gpus > 0:
             # batch_rand_perm = batch_rand_perm.to(self.device)
 
-        def compute_test_losses(dataloader, losses):
+        def compute_test_losses(dataloader, losses, kendall_taus):
+            b_prev = datetime.now()
             for batch in dataloader:
+                print("load data:", datetime.now()-b_prev)
                 # rand_aggr_losses = []
                 # greedy_losses = []
                 # sample_losses = []
@@ -92,7 +94,7 @@ class SlotAttentionMethod(pl.LightningModule):
 
                 _, num_slots, slot_size = cat_slots.shape
                 # cat_attns have shape (4*batch_size, H*W, num_slots)
-
+                prev = datetime.now()
                 # calculate intra-image slots similarity in the pixel space:
                 attns_norm = torch.norm(cat_attns, p=2, dim=-1).detach()
                 attns_normed = cat_attns.div(attns_norm.unsqueeze(-1).repeat(1,1,num_slots))
@@ -109,7 +111,7 @@ class SlotAttentionMethod(pl.LightningModule):
 
                 kendall_tau = compute_rank_correlation(cos_dis_pixel.view(-1,num_slots), cos_dis_feature.view(-1,num_slots))
                 kendall_taus.append(kendall_tau)
-
+                print("similarity time:", datetime.now()-prev)
                 slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, batch_size, 0)
 
                 # the full set of possible permutation might be too large ((7!)^3 for 7 slots...)
@@ -157,10 +159,12 @@ class SlotAttentionMethod(pl.LightningModule):
                 # sample_loss = torch.stack(torch.split(sample_loss, batch_size, 0), 1)
                 # sample_loss = torch.square(sample_loss).mean(dim=-1)
                 # sample_loss, _ = torch.min(sample_loss, 1)
-                # sample_losses.append(sample_loss)
+                # sample_losses.appiend(sample_loss)
+                print("batch time:", datetime.now()-b_prev)
+                b_prev = datetime.now()
 
-        compute_test_losses(odl, obj_greedy_losses)
-        compute_test_losses(adl, attr_greedy_losses)
+        compute_test_losses(odl, obj_greedy_losses, obj_kendall_taus)
+        compute_test_losses(adl, attr_greedy_losses, attr_kendall_taus)
 
         avg_obj_greedy_loss = torch.cat(obj_greedy_losses, 0).mean()
         avg_attr_greedy_loss = torch.cat(attr_greedy_losses, 0).mean()
