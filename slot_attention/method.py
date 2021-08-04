@@ -191,6 +191,9 @@ class SlotAttentionMethod(pl.LightningModule):
         avg_attr_greedy_loss = torch.cat(attr_greedy_losses, 0).mean()
         avg_obj_kendall_tau = torch.stack(obj_kendall_taus).mean()
         avg_attr_kendall_tau = torch.stack(attr_kendall_taus).mean()
+        if self.params.gpus > 0:
+            self.model.blank_slot = self.model.blank_slot.to(self.device)
+            self.model.slots_mu = self.model.slots_mu.to(self.device)
         logs = {
             "avg_val_loss": avg_loss,
             "avg_obj_greedy_loss": avg_obj_greedy_loss,
