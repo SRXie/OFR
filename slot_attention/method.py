@@ -2,12 +2,14 @@ import pytorch_lightning as pl
 import torch
 from torch import optim
 from torchvision import utils as vutils
+from torchvision.transforms import transforms
+from PIL import ImageDraw, ImageFont
 
 from slot_attention.model import SlotAttentionModel
 from slot_attention.params import SlotAttentionParams
 from slot_attention.utils import Tensor
-from slot_attention.utils import to_rgb_from_tensor
-from utils import compute_rank_correlation
+from slot_attention.utils import to_rgb_from_tensor, to_tensor_from_rgb,
+from slot_attention.utils import compute_cos_distance ,compute_rank_correlation
 
 class SlotAttentionMethod(pl.LightningModule):
     def __init__(self, model: SlotAttentionModel, datamodule: pl.LightningDataModule, params: SlotAttentionParams):
@@ -36,8 +38,32 @@ class SlotAttentionMethod(pl.LightningModule):
             batch = batch.to(self.device)
         recon_combined, recons, masks, slots, attns = self.model.forward(batch)
 
+        cos_dis_pixel = compute_cos_distance(attns.permute(0,2,1)) # to have shape (batch_size, num_slot, emb_size)
+        pixel_dup_sim, pixel_dup_idx = torch.sort(cos_dis_pixel, dim=-1)
+        pixel_dup_sim = pixel_dup_sim[:,:,1]
+        pixel_dup_idx = pixel_dup_idx[:,:,1]
+
+        cos_dis_feature = compute_cos_distance(slots)
+        feature_dup_sim, feature_dup_idx = torch.sort(cos_dis_feature, dim=-1)
+        feature_dup_sim = feature_dup_sim[:,:,1]
+        feature_dup_idx = feature_dup_idx[:,:,1]
+
         attn = attns.permute(0, 2, 1).view(recons.shape[0], recons.shape[1], recons.shape[3], recons.shape[4])
         recons[:,:,0,:,:] = recons[:,:,0,:,:]+attn # highlight the attention map in the red channel
+        masked_recons = recons * masks + (1 - masks)
+        masked_recons = to_rgb_from_tensor(masked_recons)
+        for i in range(masked_recons.shape[0]):
+            for j in range(masked_recons.shape[1]):
+                img = transforms.ToPILImage()(masked_recons[i,j])
+                draw = ImageDraw.Draw(img)
+                font = ImageFont.truetype("/usr/share/fonts/truetype/ubuntu/Ubuntu-L.ttf", 8)
+                pixel_text = "attn: "+str(pixel_dup_idx[i,j].item())+" - {:.4f}".format(pixel_dup_sim[i,j].item())
+                feature_text = "feat: "+str(feature_dup_idx[i,j].item())+" - {:.4f}".format(feature_dup_sim[i,j].item())
+                draw.text((4,0), pixel_text, (0, 0, 0), font=font)
+                draw.text((4,55), feature_text, (0, 0, 0), font=font)
+                img = transforms.ToTensor()(img)
+                img = to_tensor_from_rgb(img)
+                masked_recons[i,j] = img
 
         # combine images in a nice way so we can display all outputs in one grid, output rescaled to be between 0 and 1
         out = to_rgb_from_tensor(
@@ -45,7 +71,7 @@ class SlotAttentionMethod(pl.LightningModule):
                 [
                     batch.unsqueeze(1),  # original images
                     recon_combined.unsqueeze(1),  # reconstructions
-                    recons * masks + (1 - masks),  # each slot
+                    masked_recons,  # each slot
                     attn.unsqueeze(2).repeat(1,1,3,1,1), # attention map for each slot
                 ],
                 dim=1,
@@ -94,18 +120,10 @@ class SlotAttentionMethod(pl.LightningModule):
                 # cat_attns have shape (4*batch_size, H*W, num_slots)
 
                 # calculate intra-image slots similarity in the pixel space:
-                attns_norm = torch.norm(cat_attns, p=2, dim=-1).detach()
-                attns_normed = cat_attns.div(attns_norm.unsqueeze(-1).repeat(1,1,num_slots))
-                attns_normed = attns_normed.permute(0,2,1)
-                # cat_attns have shape (4*batch_size, num_slots, H*W)
-                # https://stats.stackexchange.com/questions/146221/is-cosine-similarity-identical-to-l2-normalized-euclidean-distance
-                cos_dis_pixel = torch.cdist(attns_normed, attns_normed, p=2)/2
+                cos_dis_pixel = compute_cos_distance(cat_attns.permute(0,2,1))
 
                 # calculate intra-image slots similarity in the feature space:
-                slots_norm = torch.norm(cat_slots, p=2, dim=1).detach()
-                slots_normed = cat_slots.div(slots_norm.unsqueeze(1).repeat(1,num_slots,1))
-                # https://stats.stackexchange.com/questions/146221/is-cosine-similarity-identical-to-l2-normalized-euclidean-distance
-                cos_dis_feature = torch.cdist(slots_normed, slots_normed, p=2)/2
+                cos_dis_feature = compute_cos_distance(cat_slots)
 
                 kendall_tau = compute_rank_correlation(cos_dis_pixel.view(-1,num_slots), cos_dis_feature.view(-1,num_slots))
                 kendall_taus.append(kendall_tau)

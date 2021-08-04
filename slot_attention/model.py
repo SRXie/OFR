@@ -259,6 +259,7 @@ class SlotAttentionModel(nn.Module):
             blank_slots = slots.view(batch_size*num_slots, -1)[index].mean(0)
             self.blank_slot = 0.995 * self.blank_slot + 0.005*blank_slots
         recon_combined = torch.sum(recons * masks, dim=1)
+        slots = slots.view(batch_size, num_slots, slot_size)
         return recon_combined, recons, masks, slots, attn
 
     def loss_function(self, input):

@@ -69,6 +69,19 @@ class ImageLogCallback(Callback):
 def to_rgb_from_tensor(x: Tensor):
     return (x * 0.5 + 0.5).clamp(0, 1)
 
+def to_tensor_from_rgb(x: Tensor):
+    return 2.0*(x - 0.5)
+
+def compute_cos_distance(x: Tensor):
+    """
+    Tensor x should have shape (batch_size, num_slot, emb_size)
+    """
+    x_norm = torch.norm(x, p=2, dim=-1).detach()
+    x_normed = x.div(x_norm.unsqueeze(-1).repeat(1,1,x.shape[-1]))
+    # https://stats.stackexchange.com/questions/146221/is-cosine-similarity-identical-to-l2-normalized-euclidean-distance
+    cos_distance = torch.cdist(x_normed, x_normed, p=2)/2
+    return cos_distance
+
 def compute_rank_correlation(x: Tensor, y: Tensor):
     """
     Function that measures Spearman’s correlation coefficient between target logits and output logits:
