@@ -209,6 +209,7 @@ class SlotAttentionModel(nn.Module):
 
         self.slots_mu = self.slot_attention.slots_mu
         self.slots_log_sigma = self.slot_attention.slots_log_sigma
+        self.blank_slot = None
 
     def forward(self, x, slots_only=False):
         if self.empty_cache:
