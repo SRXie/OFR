@@ -69,20 +69,20 @@ class SlotAttentionMethod(pl.LightningModule):
                     masked_recons[i,j] = img
             return masked_recons, attn
 
-        recon_combined, recons, masks, slots, attns = self.model.forward(batch)
+        recon_combined, recons, masks, slots, attns, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold)
         masked_recons, attn = captioned_masked_recons(recons, masks, slots, attns)
-
-        recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup, attns_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold)
-        masked_recons_nodup, attn_nodup = captioned_masked_recons(recons_nodup, masks_nodup, slots_nodup, attns_nodup)
+        masked_recons_nodup, attn_nodup = captioned_masked_recons(recons_nodup, masks_nodup, slots_nodup, attns)
 
         # combine images in a nice way so we can display all outputs in one grid, output rescaled to be between 0 and 1
+        def interleave_stack(x, y):
+            return torch.stack((x, y), dim=1).view(2*x.shape[0], x.shape[1], x.shape[2], x.shape[3], x.shape[4])
         out = to_rgb_from_tensor(
             torch.cat(
                 [
-                    torch.cat([batch.unsqueeze(1), batch.unsqueeze(1)], dim=0),  # original images
-                    torch.cat([recon_combined.unsqueeze(1),recon_combined_nodup.unsqueeze(1)],dim=0),  # reconstructions
-                    torch.cat([masked_recons, masked_recons_nodup], dim=0),  # each slot
-                    torch.cat([attn.unsqueeze(2).repeat(1,1,3,1,1), attn_nodup.unsqueeze(2).repeat(1,1,3,1,1)], dim=0),
+                    interleave_stack(batch.unsqueeze(1), batch.unsqueeze(1)), #torch.cat([batch.unsqueeze(1), batch.unsqueeze(1)], dim=0),  # original images
+                    interleave_stack(recon_combined.unsqueeze(1),recon_combined_nodup.unsqueeze(1)),  # reconstructions
+                    interleave_stack(masked_recons, masked_recons_nodup),  # each slot
+                    interleave_stack(attn.unsqueeze(2).repeat(1,1,3,1,1), attn_nodup.unsqueeze(2).repeat(1,1,3,1,1)),
                 ],
                 dim=1,
             )
@@ -114,7 +114,25 @@ class SlotAttentionMethod(pl.LightningModule):
         # if self.params.gpus > 0:
             # batch_rand_perm = batch_rand_perm.to(self.device)
 
-        def compute_test_losses(dataloader, losses, dup_threshold=None):
+        def compute_test_losses(dl, losses, losses_nodup, dup_threshold=None):
+
+            def _compute_greedy_loss(cat_slots, losses):
+                slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, batch_size, 0)
+                # greedy assignment regardless of re-assignment
+                # TODO: check if there is a trivial solution to this assignment
+                ext_A = slots_A.view(batch_size, num_slots, 1, 1, 1, slot_size)
+                ext_B = slots_B.view(batch_size, 1, num_slots, 1, 1, slot_size)
+                ext_C = slots_C.view(batch_size, 1, 1, num_slots, 1, slot_size)
+                ext_D = slots_D.view(batch_size, 1, 1, 1, num_slots, slot_size)
+                greedy_criterion = torch.square(ext_A-ext_B+ext_C-ext_D).sum(dim=-1)
+                # backtrace for greedy matching (3 times)
+                greedy_criterion, _ = greedy_criterion.min(-1)
+                greedy_criterion, _ = greedy_criterion.min(-1)
+                greedy_criterion, _ = greedy_criterion.min(-1)
+
+                greedy_loss = greedy_criterion.sum(dim=-1)/(num_slots*slot_size)
+                losses.append(greedy_loss)
+
             b_prev = datetime.now()
             for batch in dataloader:
                 print("load data:", datetime.now()-b_prev)
@@ -126,9 +144,12 @@ class SlotAttentionMethod(pl.LightningModule):
                 cat_batch = torch.cat(batch, 0)
                 if self.params.gpus > 0:
                     cat_batch = cat_batch.to(self.device)
-                cat_slots, cat_attns = self.model.forward(cat_batch, slots_only=True, dup_threshold=dup_threshold)
+                cat_slots, cat_attns, cat_slots_nodup = self.model.forward(cat_batch, slots_only=True, dup_threshold=dup_threshold)
 
                 _, num_slots, slot_size = cat_slots.shape
+
+                _compute_greedy_loss(cat_slots, losses)
+                _compute_greedy_loss(cat_slots_nodup, losses_nodup)
                 # # cat_attns have shape (4*batch_size, H*W, num_slots)
                 # prev = datetime.now()
                 # # calculate intra-image slots similarity in the pixel space:
@@ -141,7 +162,7 @@ class SlotAttentionMethod(pl.LightningModule):
                 # kendall_taus.append(kendall_tau)
                 # print("similarity time:", datetime.now()-prev)
 
-                slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, batch_size, 0)
+                # slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, batch_size, 0)
 
                 # the full set of possible permutation might be too large ((7!)^3 for 7 slots...)
                 # below implement three different approximation
@@ -158,20 +179,20 @@ class SlotAttentionMethod(pl.LightningModule):
                 # rand_aggr_loss = torch.square(proj_A-proj_B+proj_C-proj_D).mean(dim=-1)
                 # rand_aggr_losses.append(rand_aggr_loss.squeeze(-1))
 
-                # 2. greedy assignment regardless of re-assignment
-                # TODO: check if there is a trivial solution to this assignment
-                ext_A = slots_A.view(batch_size, num_slots, 1, 1, 1, slot_size)
-                ext_B = slots_B.view(batch_size, 1, num_slots, 1, 1, slot_size)
-                ext_C = slots_C.view(batch_size, 1, 1, num_slots, 1, slot_size)
-                ext_D = slots_D.view(batch_size, 1, 1, 1, num_slots, slot_size)
-                greedy_criterion = torch.square(ext_A-ext_B+ext_C-ext_D).sum(dim=-1)
-                # backtrace for greedy matching (3 times)
-                greedy_criterion, _ = greedy_criterion.min(-1)
-                greedy_criterion, _ = greedy_criterion.min(-1)
-                greedy_criterion, _ = greedy_criterion.min(-1)
+                # # 2. greedy assignment regardless of re-assignment
+                # # TODO: check if there is a trivial solution to this assignment
+                # ext_A = slots_A.view(batch_size, num_slots, 1, 1, 1, slot_size)
+                # ext_B = slots_B.view(batch_size, 1, num_slots, 1, 1, slot_size)
+                # ext_C = slots_C.view(batch_size, 1, 1, num_slots, 1, slot_size)
+                # ext_D = slots_D.view(batch_size, 1, 1, 1, num_slots, slot_size)
+                # greedy_criterion = torch.square(ext_A-ext_B+ext_C-ext_D).sum(dim=-1)
+                # # backtrace for greedy matching (3 times)
+                # greedy_criterion, _ = greedy_criterion.min(-1)
+                # greedy_criterion, _ = greedy_criterion.min(-1)
+                # greedy_criterion, _ = greedy_criterion.min(-1)
 
-                greedy_loss = greedy_criterion.sum(dim=-1)/(num_slots*slot_size)
-                losses.append(greedy_loss)
+                # greedy_loss = greedy_criterion.sum(dim=-1)/(num_slots*slot_size)
+                # losses.append(greedy_loss)
 
                 # 3. sampling based approximation
                 # slots_A = slots_A.repeat(sample_size, 1, 1)
@@ -192,16 +213,13 @@ class SlotAttentionMethod(pl.LightningModule):
                 print("batch time:", datetime.now()-b_prev)
                 b_prev = datetime.now()
 
-        compute_test_losses(odl, obj_greedy_losses)
-        compute_test_losses(adl, attr_greedy_losses)
+        compute_test_losses(odl, obj_greedy_losses, obj_greedy_losses_nodup, dup_threshold=self.params.dup_threshold)
+        compute_test_losses(adl, attr_greedy_losses, attr_greedy_losses_nodup, dup_threshold=self.params.dup_threshold)
 
         avg_obj_greedy_loss = torch.cat(obj_greedy_losses, 0).mean()
         avg_attr_greedy_loss = torch.cat(attr_greedy_losses, 0).mean()
         # avg_obj_kendall_tau = torch.stack(obj_kendall_taus).mean()
         # avg_attr_kendall_tau = torch.stack(attr_kendall_taus).mean()
-
-        compute_test_losses(odl, obj_greedy_losses_nodup, dup_threshold=self.params.dup_threshold)
-        compute_test_losses(adl, attr_greedy_losses_nodup, dup_threshold=self.params.dup_threshold)
 
         avg_obj_greedy_loss_nodup = torch.cat(obj_greedy_losses, 0).mean()
         avg_attr_greedy_loss_nodup = torch.cat(attr_greedy_losses, 0).mean()

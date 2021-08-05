@@ -233,6 +233,7 @@ class SlotAttentionModel(nn.Module):
         # `slots` has shape: [batch_size, num_slots, slot_size].
         batch_size, num_slots, slot_size = slots.shape
 
+        slots_nodup = slots.clone()
         if dup_threshold:
             cos_dis_pixel = compute_cos_distance(attn.permute(0,2,1)) # to have shape (batch_size, num_slot, emb_size)
             cos_dis_feature = compute_cos_distance(slots)
@@ -249,13 +250,19 @@ class SlotAttentionModel(nn.Module):
             self.slots_log_sigma = self.slots_log_sigma.to(slots.device)
             blank_slots = self.slots_mu.squeeze(0) + self.slots_log_sigma.squeeze(0).exp() * slots_init
             # fill in deuplicated slots with blank slots
-            slots[duplicated_index[0], duplicated_index[1]] = blank_slots
+            slots_nodup[duplicated_index[0], duplicated_index[1]] = blank_slots
 
         if slots_only:
-            return slots, attn
+            return slots, attn, slots_nodup
 
         slots = slots.view(batch_size * num_slots, slot_size, 1, 1)
-        decoder_in = slots.repeat(1, 1, self.decoder_resolution[0], self.decoder_resolution[1])
+        if dup_threshold:
+            slots_nodup = slots_nodup.view(batch_size * num_slots, slot_size, 1, 1)
+            slots_cat = torch.cat([slots, slots_nodup])
+            batch_size = batch_size*2
+        else:
+            slots_cat = slots
+        decoder_in = slots_cat.repeat(1, 1, self.decoder_resolution[0], self.decoder_resolution[1])
 
         out = self.decoder_pos_embedding(decoder_in)
         out = self.decoder(out)
@@ -266,6 +273,7 @@ class SlotAttentionModel(nn.Module):
         recons = out[:, :, :num_channels, :, :]
         masks = out[:, :, -1:, :, :]
         masks = F.softmax(masks, dim=1)
+
         masks_sum = masks.view(batch_size*num_slots, height*width).sum(-1)
         blank_masks = masks_sum < height*width*0.001
         index = torch.nonzero(blank_masks).squeeze(1)
@@ -274,9 +282,20 @@ class SlotAttentionModel(nn.Module):
         if not index.shape[0] == 0:
             blank_slots = slots.view(batch_size*num_slots, -1)[index].mean(0)
             self.blank_slot = 0.995 * self.blank_slot + 0.005*blank_slots
+
         recon_combined = torch.sum(recons * masks, dim=1)
+
+        if dup_threshold:
+            batch_size = batch_size//2
+            recons, recons_nodup = torch.split(recons, batch_size, 0)
+            masks, masks_nodup = torch.split(masks, batch_size, 0)
+            recon_combined, recon_combined_nodup = torch.split(recon_combined, batch_size, 0)
+            slots_nodup = slots_nodup.view(batch_size, num_slots, slot_size)
         slots = slots.view(batch_size, num_slots, slot_size)
-        return recon_combined, recons, masks, slots, attn
+        if dup_threshold:
+            return recon_combined, recons, masks, slots, attn, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup
+        else:
+            return recon_combined, recons, masks, slots, attn
 
     def loss_function(self, input):
         recon_combined, recons, masks, slots, attn = self.forward(input)
