@@ -34,7 +34,7 @@ class _Workplace(object):
             if cfg.num_val_images:
                 print(f"INFO: restricting the validation dataset size to `num_val_images`: {cfg.num_val_images}")
 
-        set_seed_everywhere(params.seed)
+        set_seed_everywhere(cfg.seed)
 
         clevr_transforms = transforms.Compose(
             [
