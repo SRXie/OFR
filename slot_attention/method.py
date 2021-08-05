@@ -114,7 +114,7 @@ class SlotAttentionMethod(pl.LightningModule):
         # if self.params.gpus > 0:
             # batch_rand_perm = batch_rand_perm.to(self.device)
 
-        def compute_test_losses(dl, losses, losses_nodup, dup_threshold=None):
+        def compute_test_losses(dataloader, losses, losses_nodup, dup_threshold=None):
 
             def _compute_greedy_loss(cat_slots, losses):
                 slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, batch_size, 0)
