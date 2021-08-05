@@ -1,6 +1,6 @@
 # A yaml version of params.py
 
-seed: 8
+seed: 0
 gpu_id: '0, 1'
 lr: 0.0004
 batch_size: 64
@@ -27,6 +27,7 @@ n_samples: 5
 warmup_steps_pct: 0.02
 decay_steps_pct: 0.2
 test_type: [obj, attr]
+dup_threshold: 0.05
 
 hydra:
   run:

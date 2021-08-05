@@ -8,6 +8,7 @@ from slot_attention.utils import Tensor
 from slot_attention.utils import assert_shape
 from slot_attention.utils import build_grid
 from slot_attention.utils import conv_transpose_out_shape
+from slot_attention.utils import compute_cos_distance
 
 
 class SlotAttention(nn.Module):
@@ -211,7 +212,7 @@ class SlotAttentionModel(nn.Module):
         self.slots_log_sigma = self.slot_attention.slots_log_sigma
         self.blank_slot = None
 
-    def forward(self, x, slots_only=False):
+    def forward(self, x, slots_only=False, dup_threshold=None):
         if self.empty_cache:
             torch.cuda.empty_cache()
 
@@ -231,6 +232,25 @@ class SlotAttentionModel(nn.Module):
         assert_shape(slots.size(), (batch_size, self.num_slots, self.slot_size))
         # `slots` has shape: [batch_size, num_slots, slot_size].
         batch_size, num_slots, slot_size = slots.shape
+
+        if dup_threshold:
+            cos_dis_pixel = compute_cos_distance(attn.permute(0,2,1)) # to have shape (batch_size, num_slot, emb_size)
+            cos_dis_feature = compute_cos_distance(slots)
+            cos_dis_min = torch.min(cos_dis_pixel, cos_dis_feature)
+            duplicated = cos_dis_min < dup_threshold
+            # we only need the upper triangle
+            duplicated = torch.triu(duplicated, diagonal=1)
+            duplicated = torch.sum(duplicated, dim=1)
+            duplicated_index = torch.nonzero(duplicated, as_tuple=True)
+            # sample blank slots
+            slots_init = torch.randn((duplicated_index[0].shape[0], slot_size))
+            slots_init = slots_init.type_as(slots)
+            self.slots_mu = self.slots_mu.to(slots.device)
+            self.slots_log_sigma = self.slots_log_sigma.to(slots.device)
+            blank_slots = self.slots_mu.squeeze(0) + self.slots_log_sigma.squeeze(0).exp() * slots_init
+            # fill in deuplicated slots with blank slots
+            slots[duplicated_index[0], duplicated_index[1]] = blank_slots
+
         if slots_only:
             return slots, attn
 

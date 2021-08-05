@@ -39,43 +39,50 @@ class SlotAttentionMethod(pl.LightningModule):
         batch = next(iter(dl))[idx]
         if self.params.gpus > 0:
             batch = batch.to(self.device)
+
+        def captioned_masked_recons(recons, masks, slots, attns):
+            cos_dis_pixel = compute_cos_distance(attns.permute(0,2,1)) # to have shape (batch_size, num_slot, emb_size)
+            pixel_dup_sim, pixel_dup_idx = torch.sort(cos_dis_pixel, dim=-1)
+            pixel_dup_sim = pixel_dup_sim[:,:,1]
+            pixel_dup_idx = pixel_dup_idx[:,:,1]
+
+            cos_dis_feature = compute_cos_distance(slots)
+            feature_dup_sim, feature_dup_idx = torch.sort(cos_dis_feature, dim=-1)
+            feature_dup_sim = feature_dup_sim[:,:,1]
+            feature_dup_idx = feature_dup_idx[:,:,1]
+
+            attn = attns.permute(0, 2, 1).view(recons.shape[0], recons.shape[1], recons.shape[3], recons.shape[4])
+            recons[:,:,0,:,:] = recons[:,:,0,:,:]+attn
+            masked_recons = recons * masks + (1 - masks)
+            masked_recons = to_rgb_from_tensor(masked_recons)
+            for i in range(masked_recons.shape[0]):
+                for j in range(masked_recons.shape[1]):
+                    img = transforms.ToPILImage()(masked_recons[i,j])
+                    draw = ImageDraw.Draw(img)
+                    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 8)
+                    pixel_text = "attn: "+str(pixel_dup_idx[i,j].item())+" - {:.4f}".format(pixel_dup_sim[i,j].item())
+                    feature_text = "feat: "+str(feature_dup_idx[i,j].item())+" - {:.4f}".format(feature_dup_sim[i,j].item())
+                    draw.text((4,0), pixel_text, (0, 0, 0), font=font)
+                    draw.text((4,55), feature_text, (0, 0, 0), font=font)
+                    img = transforms.ToTensor()(img)
+                    img = to_tensor_from_rgb(img)
+                    masked_recons[i,j] = img
+            return masked_recons, attn
+
         recon_combined, recons, masks, slots, attns = self.model.forward(batch)
+        masked_recons, attn = captioned_masked_recons(recons, masks, slots, attns)
 
-        cos_dis_pixel = compute_cos_distance(attns.permute(0,2,1)) # to have shape (batch_size, num_slot, emb_size)
-        pixel_dup_sim, pixel_dup_idx = torch.sort(cos_dis_pixel, dim=-1)
-        pixel_dup_sim = pixel_dup_sim[:,:,1]
-        pixel_dup_idx = pixel_dup_idx[:,:,1]
-
-        cos_dis_feature = compute_cos_distance(slots)
-        feature_dup_sim, feature_dup_idx = torch.sort(cos_dis_feature, dim=-1)
-        feature_dup_sim = feature_dup_sim[:,:,1]
-        feature_dup_idx = feature_dup_idx[:,:,1]
-
-        attn = attns.permute(0, 2, 1).view(recons.shape[0], recons.shape[1], recons.shape[3], recons.shape[4])
-        recons[:,:,0,:,:] = recons[:,:,0,:,:]+attn # highlight the attention map in the red channel
-        masked_recons = recons * masks + (1 - masks)
-        masked_recons = to_rgb_from_tensor(masked_recons)
-        for i in range(masked_recons.shape[0]):
-            for j in range(masked_recons.shape[1]):
-                img = transforms.ToPILImage()(masked_recons[i,j])
-                draw = ImageDraw.Draw(img)
-                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 8)
-                pixel_text = "attn: "+str(pixel_dup_idx[i,j].item())+" - {:.4f}".format(pixel_dup_sim[i,j].item())
-                feature_text = "feat: "+str(feature_dup_idx[i,j].item())+" - {:.4f}".format(feature_dup_sim[i,j].item())
-                draw.text((4,0), pixel_text, (0, 0, 0), font=font)
-                draw.text((4,55), feature_text, (0, 0, 0), font=font)
-                img = transforms.ToTensor()(img)
-                img = to_tensor_from_rgb(img)
-                masked_recons[i,j] = img
+        recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup, attns_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold)
+        masked_recons_nodup, attn_nodup = captioned_masked_recons(recons_nodup, masks_nodup, slots_nodup, attns_nodup)
 
         # combine images in a nice way so we can display all outputs in one grid, output rescaled to be between 0 and 1
         out = to_rgb_from_tensor(
             torch.cat(
                 [
-                    batch.unsqueeze(1),  # original images
-                    recon_combined.unsqueeze(1),  # reconstructions
-                    masked_recons,  # each slot
-                    attn.unsqueeze(2).repeat(1,1,3,1,1), # attention map for each slot
+                    torch.cat([batch.unsqueeze(1), batch.unsqueeze(1)], dim=0),  # original images
+                    torch.cat([recon_combined.unsqueeze(1),recon_combined_nodup.unsqueeze(1)],dim=0),  # reconstructions
+                    torch.cat([masked_recons, masked_recons_nodup], dim=0),  # each slot
+                    torch.cat([attn.unsqueeze(2).repeat(1,1,3,1,1), attn_nodup.unsqueeze(2).repeat(1,1,3,1,1)], dim=0),
                 ],
                 dim=1,
             )
@@ -83,7 +90,7 @@ class SlotAttentionMethod(pl.LightningModule):
 
         batch_size, num_slots, C, H, W = recons.shape
         images = vutils.make_grid(
-            out.view(batch_size * out.shape[1], C, H, W).cpu(), normalize=False, nrow=out.shape[1],
+            out.view(2 * batch_size * out.shape[1], C, H, W).cpu(), normalize=False, nrow=out.shape[1],
         )
 
         return images
@@ -99,7 +106,7 @@ class SlotAttentionMethod(pl.LightningModule):
         adl = self.datamodule.attr_test_dataloader()
         sample_size = 10000
         obj_greedy_losses, attr_greedy_losses = [], []
-        obj_kendall_taus, attr_kendall_taus = [], []
+        obj_greedy_losses_nodup, attr_greedy_losses_nodup = [], []
 
         # rand = torch.rand(self.params.batch_size*sample_size*3, self.params.num_slots)
         # batch_rand_perm = rand.argsort(dim=1)
@@ -107,7 +114,7 @@ class SlotAttentionMethod(pl.LightningModule):
         # if self.params.gpus > 0:
             # batch_rand_perm = batch_rand_perm.to(self.device)
 
-        def compute_test_losses(dataloader, losses, kendall_taus):
+        def compute_test_losses(dataloader, losses, dup_threshold=None):
             b_prev = datetime.now()
             for batch in dataloader:
                 print("load data:", datetime.now()-b_prev)
@@ -119,20 +126,21 @@ class SlotAttentionMethod(pl.LightningModule):
                 cat_batch = torch.cat(batch, 0)
                 if self.params.gpus > 0:
                     cat_batch = cat_batch.to(self.device)
-                cat_slots, cat_attns = self.model.forward(cat_batch, slots_only=True)
+                cat_slots, cat_attns = self.model.forward(cat_batch, slots_only=True, dup_threshold=dup_threshold)
 
                 _, num_slots, slot_size = cat_slots.shape
-                # cat_attns have shape (4*batch_size, H*W, num_slots)
-                prev = datetime.now()
-                # calculate intra-image slots similarity in the pixel space:
-                cos_dis_pixel = compute_cos_distance(cat_attns.permute(0,2,1))
+                # # cat_attns have shape (4*batch_size, H*W, num_slots)
+                # prev = datetime.now()
+                # # calculate intra-image slots similarity in the pixel space:
+                # cos_dis_pixel = compute_cos_distance(cat_attns.permute(0,2,1))
 
-                # calculate intra-image slots similarity in the feature space:
-                cos_dis_feature = compute_cos_distance(cat_slots)
+                # # calculate intra-image slots similarity in the feature space:
+                # cos_dis_feature = compute_cos_distance(cat_slots)
 
-                kendall_tau = compute_rank_correlation(cos_dis_pixel.view(-1,num_slots), cos_dis_feature.view(-1,num_slots))
-                kendall_taus.append(kendall_tau)
-                print("similarity time:", datetime.now()-prev)
+                # kendall_tau = compute_rank_correlation(cos_dis_pixel.view(-1,num_slots), cos_dis_feature.view(-1,num_slots))
+                # kendall_taus.append(kendall_tau)
+                # print("similarity time:", datetime.now()-prev)
+
                 slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, batch_size, 0)
 
                 # the full set of possible permutation might be too large ((7!)^3 for 7 slots...)
@@ -184,13 +192,20 @@ class SlotAttentionMethod(pl.LightningModule):
                 print("batch time:", datetime.now()-b_prev)
                 b_prev = datetime.now()
 
-        compute_test_losses(odl, obj_greedy_losses, obj_kendall_taus)
-        compute_test_losses(adl, attr_greedy_losses, attr_kendall_taus)
+        compute_test_losses(odl, obj_greedy_losses)
+        compute_test_losses(adl, attr_greedy_losses)
 
         avg_obj_greedy_loss = torch.cat(obj_greedy_losses, 0).mean()
         avg_attr_greedy_loss = torch.cat(attr_greedy_losses, 0).mean()
-        avg_obj_kendall_tau = torch.stack(obj_kendall_taus).mean()
-        avg_attr_kendall_tau = torch.stack(attr_kendall_taus).mean()
+        # avg_obj_kendall_tau = torch.stack(obj_kendall_taus).mean()
+        # avg_attr_kendall_tau = torch.stack(attr_kendall_taus).mean()
+
+        compute_test_losses(odl, obj_greedy_losses_nodup, dup_threshold=self.params.dup_threshold)
+        compute_test_losses(adl, attr_greedy_losses_nodup, dup_threshold=self.params.dup_threshold)
+
+        avg_obj_greedy_loss_nodup = torch.cat(obj_greedy_losses, 0).mean()
+        avg_attr_greedy_loss_nodup = torch.cat(attr_greedy_losses, 0).mean()
+
         if self.params.gpus > 0:
             self.model.blank_slot = self.model.blank_slot.to(self.device)
             self.model.slots_mu = self.model.slots_mu.to(self.device)
@@ -198,8 +213,8 @@ class SlotAttentionMethod(pl.LightningModule):
             "avg_val_loss": avg_loss,
             "avg_obj_greedy_loss": avg_obj_greedy_loss,
             "avg_attr_greedy_loss": avg_attr_greedy_loss,
-            "avg_obj_rank_corr": avg_obj_kendall_tau,
-            "avg_attr_rank_corr": avg_attr_kendall_tau,
+            "avg_obj_greedy_loss_nodup": avg_obj_greedy_loss_nodup,
+            "avg_attr_greedy_loss_nodup": avg_attr_greedy_loss_nodup,
             "blank_mean_l2": torch.norm(self.model.blank_slot-self.model.slots_mu.squeeze(0).squeeze(0), p=2)/self.model.blank_slot.shape[0],
         }
         self.log_dict(logs, sync_dist=True)
