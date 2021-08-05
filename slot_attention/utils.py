@@ -4,6 +4,8 @@ from typing import TypeVar
 from typing import Union
 
 import torch
+import random
+import numpy as np
 from pytorch_lightning import Callback
 
 import wandb
@@ -97,3 +99,10 @@ def compute_rank_correlation(x: Tensor, y: Tensor):
     y = y.sort(dim=1)[1]
     correlation = _rank_correlation_(x.float(), y.float())
     return correlation
+
+def set_seed_everywhere(seed):
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)

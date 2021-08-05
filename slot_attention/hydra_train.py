@@ -16,6 +16,7 @@ from slot_attention.model import SlotAttentionModel
 # from slot_attention.params import SlotAttentionParams
 from slot_attention.utils import ImageLogCallback
 from slot_attention.utils import rescale
+from slot_attention.utils import set_seed_everywhere
 
 
 # def main(params: Optional[SlotAttentionParams] = None):
@@ -32,6 +33,8 @@ class _Workplace(object):
                 print(f"INFO: restricting the train dataset size to `num_train_images`: {cfg.num_train_images}")
             if cfg.num_val_images:
                 print(f"INFO: restricting the validation dataset size to `num_val_images`: {cfg.num_val_images}")
+
+        set_seed_everywhere(params.seed)
 
         clevr_transforms = transforms.Compose(
             [
