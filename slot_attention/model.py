@@ -274,14 +274,14 @@ class SlotAttentionModel(nn.Module):
         masks = out[:, :, -1:, :, :]
         masks = F.softmax(masks, dim=1)
 
-        masks_sum = masks.view(batch_size*num_slots, height*width).sum(-1)
-        blank_masks = masks_sum < height*width*0.001
-        index = torch.nonzero(blank_masks).squeeze(1)
-        if not torch.is_tensor(self.blank_slot):
-            self.blank_slot = torch.rand_like(self.slots_mu.squeeze(0).squeeze(0))
-        if not index.shape[0] == 0:
-            blank_slots = slots.view(batch_size*num_slots, -1)[index].mean(0)
-            self.blank_slot = 0.995 * self.blank_slot + 0.005*blank_slots
+        # masks_sum = masks.view(batch_size*num_slots, height*width).sum(-1)
+        # blank_masks = masks_sum < height*width*0.001
+        # index = torch.nonzero(blank_masks).squeeze(1)
+        # if not torch.is_tensor(self.blank_slot):
+        #     self.blank_slot = torch.rand_like(self.slots_mu.squeeze(0).squeeze(0))
+        # if not index.shape[0] == 0:
+        #     blank_slots = slots.view(batch_size*num_slots, -1)[index].mean(0)
+        #     self.blank_slot = 0.995 * self.blank_slot + 0.005*blank_slots
 
         recon_combined = torch.sum(recons * masks, dim=1)
 

@@ -297,7 +297,6 @@ class SlotAttentionMethod(pl.LightningModule):
             "avg_attr_pseudo_greedy_loss": avg_attr_pd_greedy_loss,
             "avg_obj_pseudo_greedy_loss_nodup": avg_obj_pd_greedy_loss_nodup,
             "avg_attr_pseudo_greedy_loss_nodup": avg_attr_pd_greedy_loss_nodup,
-            "blank_mean_l2": torch.norm(self.model.blank_slot-self.model.slots_mu.squeeze(0).squeeze(0), p=2)/self.model.blank_slot.shape[0],
         }
         self.log_dict(logs, sync_dist=True)
 
