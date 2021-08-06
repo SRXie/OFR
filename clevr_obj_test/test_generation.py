@@ -13,7 +13,12 @@ def create_path(test_root, main_scene_idx, sub_scene_idx=0, file_type='images'):
     if not SCENE_SUMMARY:
         with open(os.path.join(test_root, "CLEVR_scenes.json")) as f:
             SCENE_SUMMARY = json.load(f)
-    path = os.path.join(test_root, file_type, SCENE_SUMMARY["scenes"][main_scene_idx]["image_filename"])
+    if main_scene_idx == -1:
+        main_scene_idx = 0
+        path = os.path.join(test_root, file_type, SCENE_SUMMARY["scenes"][main_scene_idx]["image_filename"])
+        path = path[:-5]+'0'+path[-4:]
+    else:
+        path = os.path.join(test_root, file_type, SCENE_SUMMARY["scenes"][main_scene_idx]["image_filename"])
     if not sub_scene_idx == 0 and not file_type == "meta":
         path = path[:-4]+'_%04d' % sub_scene_idx+path[-4:]
     if file_type == "scenes" or file_type == "meta":
@@ -60,7 +65,7 @@ def obj_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0, decomposed=No
     if not decomposed:
         decomposed = []
     tuples = [] # path tuples
-    image_B_path = create_path(test_root, 0) # the 0th image should be the background image
+    image_B_path = create_path(test_root, -1) # the -1th image should be the background image
     image_D_path = create_path(test_root, main_scene_idx, sub_scene_idx)
     for num_decomp in range(1, len(scene.objs_idx)):
         # generate all object algebra test for the given scene
