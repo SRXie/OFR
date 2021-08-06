@@ -106,3 +106,14 @@ def set_seed_everywhere(seed):
         torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
     random.seed(seed)
+
+def batched_index_select(input, dim, index):
+    """
+    https://discuss.pytorch.org/t/batched-index-select/9115/8
+    """
+    views = [input.shape[0]] + [1 if i != dim else -1 for i in range(1, len(input.shape))]
+    expanse = list(input.shape)
+    expanse[0] = -1
+    expanse[dim] = -1
+    index = index.view(views).expand(expanse)
+    return torch.gather(input, dim, index)
