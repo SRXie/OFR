@@ -107,6 +107,9 @@ def set_seed_everywhere(seed):
     np.random.seed(seed)
     random.seed(seed)
 
+def interleave_stack(x, y):
+    return torch.stack((x, y), dim=1).view(2*x.shape[0], x.shape[1], x.shape[2], x.shape[3], x.shape[4])
+
 def batched_index_select(input, dim, index):
     """
     https://discuss.pytorch.org/t/batched-index-select/9115/8
@@ -117,3 +120,80 @@ def batched_index_select(input, dim, index):
     expanse[dim] = -1
     index = index.view(views).expand(expanse)
     return torch.gather(input, dim, index)
+
+def compute_pseudo_greedy_loss(cat_slots, losses):
+    slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
+    batch_size, num_slots, slot_size = slots_A.shape
+    # greedy assignment regardless of re-assignment
+    # TODO: check if there is a trivial solution to this assignment
+    ext_A = slots_A.view(batch_size, num_slots, 1, 1, 1, slot_size)
+    ext_B = slots_B.view(batch_size, 1, num_slots, 1, 1, slot_size)
+    ext_C = slots_C.view(batch_size, 1, 1, num_slots, 1, slot_size)
+    ext_D = slots_D.view(batch_size, 1, 1, 1, num_slots, slot_size)
+    greedy_criterion = torch.square(ext_A-ext_B+ext_C-ext_D).sum(dim=-1)
+    # backtrace for greedy matching (3 times)
+    greedy_criterion, _ = greedy_criterion.min(-1)
+    greedy_criterion, _ = greedy_criterion.min(-1)
+    greedy_criterion, _ = greedy_criterion.min(-1)
+
+    greedy_loss = greedy_criterion.sum(dim=-1)/(num_slots*slot_size)
+    losses.append(greedy_loss)
+
+def compute_greedy_loss(cat_slots, losses):
+    slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
+    batch_size, num_slots, slot_size = slots_A.shape
+    # greedy assignment without multi-assignment
+    greedy_loss = torch.zeros(batch_size)
+    greedy_loss = greedy_loss.to(cat_slots.device)
+    cat_indices_holder = torch.arange(0, num_slots, dtype=int).unsqueeze(0).repeat(4*batch_size, 1).to(cat_slots.device)
+
+    for i in range(num_slots):
+        # TODO: check if there is a trivial solution to this assignment
+        ext_A = slots_A.view(batch_size, num_slots-i, 1, 1, 1, slot_size)
+        ext_B = slots_B.view(batch_size, 1, num_slots-i, 1, 1, slot_size)
+        ext_C = slots_C.view(batch_size, 1, 1, num_slots-i, 1, slot_size)
+        ext_D = slots_D.view(batch_size, 1, 1, 1, num_slots-i, slot_size)
+        greedy_criterion = torch.square(ext_A-ext_B+ext_C-ext_D).sum(dim=-1)
+        # backtrace for greedy matching (3 times)
+        greedy_criterion, indices_D = greedy_criterion.min(-1)
+        greedy_criterion, indices_C = greedy_criterion.min(-1)
+        greedy_criterion, indices_B = greedy_criterion.min(-1)
+        greedy_criterion, indices_A = greedy_criterion.min(-1)
+        greedy_loss+=greedy_criterion
+
+        # print(indices_A[1])
+        # print(indices_B[1, indices_A[1]])
+        # print(indices_C[1 , indices_A[1], indices_B[1, indices_A[1]]])
+        # print(indices_D[1, indices_A[1], indices_B[1, indices_A[1]], indices_C[1 , indices_A[1], indices_B[1, indices_A[1]]]])
+
+        index_A = indices_A.view(indices_A.shape[0],1)
+
+        index_B = batched_index_select(indices_B, 1, index_A)
+        index_B = index_B.view(index_B.shape[0],1)
+
+        index_C = batched_index_select(indices_C, 1, index_A)
+        index_C = batched_index_select(index_C, 2, index_B)
+        index_C = index_C.view(index_C.shape[0],1)
+
+        index_D = batched_index_select(indices_D, 1, index_A)
+        index_D = batched_index_select(index_D, 2, index_B)
+        index_D = batched_index_select(index_D, 3, index_C)
+        index_D = index_D.view(index_D.shape[0],1)
+
+        replace = torch.zeros(batch_size*4, num_slots-i, dtype=torch.bool)
+        replace = replace.to(cat_slots.device)
+        index_cat = torch.cat([index_A, index_B, index_C, index_D], dim=0)
+        slots_cat = torch.cat([slots_A, slots_B, slots_C, slots_D], dim=0)
+
+        replace = replace.scatter(1, index_cat, True)
+        # batched element swap
+        tmp = batched_index_select(cat_indices_holder, 1, index_cat.squeeze(1)).squeeze(1).clone()
+        cat_indices_holder[:, 0:num_slots-i-1] = torch.where(replace[:, 0:num_slots-i-1], cat_indices_holder[:, num_slots-i-1].unsqueeze(1).repeat(1, num_slots-i-1), cat_indices_holder[:, 0:num_slots-i-1])
+        cat_indices_holder[:, num_slots-i-1] = tmp
+        replace = replace.unsqueeze(-1).repeat(1, 1, slot_size)
+        slots_cat = torch.where(replace, slots_cat[:,-1,:].unsqueeze(1).repeat(1, num_slots-i, 1), slots_cat)[:,:-1,:]
+        slots_A, slots_B, slots_C, slots_D = torch.split(slots_cat, batch_size, 0)
+
+    greedy_loss = greedy_loss/(num_slots*slot_size)
+    losses.append(greedy_loss)
+    return cat_indices_holder

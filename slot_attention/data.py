@@ -12,6 +12,7 @@ import pytorch_lightning as pl
 from PIL import Image
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
+from torch.utils.data import RandomSampler
 from torchvision.transforms import transforms
 
 from slot_attention.utils import compact
@@ -210,21 +211,25 @@ class CLEVRDataModule(pl.LightningDataModule):
         )
 
     def obj_test_dataloader(self):
+        rand_sampler = RandomSampler(self.obj_test_dataset)
         return DataLoader(
             self.obj_test_dataset,
             batch_size=self.test_batch_size,
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,
+            sampler=rand_sampler,
         )
 
     def attr_test_dataloader(self):
+        rand_sampler = RandomSampler(self.obj_test_dataset)
         return DataLoader(
             self.attr_test_dataset,
             batch_size=self.test_batch_size,
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,
+            sampler=rand_sampler,
         )
 
 
