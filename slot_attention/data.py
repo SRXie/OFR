@@ -222,7 +222,7 @@ class CLEVRDataModule(pl.LightningDataModule):
         )
 
     def attr_test_dataloader(self):
-        rand_sampler = RandomSampler(self.obj_test_dataset)
+        rand_sampler = RandomSampler(self.attr_test_dataset)
         return DataLoader(
             self.attr_test_dataset,
             batch_size=self.test_batch_size,
