@@ -8,6 +8,7 @@ from time import localtime, strftime
 import pytorch_lightning.loggers as pl_loggers
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor
+from pytorch_lightning.utils import set_seed_everywhere
 from torchvision import transforms
 
 from slot_attention.data import CLEVRDataModule
@@ -16,7 +17,6 @@ from slot_attention.model import SlotAttentionModel
 # from slot_attention.params import SlotAttentionParams
 from slot_attention.utils import ImageLogCallback
 from slot_attention.utils import rescale
-from slot_attention.utils import set_seed_everywhere
 
 
 # def main(params: Optional[SlotAttentionParams] = None):
@@ -84,7 +84,7 @@ class _Workplace(object):
 
         self.method = SlotAttentionMethod(model=model, datamodule=clevr_datamodule, params=cfg)
 
-        logger_name = "slot-attention-clevr6-seed-"+str(cfg.seed)+"-dup-"+str(dup_threshold)
+        logger_name = "slot-attn-seed-"+str(cfg.seed)+"-dup-"+str(cfg.dup_threshold)
         logger = pl_loggers.WandbLogger(project="objectness-test-clevr6", name=logger_name)
         # Use this line for Tensorboard logger
         # logger = pl_loggers.TensorBoardLogger("./logs/"+logger_name+strftime("-%Y%m%d%H%M%S", localtime()))
