@@ -8,7 +8,7 @@ from time import localtime, strftime
 import pytorch_lightning.loggers as pl_loggers
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor
-from pytorch_lightning.utilities import seed_everything
+from pytorch_lightning.utilities.seed import seed_everything
 from torchvision import transforms
 
 from slot_attention.data import CLEVRDataModule
