@@ -8,7 +8,7 @@ from time import localtime, strftime
 import pytorch_lightning.loggers as pl_loggers
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor
-from pytorch_lightning.utilities import set_seed_everywhere
+from pytorch_lightning.utilities import seed_everything
 from torchvision import transforms
 
 from slot_attention.data import CLEVRDataModule
@@ -34,7 +34,7 @@ class _Workplace(object):
             if cfg.num_val_images:
                 print(f"INFO: restricting the validation dataset size to `num_val_images`: {cfg.num_val_images}")
 
-        set_seed_everywhere(cfg.seed)
+        seed_everything(cfg.seed)
 
         clevr_transforms = transforms.Compose(
             [
