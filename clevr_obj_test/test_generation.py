@@ -4,6 +4,7 @@ from itertools import combinations
 from math import log2, factorial
 import os
 import json
+import itertools
 
 SCENE_SUMMARY = None
 
@@ -65,22 +66,43 @@ def obj_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0, decomposed=No
     if not decomposed:
         decomposed = []
     tuples = [] # path tuples
-    image_B_path = create_path(test_root, -1) # the -1th image should be the background image
-    image_D_path = create_path(test_root, main_scene_idx, sub_scene_idx)
-    for num_decomp in range(1, len(scene.objs_idx)):
+    decomposed.append(sub_scene_idx)
+    for num_decomp in range(1, len(scene.objs_idx)-1):
         # generate all object algebra test for the given scene
-        # First decompose it into subscenes:
-        ACs_pairs = scene.decompose(num_decomp)
-        decomposed.append(sub_scene_idx)
-        # create algebra tuples A-B+C=D: Subscene_1 - Background + Subscene_2 = Scene
-        for AC_pair in ACs_pairs:
-            image_A_path = create_path(test_root, main_scene_idx, AC_pair[0])
-            image_C_path = create_path(test_root, main_scene_idx, AC_pair[1])
-            tuples.append((image_A_path, image_B_path, image_C_path, image_D_path))
-            if not AC_pair[0] in decomposed:
-                tuples += obj_algebra_test(test_root, main_scene_idx, AC_pair[0], decomposed)
-            if not AC_pair[1] in decomposed:
-                tuples += obj_algebra_test(test_root, main_scene_idx, AC_pair[1], decomposed)
+        # First decompose it into part_23 (num_obj>=2) and part_1:
+        for part_1 in itertools.combinations(set(scene.objs_idx), num_decomp):
+            part_23 = set(scene.objs_idx).difference(set(part_1))
+
+            subset_idx_list_B = sorted(list(part_1))
+            subset_idx_list_D = sorted(list(part_23))
+
+            subset_idx_B = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_B)]
+            subset_idx_D = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_D)]
+
+            image_B_path = create_path(test_root, main_scene_idx, subset_idx_B)
+            image_D_path = create_path(test_root, main_scene_idx, subset_idx_D)
+
+            # Then decompose part_23 into part_2 and part_3:
+            for num_decomp_2 in range(1,len(part_23)):
+                for part_2 in itertools.combinations(set(part_23), num_decomp_2):
+                    part_3 = set(part_23).difference(set(part_2))
+
+                    # Recombine them to have A=part_12, B=part_1, C=part_3, D=part_23
+                    subset_idx_list_A = sorted(list(set(part_1).union(set(part_2))))
+                    subset_idx_list_C = sorted(list(part_3))
+
+                    subset_idx_A = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_A)]
+                    subset_idx_C = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_C)]
+
+                    image_A_path = create_path(test_root, main_scene_idx, subset_idx_A)
+                    image_C_path = create_path(test_root, main_scene_idx, subset_idx_C)
+
+                    tuples.append((image_A_path, image_B_path, image_C_path, image_D_path))
+
+            if not subset_idx_list_B in decomposed:
+                tuples += obj_algebra_test(test_root, main_scene_idx, subset_idx_B, decomposed)
+            if not subset_idx_list_D in decomposed:
+                tuples += obj_algebra_test(test_root, main_scene_idx, subset_idx_D, decomposed)
 
     return tuples
 
