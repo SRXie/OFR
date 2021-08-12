@@ -14,6 +14,7 @@ from slot_attention.utils import to_rgb_from_tensor, to_tensor_from_rgb
 from slot_attention.utils import compute_cos_distance, compute_rank_correlation
 from slot_attention.utils import batched_index_select
 from slot_attention.utils import compute_greedy_loss, compute_pseudo_greedy_loss
+from slot_attention.utils import swap_bg_slot_back
 
 
 class SlotAttentionMethod(pl.LightningModule):
@@ -72,7 +73,17 @@ class SlotAttentionMethod(pl.LightningModule):
             return masked_recons, attn
 
         recon_combined, recons, masks, slots, attns, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold)
-        # reorder these with matching
+        # throw background slot back
+        cat_indices = swap_bg_slot_back(attns)
+        recons = batched_index_select(recons, 1, cat_indices)
+        masks = batched_index_select(masks, 1, cat_indices)
+        slots = batched_index_select(slots, 1, cat_indices)
+        attns = batched_index_select(attns, 2, cat_indices)
+        recons_nodup = batched_index_select(recons_nodup, 1, cat_indices)
+        masks_nodup = batched_index_select(masks_nodup, 1, cat_indices)
+        slots_nodup = batched_index_select(slots_nodup, 1, cat_indices)
+
+        # reorder with matching
         cat_indices = compute_greedy_loss(slots, [])
         recons_perm = batched_index_select(recons, 1, cat_indices)
         masks_perm = batched_index_select(masks, 1, cat_indices)
@@ -131,8 +142,9 @@ class SlotAttentionMethod(pl.LightningModule):
         def compute_test_losses(dataloader, losses, pseudo_losses, losses_nodup, pseudo_losses_nodup, dup_threshold=None):
 
             b_prev = datetime.now()
-            for batch in dataloader:
-                print("load data:", datetime.now()-b_prev)
+            for _ in range(1000):
+                batch = next(iter(dl))
+                # print("load data:", datetime.now()-b_prev)
                 # sample_losses = []
                 # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
                 batch_size = batch[0].shape[0]
@@ -141,7 +153,9 @@ class SlotAttentionMethod(pl.LightningModule):
                     cat_batch = cat_batch.to(self.device)
                 cat_slots, cat_attns, cat_slots_nodup = self.model.forward(cat_batch, slots_only=True, dup_threshold=dup_threshold)
 
-                _, num_slots, slot_size = cat_slots.shape
+                cat_indices = swap_bg_slot_back(cat_attns)
+                cat_slots = batched_index_select(cat_slots, 1, cat_indices)
+                cat_slots_nodup = batched_index_select(cat_slots_nodup, 1, cat_indices)
 
                 compute_greedy_loss(cat_slots, losses)
                 compute_greedy_loss(cat_slots_nodup, losses_nodup)
@@ -164,8 +178,8 @@ class SlotAttentionMethod(pl.LightningModule):
                 # sample_loss = torch.square(sample_loss).mean(dim=-1)
                 # sample_loss, _ = torch.min(sample_loss, 1)
                 # sample_losses.appiend(sample_loss)
-                print("batch time:", datetime.now()-b_prev)
-                b_prev = datetime.now()
+                # print("batch time:", datetime.now()-b_prev)
+                # b_prev = datetime.now()
 
         compute_test_losses(odl, obj_greedy_losses, obj_pd_greedy_losses, obj_greedy_losses_nodup, obj_pd_greedy_losses_nodup, dup_threshold=self.params.dup_threshold)
         compute_test_losses(adl, attr_greedy_losses, attr_pd_greedy_losses, attr_greedy_losses_nodup, attr_pd_greedy_losses_nodup, dup_threshold=self.params.dup_threshold)

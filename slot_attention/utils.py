@@ -140,15 +140,20 @@ def compute_pseudo_greedy_loss(cat_slots, losses):
     losses.append(greedy_loss)
 
 def compute_greedy_loss(cat_slots, losses):
-    slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
+    slots_A_full, slots_B_full, slots_C_full, slots_D_full = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
+    # We exclude the background slot from beginning
+    # greedy_loss = torch.square(slots_A_full[:,-1,:]-slots_B_full[:,-1,:]+slots_C_full[:,-1,:]-slots_D_full[:,-1,:]).sum(dim=-1)
+    slots_A = slots_A_full[:, :-1, :]
+    slots_B = slots_B_full[:, :-1, :]
+    slots_C = slots_C_full[:, :-1, :]
+    slots_D = slots_D_full[:, :-1, :]
+
     batch_size, num_slots, slot_size = slots_A.shape
     # greedy assignment without multi-assignment
-    greedy_loss = torch.zeros(batch_size)
-    greedy_loss = greedy_loss.to(cat_slots.device)
-    cat_indices_holder = torch.arange(0, num_slots, dtype=int).unsqueeze(0).repeat(4*batch_size, 1).to(cat_slots.device)
+    greedy_loss = torch.zeros(batch_size).to(cat_slots.device)
+    cat_indices_holder = torch.arange(0, num_slots+1, dtype=int).unsqueeze(0).repeat(4*batch_size, 1).to(cat_slots.device)
 
     for i in range(num_slots):
-        # TODO: check if there is a trivial solution to this assignment
         ext_A = slots_A.view(batch_size, num_slots-i, 1, 1, 1, slot_size)
         ext_B = slots_B.view(batch_size, 1, num_slots-i, 1, 1, slot_size)
         ext_C = slots_C.view(batch_size, 1, 1, num_slots-i, 1, slot_size)
@@ -196,4 +201,24 @@ def compute_greedy_loss(cat_slots, losses):
 
     greedy_loss = greedy_loss/(num_slots*slot_size)
     losses.append(greedy_loss)
+    return cat_indices_holder
+
+def swap_bg_slot_back(cat_attns):#, cat_slots, cat_slots_nodup):
+    batch_size, _, num_slots = cat_attns.shape
+    batch_size = batch_size // 4
+    cat_indices_holder = torch.arange(0, num_slots, dtype=int).unsqueeze(0).repeat(4*batch_size, 1).to(cat_attns.device)
+    # get slot index with largest non-zero attention area
+    cat_attns = cat_attns.permute(0,2,1)
+    attns_area = torch.sum(cat_attns > 2.0/num_slots, dim=-1)
+
+    cat_index = torch.argmax(attns_area, dim=1)
+    # batched element swap
+    replace = torch.zeros(batch_size*4, num_slots, dtype=torch.bool)
+    replace = replace.to(cat_attns.device)
+    replace = replace.scatter(1, cat_index.unsqueeze(1), True)
+
+    tmp_index = batched_index_select(cat_indices_holder, 1, cat_index).squeeze(1).clone()
+    cat_indices_holder[:, 0:num_slots-1] = torch.where(replace[:, 0:num_slots-1], cat_indices_holder[:, num_slots-1].unsqueeze(1).repeat(1, num_slots-1), cat_indices_holder[:, 0:num_slots-1])
+    cat_indices_holder[:, num_slots-1] = tmp_index
+
     return cat_indices_holder
