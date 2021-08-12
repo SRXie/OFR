@@ -141,8 +141,10 @@ class SlotAttentionMethod(pl.LightningModule):
 
         def compute_test_losses(dataloader, losses, pseudo_losses, losses_nodup, pseudo_losses_nodup, dup_threshold=None):
 
+            random_idx = torch.randint(high=len(dataloader), size=(1,))
+
             b_prev = datetime.now()
-            for _ in range(min(100, len(dataloader))):
+            for batch in dataloader[random_idx:]:
                 batch = next(iter(dataloader))
                 print("load data:", datetime.now()-b_prev)
                 # sample_losses = []
