@@ -142,9 +142,9 @@ class SlotAttentionMethod(pl.LightningModule):
         def compute_test_losses(dataloader, losses, pseudo_losses, losses_nodup, pseudo_losses_nodup, dup_threshold=None):
 
             b_prev = datetime.now()
-            for _ in range(1000):
+            for _ in range(min(100, len(dataloader))):
                 batch = next(iter(dataloader))
-                # print("load data:", datetime.now()-b_prev)
+                print("load data:", datetime.now()-b_prev)
                 # sample_losses = []
                 # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
                 batch_size = batch[0].shape[0]
@@ -178,8 +178,8 @@ class SlotAttentionMethod(pl.LightningModule):
                 # sample_loss = torch.square(sample_loss).mean(dim=-1)
                 # sample_loss, _ = torch.min(sample_loss, 1)
                 # sample_losses.appiend(sample_loss)
-                # print("batch time:", datetime.now()-b_prev)
-                # b_prev = datetime.now()
+                print("batch time:", datetime.now()-b_prev)
+                b_prev = datetime.now()
 
         compute_test_losses(odl, obj_greedy_losses, obj_pd_greedy_losses, obj_greedy_losses_nodup, obj_pd_greedy_losses_nodup, dup_threshold=self.params.dup_threshold)
         compute_test_losses(adl, attr_greedy_losses, attr_pd_greedy_losses, attr_greedy_losses_nodup, attr_pd_greedy_losses_nodup, dup_threshold=self.params.dup_threshold)
