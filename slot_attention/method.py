@@ -143,7 +143,7 @@ class SlotAttentionMethod(pl.LightningModule):
 
             b_prev = datetime.now()
             for _ in range(1000):
-                batch = next(iter(dl))
+                batch = next(iter(dataloader))
                 # print("load data:", datetime.now()-b_prev)
                 # sample_losses = []
                 # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
