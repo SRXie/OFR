@@ -73,6 +73,7 @@ class CLEVRAlgebraTestset(Dataset):
         max_n_objects: int = 10,
         test_type: str = "obj", # or "attr"
         test_cases: List[List[Optional[str]]] = None,
+        num_test_cases: int = 100000,
     ):
         super().__init__()
         self.data_root = data_root
@@ -89,6 +90,10 @@ class CLEVRAlgebraTestset(Dataset):
             self.img_files = test_cases
         else:
             self.img_files = self.get_files()
+        if len(self.img_files) > num_test_cases:
+            start_idx =  random.randint(0, len(self.img_files)-num_test_cases)
+            self.img_files = self.img_files[start_idx:start_idx+num_test_cases]
+        print("Test case size: ", len(self.img_files))
 
     def __getitem__(self, index: int):
         image_paths = self.img_files[index]
@@ -123,6 +128,7 @@ class CLEVRAlgebraTestset(Dataset):
                 # Last, append these path tuples into paths.
                 paths+=image_paths
             i += 1
+        random.shuffle(paths)
         with open(os.path.join(self.test_root, "CLEVR_test_cases.csv"), "w") as f:
             wr = csv.writer(f)
             wr.writerows(paths)

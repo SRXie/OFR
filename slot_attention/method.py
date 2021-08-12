@@ -140,12 +140,8 @@ class SlotAttentionMethod(pl.LightningModule):
             # batch_rand_perm = batch_rand_perm.to(self.device)
 
         def compute_test_losses(dataloader, losses, pseudo_losses, losses_nodup, pseudo_losses_nodup, dup_threshold=None):
-
-            random_idx = torch.randint(high=len(dataloader), size=(1,))
-
             b_prev = datetime.now()
-            for batch in dataloader[random_idx:]:
-                batch = next(iter(dataloader))
+            for batch in dataloader:
                 print("load data:", datetime.now()-b_prev)
                 # sample_losses = []
                 # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
