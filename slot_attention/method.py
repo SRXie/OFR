@@ -3,7 +3,6 @@ import torch
 from torch import optim
 from torchvision import utils as vutils
 from torchvision.transforms import transforms
-from PIL import ImageDraw, ImageFont
 from datetime import datetime
 
 
@@ -15,6 +14,7 @@ from slot_attention.utils import compute_cos_distance, compute_rank_correlation
 from slot_attention.utils import batched_index_select
 from slot_attention.utils import compute_greedy_loss, compute_pseudo_greedy_loss
 from slot_attention.utils import swap_bg_slot_back
+from slot_attention.utils import captioned_masked_recons
 
 
 class SlotAttentionMethod(pl.LightningModule):
@@ -42,35 +42,6 @@ class SlotAttentionMethod(pl.LightningModule):
         batch = torch.stack([b[1] for b in batch], 0)
         if self.params.gpus > 0:
             batch = batch.to(self.device)
-
-        def captioned_masked_recons(recons, masks, slots, attns):
-            cos_dis_pixel = compute_cos_distance(attns.permute(0,2,1)) # to have shape (batch_size, num_slot, emb_size)
-            pixel_dup_sim, pixel_dup_idx = torch.sort(cos_dis_pixel, dim=-1)
-            pixel_dup_sim = pixel_dup_sim[:,:,1]
-            pixel_dup_idx = pixel_dup_idx[:,:,1]
-
-            cos_dis_feature = compute_cos_distance(slots)
-            feature_dup_sim, feature_dup_idx = torch.sort(cos_dis_feature, dim=-1)
-            feature_dup_sim = feature_dup_sim[:,:,1]
-            feature_dup_idx = feature_dup_idx[:,:,1]
-
-            attn = attns.permute(0, 2, 1).view(recons.shape[0], recons.shape[1], recons.shape[3], recons.shape[4])
-            masked_recons = recons * masks + (1 - masks)
-            masked_recons[:,:,0,:,:] = masked_recons[:,:,0,:,:]+attn
-            masked_recons = to_rgb_from_tensor(masked_recons)
-            for i in range(masked_recons.shape[0]):
-                for j in range(masked_recons.shape[1]):
-                    img = transforms.ToPILImage()(masked_recons[i,j])
-                    draw = ImageDraw.Draw(img)
-                    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 8)
-                    pixel_text = "attn: "+str(pixel_dup_idx[i,j].item())+" - {:.4f}".format(pixel_dup_sim[i,j].item())
-                    feature_text = "feat: "+str(feature_dup_idx[i,j].item())+" - {:.4f}".format(feature_dup_sim[i,j].item())
-                    draw.text((4,0), pixel_text, (0, 0, 0), font=font)
-                    draw.text((4,55), feature_text, (0, 0, 0), font=font)
-                    img = transforms.ToTensor()(img)
-                    img = to_tensor_from_rgb(img)
-                    masked_recons[i,j] = img
-            return masked_recons, attn
 
         recon_combined, recons, masks, slots, attns, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold)
         # throw background slot back

@@ -9,6 +9,7 @@ from slot_attention.utils import assert_shape
 from slot_attention.utils import build_grid
 from slot_attention.utils import conv_transpose_out_shape
 from slot_attention.utils import compute_cos_distance
+from slot_attention.utils import batched_index_select
 
 
 class SlotAttention(nn.Module):
@@ -232,6 +233,12 @@ class SlotAttentionModel(nn.Module):
         assert_shape(slots.size(), (batch_size, self.num_slots, self.slot_size))
         # `slots` has shape: [batch_size, num_slots, slot_size].
         batch_size, num_slots, slot_size = slots.shape
+
+        # to keep the one with largest attention mass in dup removal, sort slots by attention mass
+        attn_mass = attn.permute(0,2,1).sum(-1)
+        idx = torch.argsort(attn_mass, dim=1, descending=True)
+        slots = batched_index_select(slots, 1, idx)
+        attn = batched_index_select(attn, 2, idx)
 
         slots_nodup = slots.clone()
         if dup_threshold:
