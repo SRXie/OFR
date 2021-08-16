@@ -244,7 +244,7 @@ class SlotAttentionModel(nn.Module):
         if dup_threshold:
             cos_dis_pixel = compute_cos_distance(attn.permute(0,2,1)) # to have shape (batch_size, num_slot, emb_size)
             cos_dis_feature = compute_cos_distance(slots)
-            cos_dis_min = torch.min(cos_dis_pixel, cos_dis_feature)
+            cos_dis_min = cos_dis_feature # torch.min(cos_dis_pixel, cos_dis_feature)
             duplicated = cos_dis_min < dup_threshold
             # we only need the upper triangle
             duplicated = torch.triu(duplicated, diagonal=1)
