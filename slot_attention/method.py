@@ -123,6 +123,7 @@ class SlotAttentionMethod(pl.LightningModule):
         adl = self.datamodule.attr_test_dataloader()
         sample_size = 10000
         obj_aggr_losses, attr_aggr_losses = [], []
+        obj_aggr_losses_nodup, attr_aggr_losses_nodup = [], []
         obj_greedy_losses, attr_greedy_losses = [], []
         obj_greedy_losses_nodup, attr_greedy_losses_nodup = [], []
         obj_pd_greedy_losses, attr_pd_greedy_losses = [], []
@@ -134,7 +135,7 @@ class SlotAttentionMethod(pl.LightningModule):
         # if self.params.gpus > 0:
             # batch_rand_perm = batch_rand_perm.to(self.device)
 
-        def compute_test_losses(dataloader, losses, pseudo_losses, losses_nodup, pseudo_losses_nodup, aggr_losses, dup_threshold=None):
+        def compute_test_losses(dataloader, losses, pseudo_losses, losses_nodup, pseudo_losses_nodup, aggr_losses, aggr_losses_nodup, dup_threshold=None):
             b_prev = datetime.now()
             for batch in dataloader:
                 print("load data:", datetime.now()-b_prev)
@@ -147,6 +148,7 @@ class SlotAttentionMethod(pl.LightningModule):
                 cat_slots, cat_attns, cat_slots_nodup = self.model.forward(cat_batch, slots_only=True, dup_threshold=dup_threshold)
 
                 compute_aggregated_loss(cat_slots, aggr_losses)
+                compute_aggregated_loss(cat_slots_nodup, aggr_losses_nodup)
 
                 compute_greedy_loss(cat_slots, losses)
                 compute_greedy_loss(cat_slots_nodup, losses_nodup)
@@ -173,11 +175,14 @@ class SlotAttentionMethod(pl.LightningModule):
                 b_prev = datetime.now()
 
         with torch.no_grad():
-            compute_test_losses(odl, obj_greedy_losses, obj_pd_greedy_losses, obj_greedy_losses_nodup, obj_pd_greedy_losses_nodup, obj_aggr_losses, dup_threshold=self.params.dup_threshold)
-            compute_test_losses(adl, attr_greedy_losses, attr_pd_greedy_losses, attr_greedy_losses_nodup, attr_pd_greedy_losses_nodup, attr_aggr_losses, dup_threshold=self.params.dup_threshold)
+            compute_test_losses(odl, obj_greedy_losses, obj_pd_greedy_losses, obj_greedy_losses_nodup, obj_pd_greedy_losses_nodup, obj_aggr_losses, obj_aggr_losses_nodup, dup_threshold=self.params.dup_threshold)
+            compute_test_losses(adl, attr_greedy_losses, attr_pd_greedy_losses, attr_greedy_losses_nodup, attr_pd_greedy_losses_nodup, attr_aggr_losses, attr_aggr_losses_nodup, dup_threshold=self.params.dup_threshold)
 
             avg_obj_aggr_loss = torch.cat(obj_aggr_losses, 0).mean()
             avg_attr_aggr_loss = torch.cat(attr_aggr_losses, 0).mean()
+
+            avg_obj_aggr_loss_nodup = torch.cat(obj_aggr_losses_nodup, 0).mean()
+            avg_attr_aggr_loss_nodup = torch.cat(attr_aggr_losses_nodup, 0).mean()
 
             avg_obj_greedy_loss = torch.cat(obj_greedy_losses, 0).mean()
             avg_attr_greedy_loss = torch.cat(attr_greedy_losses, 0).mean()
@@ -194,6 +199,8 @@ class SlotAttentionMethod(pl.LightningModule):
                 "avg_val_loss": avg_loss,
                 "avg_obj_aggr_loss": avg_obj_aggr_loss,
                 "avg_attr_aggr_loss": avg_attr_aggr_loss,
+                "avg_obj_aggr_loss_nodup": avg_obj_aggr_loss_nodup,
+                "avg_attr_aggr_loss_nodup": avg_attr_aggr_loss_nodup,
                 "avg_obj_greedy_loss": avg_obj_greedy_loss,
                 "avg_attr_greedy_loss": avg_attr_greedy_loss,
                 "avg_obj_greedy_loss_nodup": avg_obj_greedy_loss_nodup,
