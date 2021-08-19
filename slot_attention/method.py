@@ -15,6 +15,7 @@ from slot_attention.utils import batched_index_select
 from slot_attention.utils import compute_greedy_loss, compute_pseudo_greedy_loss, compute_aggregated_loss
 from slot_attention.utils import swap_bg_slot_back
 from slot_attention.utils import captioned_masked_recons
+from slot_attention.utils import split_and_interleave_stack
 
 
 class SlotAttentionMethod(pl.LightningModule):

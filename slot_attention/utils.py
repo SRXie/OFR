@@ -221,7 +221,7 @@ def compute_greedy_loss(cat_slots, losses):
         slots_cat = torch.where(replace, slots_cat[:,-1,:].unsqueeze(1).repeat(1, num_slots-i, 1), slots_cat)[:,:-1,:]
         slots_A, slots_B, slots_C, slots_D = torch.split(slots_cat, batch_size, 0)
 
-    greedy_loss = greedy_loss/(num_slots)
+    greedy_loss = greedy_loss/num_slots
     losses.append(greedy_loss)
     return cat_indices_holder
 

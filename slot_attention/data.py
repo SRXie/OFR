@@ -73,7 +73,7 @@ class CLEVRAlgebraTestset(Dataset):
         max_n_objects: int = 10,
         test_type: str = "obj", # or "attr"
         test_cases: List[List[Optional[str]]] = None,
-        num_test_cases: int = 100000,
+        num_test_cases: int = 50000,
     ):
         super().__init__()
         self.data_root = data_root

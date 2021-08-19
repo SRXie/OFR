@@ -33,4 +33,4 @@ class SlotAttentionParams:
     warmup_steps_pct: float = 0.02
     decay_steps_pct: float = 0.2
     test_type: Tuple[str] = ("obj" , "attr")
-    dup_threshold: Optional[float] = 0.05
+    dup_threshold: Optional[float] = 0.15
