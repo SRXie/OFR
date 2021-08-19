@@ -12,7 +12,7 @@ from slot_attention.utils import Tensor
 from slot_attention.utils import to_rgb_from_tensor, to_tensor_from_rgb
 from slot_attention.utils import compute_cos_distance, compute_rank_correlation
 from slot_attention.utils import batched_index_select
-from slot_attention.utils import compute_greedy_loss, compute_pseudo_greedy_loss
+from slot_attention.utils import compute_greedy_loss, compute_pseudo_greedy_loss, compute_aggregated_loss
 from slot_attention.utils import swap_bg_slot_back
 from slot_attention.utils import captioned_masked_recons
 
@@ -39,53 +39,75 @@ class SlotAttentionMethod(pl.LightningModule):
         dl = self.datamodule.obj_test_dataloader()
         random_idx = torch.randint(high=len(dl), size=(1,))
         batch = next(iter(dl))
-        batch = torch.stack([b[1] for b in batch], 0)
+        perm = torch.randperm(self.params.batch_size)
+        idx = perm[: self.params.n_samples]
+        batch = torch.cat([b[idx] for b in batch], 0)
         if self.params.gpus > 0:
             batch = batch.to(self.device)
 
-        recon_combined, recons, masks, slots, attns, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold)
-        # throw background slot back
-        cat_indices = swap_bg_slot_back(attns)
-        recons = batched_index_select(recons, 1, cat_indices)
-        masks = batched_index_select(masks, 1, cat_indices)
-        slots = batched_index_select(slots, 1, cat_indices)
-        attns = batched_index_select(attns, 2, cat_indices)
-        recons_nodup = batched_index_select(recons_nodup, 1, cat_indices)
-        masks_nodup = batched_index_select(masks_nodup, 1, cat_indices)
-        slots_nodup = batched_index_select(slots_nodup, 1, cat_indices)
+        with torch.no_grad():
 
-        # reorder with matching
-        cat_indices = compute_greedy_loss(slots, [])
-        recons_perm = batched_index_select(recons, 1, cat_indices)
-        masks_perm = batched_index_select(masks, 1, cat_indices)
-        slots_perm = batched_index_select(slots, 1, cat_indices)
-        attns_perm = batched_index_select(attns, 2, cat_indices)
-        masked_recons_perm, attn_perm = captioned_masked_recons(recons_perm, masks_perm, slots_perm, attns_perm)
+            recon_combined, recons, masks, slots, attns, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold)
+            # throw background slot back
+            cat_indices = swap_bg_slot_back(attns)
+            recons = batched_index_select(recons, 1, cat_indices)
+            masks = batched_index_select(masks, 1, cat_indices)
+            slots = batched_index_select(slots, 1, cat_indices)
+            attns = batched_index_select(attns, 2, cat_indices)
+            recons_nodup = batched_index_select(recons_nodup, 1, cat_indices)
+            masks_nodup = batched_index_select(masks_nodup, 1, cat_indices)
+            slots_nodup = batched_index_select(slots_nodup, 1, cat_indices)
 
-        cat_indices_nodup = compute_greedy_loss(slots_nodup, [])
-        recons_perm_nodup = batched_index_select(recons_nodup, 1, cat_indices_nodup)
-        masks_perm_nodup = batched_index_select(masks_nodup, 1, cat_indices_nodup)
-        slots_perm_nodup = batched_index_select(slots_nodup, 1, cat_indices_nodup)
-        attns_perm_nodup = batched_index_select(attns, 2, cat_indices_nodup)
-        masked_recons_perm_nodup, attn_perm_nodup = captioned_masked_recons(recons_perm_nodup, masks_perm_nodup, slots_perm_nodup, attns_perm_nodup)
+            # reorder with matching
+            cat_indices = compute_greedy_loss(slots, [])
+            recons_perm = batched_index_select(recons, 1, cat_indices)
+            masks_perm = batched_index_select(masks, 1, cat_indices)
+            slots_perm = batched_index_select(slots, 1, cat_indices)
+            attns_perm = batched_index_select(attns, 2, cat_indices)
+            masked_recons_perm, masked_attn_perm, masks_perm = captioned_masked_recons(recons_perm, masks_perm, slots_perm, attns_perm)
 
-        # combine images in a nice way so we can display all outputs in one grid, output rescaled to be between 0 and 1
-        out = to_rgb_from_tensor(
-            torch.cat(
-                [
-                    torch.cat([batch.unsqueeze(1), batch.unsqueeze(1)], dim=0),  # original images
-                    torch.cat([recon_combined.unsqueeze(1),recon_combined_nodup.unsqueeze(1)], dim=0),  # reconstructions
-                    torch.cat([masked_recons_perm, masked_recons_perm_nodup], dim=0),  # each slot
-                    torch.cat([recons_perm, recons_perm_nodup], dim=0),
-                ],
-                dim=1,
+            cat_indices_nodup = compute_greedy_loss(slots_nodup, [])
+            recons_perm_nodup = batched_index_select(recons_nodup, 1, cat_indices_nodup)
+            masks_perm_nodup = batched_index_select(masks_nodup, 1, cat_indices_nodup)
+            slots_perm_nodup = batched_index_select(slots_nodup, 1, cat_indices_nodup)
+            attns_perm_nodup = batched_index_select(attns, 2, cat_indices_nodup)
+            masked_recons_perm_nodup, masked_attn_perm_nodup, masks_perm_nodup = captioned_masked_recons(recons_perm_nodup, masks_perm_nodup, slots_perm_nodup, attns_perm_nodup)
+
+            batch = split_and_interleave_stack(batch, self.params.n_samples)
+            recon_combined = split_and_interleave_stack(recon_combined, self.params.n_samples)
+            recons_perm = split_and_interleave_stack(recons_perm, self.params.n_samples)
+            masks_perm = split_and_interleave_stack(masks_perm, self.params.n_samples)
+            slots_perm = split_and_interleave_stack(slots_perm, self.params.n_samples)
+            masked_attn_perm = split_and_interleave_stack(masked_attn_perm, self.params.n_samples)
+            recon_combined_nodup = split_and_interleave_stack(recon_combined_nodup, self.params.n_samples)
+            recons_perm_nodup = split_and_interleave_stack(recons_perm_nodup, self.params.n_samples)
+            masks_perm_nodup = split_and_interleave_stack(masks_perm_nodup, self.params.n_samples)
+            slots_perm_nodup = split_and_interleave_stack(slots_perm_nodup, self.params.n_samples)
+            masked_recons_perm = split_and_interleave_stack(masked_recons_perm, self.params.n_samples)
+            masked_recons_perm_nodup = split_and_interleave_stack(masked_recons_perm_nodup, self.params.n_samples)
+            masked_attn_perm_nodup = split_and_interleave_stack(masked_attn_perm_nodup, self.params.n_samples)
+            masked_attn_perm = split_and_interleave_stack(masked_attn_perm, self.params.n_samples)
+            masked_attn_perm_nodup = split_and_interleave_stack(masked_attn_perm_nodup, self.params.n_samples)
+
+
+            # combine images in a nice way so we can display all outputs in one grid, output rescaled to be between 0 and 1
+            out = to_rgb_from_tensor(
+                torch.cat(
+                    [
+                        torch.cat([batch.unsqueeze(1), batch.unsqueeze(1)], dim=0),  # original images
+                        torch.cat([recon_combined.unsqueeze(1),recon_combined_nodup.unsqueeze(1)], dim=0),  # reconstructions
+                        torch.cat([masked_attn_perm, masked_attn_perm_nodup], dim=0),  # each slot
+                        torch.cat([masked_recons_perm, masked_recons_perm_nodup], dim=0),
+                        torch.cat([masks_perm, masks_perm_nodup], dim=0),
+                    ],
+                    dim=1,
+                )
             )
-        )
 
-        batch_size, num_slots, C, H, W = recons.shape
-        images = vutils.make_grid(
-            out.view(2 * batch_size * out.shape[1], C, H, W).cpu(), normalize=False, nrow=out.shape[1],
-        )
+            batch_size, num_slots, C, H, W = recons.shape
+            images = vutils.make_grid(
+                out.view(2 * batch_size * out.shape[1], C, H, W).cpu(), normalize=False, nrow=out.shape[1],
+            )
 
         return images
 
@@ -99,6 +121,7 @@ class SlotAttentionMethod(pl.LightningModule):
         odl = self.datamodule.obj_test_dataloader()
         adl = self.datamodule.attr_test_dataloader()
         sample_size = 10000
+        obj_aggr_losses, attr_aggr_losses = [], []
         obj_greedy_losses, attr_greedy_losses = [], []
         obj_greedy_losses_nodup, attr_greedy_losses_nodup = [], []
         obj_pd_greedy_losses, attr_pd_greedy_losses = [], []
@@ -110,7 +133,7 @@ class SlotAttentionMethod(pl.LightningModule):
         # if self.params.gpus > 0:
             # batch_rand_perm = batch_rand_perm.to(self.device)
 
-        def compute_test_losses(dataloader, losses, pseudo_losses, losses_nodup, pseudo_losses_nodup, dup_threshold=None):
+        def compute_test_losses(dataloader, losses, pseudo_losses, losses_nodup, pseudo_losses_nodup, aggr_losses, dup_threshold=None):
             b_prev = datetime.now()
             for batch in dataloader:
                 print("load data:", datetime.now()-b_prev)
@@ -122,9 +145,7 @@ class SlotAttentionMethod(pl.LightningModule):
                     cat_batch = cat_batch.to(self.device)
                 cat_slots, cat_attns, cat_slots_nodup = self.model.forward(cat_batch, slots_only=True, dup_threshold=dup_threshold)
 
-                cat_indices = swap_bg_slot_back(cat_attns)
-                cat_slots = batched_index_select(cat_slots, 1, cat_indices)
-                cat_slots_nodup = batched_index_select(cat_slots_nodup, 1, cat_indices)
+                compute_aggregated_loss(cat_slots, aggr_losses)
 
                 compute_greedy_loss(cat_slots, losses)
                 compute_greedy_loss(cat_slots_nodup, losses_nodup)
@@ -150,34 +171,40 @@ class SlotAttentionMethod(pl.LightningModule):
                 print("batch time:", datetime.now()-b_prev)
                 b_prev = datetime.now()
 
-        compute_test_losses(odl, obj_greedy_losses, obj_pd_greedy_losses, obj_greedy_losses_nodup, obj_pd_greedy_losses_nodup, dup_threshold=self.params.dup_threshold)
-        compute_test_losses(adl, attr_greedy_losses, attr_pd_greedy_losses, attr_greedy_losses_nodup, attr_pd_greedy_losses_nodup, dup_threshold=self.params.dup_threshold)
+        with torch.no_grad():
+            compute_test_losses(odl, obj_greedy_losses, obj_pd_greedy_losses, obj_greedy_losses_nodup, obj_pd_greedy_losses_nodup, obj_aggr_losses, dup_threshold=self.params.dup_threshold)
+            compute_test_losses(adl, attr_greedy_losses, attr_pd_greedy_losses, attr_greedy_losses_nodup, attr_pd_greedy_losses_nodup, attr_aggr_losses, dup_threshold=self.params.dup_threshold)
 
-        avg_obj_greedy_loss = torch.cat(obj_greedy_losses, 0).mean()
-        avg_attr_greedy_loss = torch.cat(attr_greedy_losses, 0).mean()
+            avg_obj_aggr_loss = torch.cat(obj_aggr_losses, 0).mean()
+            avg_attr_aggr_loss = torch.cat(attr_aggr_losses, 0).mean()
 
-        avg_obj_greedy_loss_nodup = torch.cat(obj_greedy_losses_nodup, 0).mean()
-        avg_attr_greedy_loss_nodup = torch.cat(attr_greedy_losses_nodup, 0).mean()
+            avg_obj_greedy_loss = torch.cat(obj_greedy_losses, 0).mean()
+            avg_attr_greedy_loss = torch.cat(attr_greedy_losses, 0).mean()
 
-        avg_obj_pd_greedy_loss = torch.cat(obj_pd_greedy_losses, 0).mean()
-        avg_attr_pd_greedy_loss = torch.cat(attr_pd_greedy_losses, 0).mean()
-        avg_obj_pd_greedy_loss_nodup = torch.cat(obj_pd_greedy_losses_nodup, 0).mean()
-        avg_attr_pd_greedy_loss_nodup = torch.cat(attr_pd_greedy_losses_nodup, 0).mean()
+            avg_obj_greedy_loss_nodup = torch.cat(obj_greedy_losses_nodup, 0).mean()
+            avg_attr_greedy_loss_nodup = torch.cat(attr_greedy_losses_nodup, 0).mean()
 
-        logs = {
-            "avg_val_loss": avg_loss,
-            "avg_obj_greedy_loss": avg_obj_greedy_loss,
-            "avg_attr_greedy_loss": avg_attr_greedy_loss,
-            "avg_obj_greedy_loss_nodup": avg_obj_greedy_loss_nodup,
-            "avg_attr_greedy_loss_nodup": avg_attr_greedy_loss_nodup,
-            "avg_obj_pseudo_greedy_loss": avg_obj_pd_greedy_loss,
-            "avg_attr_pseudo_greedy_loss": avg_attr_pd_greedy_loss,
-            "avg_obj_pseudo_greedy_loss_nodup": avg_obj_pd_greedy_loss_nodup,
-            "avg_attr_pseudo_greedy_loss_nodup": avg_attr_pd_greedy_loss_nodup,
-        }
-        self.log_dict(logs, sync_dist=True)
+            avg_obj_pd_greedy_loss = torch.cat(obj_pd_greedy_losses, 0).mean()
+            avg_attr_pd_greedy_loss = torch.cat(attr_pd_greedy_losses, 0).mean()
+            avg_obj_pd_greedy_loss_nodup = torch.cat(obj_pd_greedy_losses_nodup, 0).mean()
+            avg_attr_pd_greedy_loss_nodup = torch.cat(attr_pd_greedy_losses_nodup, 0).mean()
 
-        print("; ".join([f"{k}: {v.item():.6f}" for k, v in logs.items()]))
+            logs = {
+                "avg_val_loss": avg_loss,
+                "avg_obj_aggr_loss": avg_obj_aggr_loss,
+                "avg_attr_aggr_loss": avg_attr_aggr_loss,
+                "avg_obj_greedy_loss": avg_obj_greedy_loss,
+                "avg_attr_greedy_loss": avg_attr_greedy_loss,
+                "avg_obj_greedy_loss_nodup": avg_obj_greedy_loss_nodup,
+                "avg_attr_greedy_loss_nodup": avg_attr_greedy_loss_nodup,
+                "avg_obj_pseudo_greedy_loss": avg_obj_pd_greedy_loss,
+                "avg_attr_pseudo_greedy_loss": avg_attr_pd_greedy_loss,
+                "avg_obj_pseudo_greedy_loss_nodup": avg_obj_pd_greedy_loss_nodup,
+                "avg_attr_pseudo_greedy_loss_nodup": avg_attr_pd_greedy_loss_nodup,
+            }
+            self.log_dict(logs, sync_dist=True)
+
+            print("; ".join([f"{k}: {v.item():.6f}" for k, v in logs.items()]))
 
     def configure_optimizers(self):
         optimizer = optim.Adam(self.model.parameters(), lr=self.params.lr, weight_decay=self.params.weight_decay)

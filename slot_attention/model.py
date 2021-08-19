@@ -234,9 +234,10 @@ class SlotAttentionModel(nn.Module):
         # `slots` has shape: [batch_size, num_slots, slot_size].
         batch_size, num_slots, slot_size = slots.shape
 
-        # to keep the one with largest attention mass in dup removal, sort slots by attention mass
-        attn_mass = attn.permute(0,2,1).sum(-1)
-        idx = torch.argsort(attn_mass, dim=1, descending=True)
+        # to keep the one with largest attention mass in dup removal, sort slots by max-pooled attention mass
+        attn_mass = attn.permute(0,2,1).clone()
+        attn_mass = torch.where(attn_mass>=attn_mass.max(dim=1)[0].unsqueeze(1).repeat(1,num_slots,1), attn_mass, torch.zeros_like(attn_mass)).sum(-1)
+        idx = torch.argsort(attn_mass.detach(), dim=1, descending=True)
         slots = batched_index_select(slots, 1, idx)
         attn = batched_index_select(attn, 2, idx)
 
@@ -245,7 +246,7 @@ class SlotAttentionModel(nn.Module):
             cos_dis_pixel = compute_cos_distance(attn.permute(0,2,1)) # to have shape (batch_size, num_slot, emb_size)
             cos_dis_feature = compute_cos_distance(slots)
             cos_dis_min = torch.min(cos_dis_pixel, cos_dis_feature)
-            duplicated = cos_dis_min < dup_threshold
+            duplicated = cos_dis_feature < dup_threshold
             # we only need the upper triangle
             duplicated = torch.triu(duplicated, diagonal=1)
             duplicated = torch.sum(duplicated, dim=1)

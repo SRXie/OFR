@@ -109,6 +109,12 @@ def set_seed_everywhere(seed):
     np.random.seed(seed)
     random.seed(seed)
 
+def split_and_interleave_stack(input, split_size):
+    x, y, z, w = torch.split(input, split_size, 0)
+    view_shape = [size for size in x.shape]
+    view_shape[0]*=4
+    return torch.stack((x, y, z, w), dim=1).view(view_shape)
+
 def interleave_stack(x, y):
     return torch.stack((x, y), dim=1).view(2*x.shape[0], x.shape[1], x.shape[2], x.shape[3], x.shape[4])
 
@@ -123,44 +129,58 @@ def batched_index_select(input, dim, index):
     index = index.view(views).expand(expanse)
     return torch.gather(input, dim, index)
 
+def compute_aggregated_loss(cat_slots, losses):
+    slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
+    batch_size, num_slots, slot_size = slots_A.shape
+
+    ext_A = slots_A.sum(1)
+    ext_B = slots_B.sum(1)
+    ext_C = slots_C.sum(1)
+    ext_D = slots_D.sum(1)
+    loss = torch.norm(ext_A-ext_B+ext_C-ext_D, 2, -1)
+    norm_term = torch.stack([torch.norm(ext_A-ext_B, 2, -1), torch.norm(ext_A-ext_D, 2, -1), torch.norm(ext_C-ext_B, 2, -1), torch.norm(ext_C-ext_D, 2, -1)], dim=-1)
+    norm_term = torch.max(norm_term, dim=-1)[0]
+    loss = loss.div(norm_term+0.0001)
+
+    losses.append(loss)
+
 def compute_pseudo_greedy_loss(cat_slots, losses):
     slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
     batch_size, num_slots, slot_size = slots_A.shape
     # greedy assignment regardless of re-assignment
     # TODO: check if there is a trivial solution to this assignment
-    ext_A = slots_A.view(batch_size, num_slots, 1, 1, 1, slot_size)
-    ext_B = slots_B.view(batch_size, 1, num_slots, 1, 1, slot_size)
-    ext_C = slots_C.view(batch_size, 1, 1, num_slots, 1, slot_size)
-    ext_D = slots_D.view(batch_size, 1, 1, 1, num_slots, slot_size)
-    greedy_criterion = torch.square(ext_A-ext_B+ext_C-ext_D).sum(dim=-1)
+    ext_A = slots_A.view(batch_size, num_slots, 1, 1, 1, slot_size).expand(-1, -1, num_slots, num_slots, num_slots, -1)
+    ext_B = slots_B.view(batch_size, 1, num_slots, 1, 1, slot_size).expand(-1, num_slots, -1, num_slots, num_slots, -1)
+    ext_C = slots_C.view(batch_size, 1, 1, num_slots, 1, slot_size).expand(-1, num_slots, num_slots, -1, num_slots, -1)
+    ext_D = slots_D.view(batch_size, 1, 1, 1, num_slots, slot_size).expand(-1, num_slots, num_slots, num_slots, -1, -1)
+    greedy_criterion = torch.norm(ext_A-ext_B+ext_C-ext_D, 2, -1)
+    norm_term = torch.stack([torch.norm(ext_A-ext_B, 2, -1), torch.norm(ext_A-ext_D, 2, -1), torch.norm(ext_C-ext_B, 2, -1), torch.norm(ext_C-ext_D, 2, -1)], dim=-1)
+    norm_term = torch.max(norm_term, dim=-1)[0]
+    greedy_criterion = greedy_criterion.div(norm_term+0.0001)
     # backtrace for greedy matching (3 times)
     greedy_criterion, _ = greedy_criterion.min(-1)
     greedy_criterion, _ = greedy_criterion.min(-1)
     greedy_criterion, _ = greedy_criterion.min(-1)
 
-    greedy_loss = greedy_criterion.sum(dim=-1)/(num_slots*slot_size)
+    greedy_loss = greedy_criterion.sum(dim=-1)/num_slots
     losses.append(greedy_loss)
 
 def compute_greedy_loss(cat_slots, losses):
-    slots_A_full, slots_B_full, slots_C_full, slots_D_full = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
-    # We exclude the background slot from beginning
-    # greedy_loss = torch.square(slots_A_full[:,-1,:]-slots_B_full[:,-1,:]+slots_C_full[:,-1,:]-slots_D_full[:,-1,:]).sum(dim=-1)
-    slots_A = slots_A_full[:, :-1, :]
-    slots_B = slots_B_full[:, :-1, :]
-    slots_C = slots_C_full[:, :-1, :]
-    slots_D = slots_D_full[:, :-1, :]
-
+    slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
     batch_size, num_slots, slot_size = slots_A.shape
     # greedy assignment without multi-assignment
     greedy_loss = torch.zeros(batch_size).to(cat_slots.device)
-    cat_indices_holder = torch.arange(0, num_slots+1, dtype=int).unsqueeze(0).repeat(4*batch_size, 1).to(cat_slots.device)
+    cat_indices_holder = torch.arange(0, num_slots, dtype=int).unsqueeze(0).repeat(4*batch_size, 1).to(cat_slots.device)
 
     for i in range(num_slots):
-        ext_A = slots_A.view(batch_size, num_slots-i, 1, 1, 1, slot_size)
-        ext_B = slots_B.view(batch_size, 1, num_slots-i, 1, 1, slot_size)
-        ext_C = slots_C.view(batch_size, 1, 1, num_slots-i, 1, slot_size)
-        ext_D = slots_D.view(batch_size, 1, 1, 1, num_slots-i, slot_size)
-        greedy_criterion = torch.square(ext_A-ext_B+ext_C-ext_D).sum(dim=-1)
+        ext_A = slots_A.view(batch_size, num_slots-i, 1, 1, 1, slot_size).expand(-1, -1, num_slots-i, num_slots-i, num_slots-i, -1)
+        ext_B = slots_B.view(batch_size, 1, num_slots-i, 1, 1, slot_size).expand(-1, num_slots-i, -1, num_slots-i, num_slots-i, -1)
+        ext_C = slots_C.view(batch_size, 1, 1, num_slots-i, 1, slot_size).expand(-1, num_slots-i, num_slots-i, -1, num_slots-i, -1)
+        ext_D = slots_D.view(batch_size, 1, 1, 1, num_slots-i, slot_size).expand(-1, num_slots-i, num_slots-i, num_slots-i, -1, -1)
+        greedy_criterion = torch.norm(ext_A-ext_B+ext_C-ext_D, 2, -1)
+        norm_term = torch.stack([torch.norm(ext_A-ext_B, 2, -1), torch.norm(ext_A-ext_D, 2, -1), torch.norm(ext_C-ext_B, 2, -1), torch.norm(ext_C-ext_D, 2, -1)], dim=-1)
+        norm_term = torch.max(norm_term, dim=-1)[0]
+        greedy_criterion = greedy_criterion.div(norm_term+0.0001)
         # backtrace for greedy matching (3 times)
         greedy_criterion, indices_D = greedy_criterion.min(-1)
         greedy_criterion, indices_C = greedy_criterion.min(-1)
@@ -201,7 +221,7 @@ def compute_greedy_loss(cat_slots, losses):
         slots_cat = torch.where(replace, slots_cat[:,-1,:].unsqueeze(1).repeat(1, num_slots-i, 1), slots_cat)[:,:-1,:]
         slots_A, slots_B, slots_C, slots_D = torch.split(slots_cat, batch_size, 0)
 
-    greedy_loss = greedy_loss/(num_slots*slot_size)
+    greedy_loss = greedy_loss/(num_slots)
     losses.append(greedy_loss)
     return cat_indices_holder
 
@@ -237,20 +257,44 @@ def captioned_masked_recons(recons, masks, slots, attns):
     feature_dup_idx = feature_dup_idx[:,:,1]
 
     attn = attns.permute(0, 2, 1).view(recons.shape[0], recons.shape[1], recons.shape[3], recons.shape[4])
-    masked_recons = torch.zeros_like(recons)#recons * masks + (1 - masks)
-    masked_recons[:,:,2,:,:] = masked_recons[:,:,2,:,:]+masks.squeeze(2)
-    masked_recons[:,:,0,:,:] = masked_recons[:,:,0,:,:]+attn
+    masked_recons = recons #* masks + (1 - masks)
     masked_recons = to_rgb_from_tensor(masked_recons)
+    masked_attns = torch.zeros_like(recons)
+    masked_attns[:,:,2,:,:] = masked_attns[:,:,2,:,:]+masks.squeeze(2)
+    masked_attns[:,:,0,:,:] = masked_attns[:,:,0,:,:]+attn
+    masked_attns = to_rgb_from_tensor(masked_attns)
+
+    # TODO: We keep this mass instead of attn mass for now
+    mask_mass = masks.view(recons.shape[0], recons.shape[1], -1)
+    mask_mass = torch.where(mask_mass>=mask_mass.max(dim=1)[0].unsqueeze(1).repeat(1,recons.shape[1],1), mask_mass, torch.zeros_like(mask_mass)).sum(-1)
+    masks = masks.repeat(1,1,3,1,1)
+    masks = to_rgb_from_tensor(masks)
     for i in range(masked_recons.shape[0]):
         for j in range(masked_recons.shape[1]):
             img = transforms.ToPILImage()(masked_recons[i,j])
             draw = ImageDraw.Draw(img)
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 8)
-            pixel_text = "attn: "+str(pixel_dup_idx[i,j].item())+" - {:.4f}".format(pixel_dup_sim[i,j].item())
             feature_text = "feat: "+str(feature_dup_idx[i,j].item())+" - {:.4f}".format(feature_dup_sim[i,j].item())
-            draw.text((4,0), pixel_text, (0, 0, 0), font=font)
             draw.text((4,55), feature_text, (0, 0, 0), font=font)
             img = transforms.ToTensor()(img)
             img = to_tensor_from_rgb(img)
             masked_recons[i,j] = img
-    return masked_recons, attn
+        for j in range(masked_recons.shape[1]):
+            img = transforms.ToPILImage()(masked_attns[i,j])
+            draw = ImageDraw.Draw(img)
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 8)
+            pixel_text = "attn: "+str(pixel_dup_idx[i,j].item())+" - {:.4f}".format(pixel_dup_sim[i,j].item())
+            draw.text((4,0), pixel_text, (0, 0, 0), font=font)
+            img = transforms.ToTensor()(img)
+            img = to_tensor_from_rgb(img)
+            masked_attns[i,j] = img
+        for j in range(masked_recons.shape[1]):
+            img = transforms.ToPILImage()(masks[i,j])
+            draw = ImageDraw.Draw(img)
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 8)
+            pixel_text = "attn: {:.4f}".format(mask_mass[i,j].item())
+            draw.text((4,0), pixel_text, (0, 0, 0), font=font)
+            img = transforms.ToTensor()(img)
+            img = to_tensor_from_rgb(img)
+            masks[i,j] = img
+    return masked_recons, masked_attns, masks
