@@ -234,12 +234,12 @@ class SlotAttentionModel(nn.Module):
         # `slots` has shape: [batch_size, num_slots, slot_size].
         batch_size, num_slots, slot_size = slots.shape
 
-        # to keep the one with largest attention mass in dup removal, sort slots by max-pooled attention mass
-        attn_mass = attn.permute(0,2,1).clone()
-        attn_mass = torch.where(attn_mass>=attn_mass.max(dim=1)[0].unsqueeze(1).repeat(1,num_slots,1), attn_mass, torch.zeros_like(attn_mass)).sum(-1)
-        idx = torch.argsort(attn_mass.detach(), dim=1, descending=True)
-        slots = batched_index_select(slots, 1, idx)
-        attn = batched_index_select(attn, 2, idx)
+        # # to keep the one with largest attention mass in dup removal, sort slots by max-pooled attention mass
+        # attn_mass = attn.permute(0,2,1).clone()
+        # attn_mass = torch.where(attn_mass>=attn_mass.max(dim=1)[0].unsqueeze(1).repeat(1,num_slots,1), attn_mass, torch.zeros_like(attn_mass)).sum(-1)
+        # idx = torch.argsort(attn_mass.detach(), dim=1, descending=True)
+        # slots = batched_index_select(slots, 1, idx)
+        # attn = batched_index_select(attn, 2, idx)
 
         slots_nodup = slots.clone()
         if dup_threshold:
