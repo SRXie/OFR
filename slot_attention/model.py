@@ -330,11 +330,15 @@ class SlotAttentionModel(nn.Module):
 
             assert_shape(attn.shape, (batch_size, H*W, num_slots))
             attn = attn.permute(0,2,1).view(batch_size, num_slots, H, W)
+            index = torch.argmax(attn, dim=1)
+            # get binarized masks (batch_size, , H, W)
+            attn_mask = torch.zeros_like(attn)
+            attn_mask[torch.arange(batch_size)[:, None, None], index, torch.arange(H)[None, :, None], torch.arange(W)[None, None, :]] = 1.0
 
             mask_aris, attn_ari = None, None
             for b in range(batch_size):
                 mask_ari = compute_mask_ari(mask_gt[b].detach().cpu(), pred_mask[b].detach().cpu())
-                attn_ari = compute_mask_ari(mask_gt[b].detach().cpu(), attn[b].detach().cpu())
+                attn_ari = compute_mask_ari(mask_gt[b].detach().cpu(), attn_mask[b].detach().cpu())
                 if not mask_aris:
                     mask_aris = mask_ari
                     attn_aris = attn_ari
