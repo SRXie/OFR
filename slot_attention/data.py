@@ -233,7 +233,6 @@ class CLEVRDataModule(pl.LightningDataModule):
             data_root=self.val_root,
             max_num_images=self.num_val_images,
             clevr_transforms=self.clevr_transforms,
-            split="val",
             max_n_objects=self.max_n_objects,
         )
 

@@ -306,7 +306,7 @@ class SlotAttentionModel(nn.Module):
         else:
             return recon_combined, recons, masks, slots, attn
 
-    def loss_function(self, input):
+    def loss_function(self, input, mask_gt=None):
         recon_combined, recons, masks, slots, attn = self.forward(input)
         loss = F.mse_loss(recon_combined, input)
 
