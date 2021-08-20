@@ -3,6 +3,7 @@ import json
 import csv
 import os
 import random
+import numpy as np
 from typing import Callable
 from typing import List
 from typing import Optional
@@ -63,6 +64,60 @@ class CLEVRDataset(Dataset):
                 paths.append(image_path)
             i += 1
         return sorted(compact(paths))
+
+class CLEVRValset(Dataset):
+    def __init__(
+        self,
+        data_root: str,
+        max_num_images: Optional[int],
+        clevr_transforms: Callable,
+        max_n_objects: int = 10,
+    ):
+        super().__init__()
+        self.data_root = data_root
+        self.clevr_transforms = clevr_transforms
+        self.max_num_main_scenes = max_num_images
+        self.img_root =  os.path.join(data_root, "images")
+        self.mask_root = os.path.join(data_root, "masks")
+        self.meta_root = os.path.join(data_root, "meta")
+        self.max_n_objects = max_n_objects
+
+        assert os.path.exists(self.data_root), f"Path {self.data_root} does not exist"
+        assert os.path.exists(self.img_root), f"Path {self.img_root} does not exist"
+        assert os.path.exists(self.mask_root), f"Path {self.mask_root} does not exist"
+        assert os.path.exists(self.meta_root), f"Path {self.meta_root} does not exist"
+
+        self.img_files = self.get_files()
+
+    def __getitem__(self, index: int):
+        image_paths = self.img_files[index]
+        imgs = [Image.open(image_path) for image_path in image_paths]
+        imgs = [img.convert("RGB") for img in imgs]
+        return [self.clevr_transforms(img) for img in imgs]
+
+    def __len__(self):
+        return len(self.img_files)
+
+    def get_files(self) -> List[str]:
+        paths: List[List[Optional[str]]] = []
+        i = 0
+        while (self.max_num_main_scenes is None or i < self.max_num_main_scenes) and i < 100000:
+            meta_path = os.path.join(self.meta_root, '{}.npz'.format(i))
+            meta = np.load(meta_path, allow_pickle=True)
+
+            num_objects_in_scene = int(meta['visibility'].sum())
+            if num_objects_in_scene <= self.max_n_objects:
+                img_paths = []
+                image_path = os.path.join(self.img_root, '{}.png'.format(i))
+                assert os.path.exists(image_path), f"{image_path} does not exist"
+                img_paths.append(image_path)
+                for j in range(self.max_n_objects+1):
+                    mask_path = os.path.join(self.mask_root, '{}_{}.png'.format(i, j))
+                    assert os.path.exists(mask_path), f"{mask_path} does not exist"
+                    img_paths.append(mask_path)
+                paths.append(img_paths)
+            i += 1
+        return paths
 
 class CLEVRAlgebraTestset(Dataset):
     def __init__(
@@ -139,6 +194,7 @@ class CLEVRDataModule(pl.LightningDataModule):
     def __init__(
         self,
         data_root: str,
+        val_root: str,
         test_root: str,
         train_batch_size: int,
         val_batch_size: int,
@@ -154,6 +210,7 @@ class CLEVRDataModule(pl.LightningDataModule):
     ):
         super().__init__()
         self.data_root = data_root
+        self.val_root = val_root
         self.test_root = test_root
         self.train_batch_size = train_batch_size
         self.val_batch_size = val_batch_size
@@ -172,8 +229,8 @@ class CLEVRDataModule(pl.LightningDataModule):
             split="train",
             max_n_objects=self.max_n_objects,
         )
-        self.val_dataset = CLEVRDataset(
-            data_root=self.data_root,
+        self.val_dataset = CLEVRValset(
+            data_root=self.val_root,
             max_num_images=self.num_val_images,
             clevr_transforms=self.clevr_transforms,
             split="val",

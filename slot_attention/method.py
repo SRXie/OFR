@@ -1,5 +1,6 @@
 import pytorch_lightning as pl
 import torch
+import numpy as np
 from torch import optim
 from torchvision import utils as vutils
 from torchvision.transforms import transforms
@@ -113,11 +114,14 @@ class SlotAttentionMethod(pl.LightningModule):
         return images
 
     def validation_step(self, batch, batch_idx, optimizer_idx=0):
-        val_loss = self.model.loss_function(batch)
+        # batch is a list of lengthn num_slots+1
+        val_loss = self.model.loss_function(batch[0], batch[1:])
         return val_loss
 
     def validation_epoch_end(self, outputs):
         avg_loss = torch.stack([x["loss"] for x in outputs]).mean()
+        avg_ari_mask = np.stack([x["mask_ari"] for x in outputs]).mean()
+        avg_ari_attn = np.stack([x["attn_ari"] for x in outputs]).mean()
         # Algebra Test starts here
         odl = self.datamodule.obj_test_dataloader()
         adl = self.datamodule.attr_test_dataloader()
@@ -197,6 +201,8 @@ class SlotAttentionMethod(pl.LightningModule):
 
             logs = {
                 "avg_val_loss": avg_loss,
+                "avg_ari_mask": avg_ari_mask,
+                "avg_ari_attn": avg_ari_attn,
                 "avg_obj_aggr_loss": avg_obj_aggr_loss,
                 "avg_attr_aggr_loss": avg_attr_aggr_loss,
                 "avg_obj_aggr_loss_nodup": avg_obj_aggr_loss_nodup,

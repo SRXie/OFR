@@ -59,6 +59,7 @@ class _Workplace(object):
 
         clevr_datamodule = CLEVRDataModule(
             data_root=cfg.data_root,
+            val_root=cfg.val_root,
             test_root=cfg.test_root,
             max_n_objects=cfg.num_slots - 1,
             train_batch_size=cfg.batch_size,

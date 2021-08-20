@@ -53,6 +53,7 @@ def main(params: Optional[SlotAttentionParams] = None):
 
     clevr_datamodule = CLEVRDataModule(
         data_root=params.data_root,
+        val_root=params.val_root,
         test_root=params.test_root,
         max_n_objects=params.num_slots - 1,
         train_batch_size=params.batch_size,

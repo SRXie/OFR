@@ -16,6 +16,7 @@ class SlotAttentionParams:
     num_slots: int = 7
     num_iterations: int = 4
     data_root: str = "/datasets01/CLEVR_v1.0/060817/"
+    val_root: str = "/checkpoint/siruixie/clevr_with_masks/"
     test_root: str = "/checkpoint/siruixie/clevr_obj_test/output/"
     gpus: int = 1
     max_epochs: int = 100

@@ -10,6 +10,7 @@ from slot_attention.utils import build_grid
 from slot_attention.utils import conv_transpose_out_shape
 from slot_attention.utils import compute_cos_distance
 from slot_attention.utils import batched_index_select
+from slot_attention.utils import compute_mask_ari
 
 
 class SlotAttention(nn.Module):
@@ -308,9 +309,45 @@ class SlotAttentionModel(nn.Module):
     def loss_function(self, input):
         recon_combined, recons, masks, slots, attn = self.forward(input)
         loss = F.mse_loss(recon_combined, input)
-        return {
-            "loss": loss,
-        }
+
+        if not mask_gt:
+            return {
+                "loss": loss,
+            }
+        else:
+            # compute ARI with mask gt
+            # (batch_size, num_slots, 1, H, W) to (batch_size, num_slots, H, W)
+            pred_mask = masks.squeeze(2)
+
+            batch_size, num_slots, H, W = pred_mask.size()
+            mask_gt = torch.stack(mask_gt, 1)[:,:,0,:,:]
+            assert_shape(mask_gt.shape, pred_mask.shape)
+            # index shape (batch_size, H, W)
+            index = torch.argmax(pred_mask, dim=1)
+            # get binarized masks (batch_size, , H, W)
+            pred_mask = torch.zeros_like(pred_mask)
+            pred_mask[torch.arange(batch_size)[:, None, None], index, torch.arange(H)[None, :, None], torch.arange(W)[None, None, :]] = 1.0
+
+            assert_shape(attn.shape, (batch_size, H*W, num_slots))
+            attn = attn.permute(0,2,1).view(batch_size, num_slots, H, W)
+
+            mask_aris, attn_ari = None, None
+            for b in range(batch_size):
+                mask_ari = compute_mask_ari(mask_gt[b].detach().cpu(), pred_mask[b].detach().cpu())
+                attn_ari = compute_mask_ari(mask_gt[b].detach().cpu(), attn[b].detach().cpu())
+                if not mask_aris:
+                    mask_aris = mask_ari
+                    attn_aris = attn_ari
+                else:
+                    mask_aris += mask_ari
+                    attn_aris = attn_ari
+            mask_ari = mask_aris/batch_size
+            attn_ari = attn_aris/batch_size
+            return {
+                "loss": loss,
+                "attn_ari": attn_ari,
+                "mask_ari": mask_ari,
+            }
 
 
 class SoftPositionEmbed(nn.Module):
