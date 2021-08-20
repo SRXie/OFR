@@ -6,7 +6,7 @@ lr: 0.0004
 batch_size: 64
 val_batch_size: 64
 test_batch_size: 256
-resolution: [64, 64] # Tuple[int, int]
+resolution: [128, 128] # Tuple[int, int]
 num_slots: 7
 num_iterations: 4
 data_root: /datasets01/CLEVR_v1.0/060817/
