@@ -10,6 +10,7 @@ from typing import Optional
 from typing import Tuple
 
 import pytorch_lightning as pl
+import torch
 from PIL import Image
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
