@@ -98,9 +98,9 @@ class SlotAttentionMethod(pl.LightningModule):
                     [
                         torch.cat([batch.unsqueeze(1), batch.unsqueeze(1)], dim=0),  # original images
                         torch.cat([recon_combined.unsqueeze(1),recon_combined_nodup.unsqueeze(1)], dim=0),  # reconstructions
-                        torch.cat([masked_attn_perm, masked_attn_perm_nodup], dim=0),  # each slot
                         torch.cat([masked_recons_perm, masked_recons_perm_nodup], dim=0),
                         torch.cat([masks_perm, masks_perm_nodup], dim=0),
+                        torch.cat([masked_attn_perm, masked_attn_perm_nodup], dim=0),  # each slot
                     ],
                     dim=1,
                 )

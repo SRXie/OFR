@@ -72,6 +72,7 @@ class CLEVRValset(Dataset):
         max_num_images: Optional[int],
         clevr_transforms: Callable,
         max_n_objects: int = 10,
+        val_list: None
     ):
         super().__init__()
         self.data_root = data_root
@@ -87,7 +88,10 @@ class CLEVRValset(Dataset):
         assert os.path.exists(self.mask_root), f"Path {self.mask_root} does not exist"
         assert os.path.exists(self.meta_root), f"Path {self.meta_root} does not exist"
 
-        self.img_files = self.get_files()
+        if val_list:
+            self.img_files = val_list
+        else:
+            self.img_files = self.get_files()
 
     def __getitem__(self, index: int):
         image_paths = self.img_files[index]
@@ -117,6 +121,9 @@ class CLEVRValset(Dataset):
                     img_paths.append(mask_path)
                 paths.append(img_paths)
             i += 1
+        with open(os.path.join(self.val_root, "CLEVR_val_list.csv"), "w") as f:
+            wr = csv.writer(f)
+            wr.writerows(paths)
         return paths
 
 class CLEVRAlgebraTestset(Dataset):
@@ -146,8 +153,7 @@ class CLEVRAlgebraTestset(Dataset):
         else:
             self.img_files = self.get_files()
         if len(self.img_files) > num_test_cases:
-            start_idx =  random.randint(0, len(self.img_files)-num_test_cases)
-            self.img_files = self.img_files[start_idx:start_idx+num_test_cases]
+            self.img_files = self.img_files[0:num_test_cases]
         print("Test case size: ", len(self.img_files))
 
     def __getitem__(self, index: int):
@@ -255,24 +261,49 @@ class CLEVRDataModule(pl.LightningDataModule):
         )
 
     def train_dataloader(self):
+        def seed_worker(worker_id):
+            worker_seed = torch.initial_seed() % 2**32
+            numpy.random.seed(worker_seed)
+            random.seed(worker_seed)
+
+        g = torch.Generator()
+        g.manual_seed(0)
         return DataLoader(
             self.train_dataset,
             batch_size=self.train_batch_size,
             shuffle=True,
             num_workers=self.num_workers,
             pin_memory=True,
+            worker_init_fn=seed_worker,
+            generator=g,
         )
 
     def val_dataloader(self):
+        def seed_worker(worker_id):
+            worker_seed = torch.initial_seed() % 2**32
+            numpy.random.seed(worker_seed)
+            random.seed(worker_seed)
+
+        g = torch.Generator()
+        g.manual_seed(0)
         return DataLoader(
             self.val_dataset,
             batch_size=self.val_batch_size,
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,
+            worker_init_fn=seed_worker,
+            generator=g,
         )
 
     def obj_test_dataloader(self):
+        def seed_worker(worker_id):
+            worker_seed = torch.initial_seed() % 2**32
+            numpy.random.seed(worker_seed)
+            random.seed(worker_seed)
+
+        g = torch.Generator()
+        g.manual_seed(0)
         rand_sampler = RandomSampler(self.obj_test_dataset)
         return DataLoader(
             self.obj_test_dataset,
@@ -281,9 +312,18 @@ class CLEVRDataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
             pin_memory=True,
             sampler=rand_sampler,
+            worker_init_fn=seed_worker,
+            generator=g,
         )
 
     def attr_test_dataloader(self):
+        def seed_worker(worker_id):
+            worker_seed = torch.initial_seed() % 2**32
+            numpy.random.seed(worker_seed)
+            random.seed(worker_seed)
+
+        g = torch.Generator()
+        g.manual_seed(0)
         rand_sampler = RandomSampler(self.attr_test_dataset)
         return DataLoader(
             self.attr_test_dataset,
@@ -292,6 +332,8 @@ class CLEVRDataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
             pin_memory=True,
             sampler=rand_sampler,
+            worker_init_fn=seed_worker,
+            generator=g,
         )
 
 
