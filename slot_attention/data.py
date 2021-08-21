@@ -72,7 +72,7 @@ class CLEVRValset(Dataset):
         max_num_images: Optional[int],
         clevr_transforms: Callable,
         max_n_objects: int = 10,
-        val_list: None
+        val_list: Optional[List] = None,
     ):
         super().__init__()
         self.data_root = data_root
