@@ -60,6 +60,7 @@ class _Workplace(object):
                 csv_reader = reader(f)
                 self.val_list = list(csv_reader)
         else:
+            self.val_list = None
             print(os.path.join(cfg.val_root, "CLEVR_val_list.csv")+" does not exist.")
 
         clevr_datamodule = CLEVRDataModule(
@@ -75,6 +76,7 @@ class _Workplace(object):
             num_val_images=cfg.num_val_images,
             num_test_images=cfg.num_test_images,
             num_workers=cfg.num_workers,
+            val_list = self.val_list,
             obj_algebra_test_cases = self.obj_algebra_test_cases,
             attr_algebra_test_cases = self.attr_algebra_test_cases,
         )

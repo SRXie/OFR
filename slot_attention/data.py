@@ -72,7 +72,7 @@ class CLEVRValset(Dataset):
         max_num_images: Optional[int],
         clevr_transforms: Callable,
         max_n_objects: int = 10,
-        val_list: Optional[List] = None,
+        val_list: List[List[Optional[str]]] = None,
     ):
         super().__init__()
         self.data_root = data_root
@@ -121,7 +121,7 @@ class CLEVRValset(Dataset):
                     img_paths.append(mask_path)
                 paths.append(img_paths)
             i += 1
-        with open(os.path.join(self.val_root, "CLEVR_val_list.csv"), "w") as f:
+        with open(os.path.join(self.data_root, "CLEVR_val_list.csv"), "w") as f:
             wr = csv.writer(f)
             wr.writerows(paths)
         return paths
@@ -211,6 +211,7 @@ class CLEVRDataModule(pl.LightningDataModule):
         num_train_images: Optional[int] = None,
         num_val_images: Optional[int] = None,
         num_test_images: Optional[int] = None,
+        val_list: List[List[Optional[str]]] = None,
         obj_algebra_test_cases: List[List[Optional[str]]] = None,
         attr_algebra_test_cases: List[List[Optional[str]]] = None,
     ):
@@ -240,6 +241,7 @@ class CLEVRDataModule(pl.LightningDataModule):
             max_num_images=self.num_val_images,
             clevr_transforms=self.clevr_transforms,
             max_n_objects=self.max_n_objects,
+            val_list = val_list,
         )
 
         self.obj_test_dataset = CLEVRAlgebraTestset(
