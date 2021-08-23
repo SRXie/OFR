@@ -88,9 +88,6 @@ class SlotAttentionMethod(pl.LightningModule):
             masked_recons_perm = split_and_interleave_stack(masked_recons_perm, self.params.n_samples)
             masked_recons_perm_nodup = split_and_interleave_stack(masked_recons_perm_nodup, self.params.n_samples)
             masked_attn_perm_nodup = split_and_interleave_stack(masked_attn_perm_nodup, self.params.n_samples)
-            masked_attn_perm = split_and_interleave_stack(masked_attn_perm, self.params.n_samples)
-            masked_attn_perm_nodup = split_and_interleave_stack(masked_attn_perm_nodup, self.params.n_samples)
-
 
             # combine images in a nice way so we can display all outputs in one grid, output rescaled to be between 0 and 1
             out = to_rgb_from_tensor(
@@ -228,6 +225,7 @@ class SlotAttentionMethod(pl.LightningModule):
         total_steps = self.params.max_epochs * len(self.datamodule.train_dataloader())
 
         def warm_and_decay_lr_scheduler(step: int):
+            step = step * self.params.gpus # to make the decay consistent over multi-GPU
             warmup_steps = warmup_steps_pct * total_steps
             decay_steps = decay_steps_pct * total_steps
             assert step < total_steps

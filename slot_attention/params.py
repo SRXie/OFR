@@ -12,7 +12,7 @@ class SlotAttentionParams:
     batch_size: int = 64
     val_batch_size: int = 64
     test_batch_size: int = 1024
-    resolution: Tuple[int, int] = (128, 128)
+    resolution: Tuple[int, int] = (64, 64)
     num_slots: int = 7
     num_iterations: int = 4
     data_root: str = "/datasets01/CLEVR_v1.0/060817/"
