@@ -47,21 +47,21 @@ class _Workplace(object):
         if os.path.exists(os.path.join(cfg.test_root, "obj_test", "CLEVR_test_cases.csv")):
             with open(os.path.join(cfg.test_root, "obj_test", "CLEVR_test_cases.csv"), "r") as f:
                 csv_reader = reader(f)
-                obj_algebra_test_cases = list(csv_reader)
+                self.obj_algebra_test_cases = list(csv_reader)
         else:
-            obj_algebra_test_cases = None
+            self.obj_algebra_test_cases = None
             print(os.path.join(cfg.test_root, "obj_test", "CLEVR_test_cases.csv")+" does not exist.")
 
         if os.path.exists(os.path.join(cfg.test_root, "attr_test", "CLEVR_test_cases.csv")):
             with open(os.path.join(cfg.test_root, "attr_test", "CLEVR_test_cases.csv"), "r") as f:
                 csv_reader = reader(f)
-                attr_algebra_test_cases = list(csv_reader)
+                self.attr_algebra_test_cases = list(csv_reader)
         else:
             attr_algebra_test_cases = None
             print(os.path.join(cfg.test_root, "attr_test", "CLEVR_test_cases.csv")+" does not exist.")
         if os.path.exists(os.path.join(cfg.val_root, "CLEVR_val_list.csv")):
             with open(os.path.join(cfg.val_root, "CLEVR_val_list.csv"), "r") as f:
-                csv_reader = reader(f)
+                self.csv_reader = reader(f)
                 self.val_list = list(csv_reader)
         else:
             self.val_list = None
