@@ -145,9 +145,11 @@ def compute_aggregated_loss(cat_slots, losses):
 
     losses.append(loss)
 
-def compute_pseudo_greedy_loss(cat_slots, losses):
+def compute_pseudo_greedy_loss(cat_slots, losses, easy_neg=False):
     slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
     batch_size, num_slots, slot_size = slots_A.shape
+    if easy_neg:
+        slots_D = slots_D[torch.randperm(batch_size)]
     # greedy assignment regardless of re-assignment
     # TODO: check if there is a trivial solution to this assignment
     ext_A = slots_A.view(batch_size, num_slots, 1, 1, 1, slot_size).expand(-1, -1, num_slots, num_slots, num_slots, -1)
@@ -166,9 +168,11 @@ def compute_pseudo_greedy_loss(cat_slots, losses):
     greedy_loss = greedy_criterion.sum(dim=-1)/num_slots
     losses.append(greedy_loss)
 
-def compute_greedy_loss(cat_slots, losses):
+def compute_greedy_loss(cat_slots, losses, easy_neg=False):
     slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
     batch_size, num_slots, slot_size = slots_A.shape
+    if easy_neg:
+        slots_D = slots_D[torch.randperm(batch_size)]
     # greedy assignment without multi-assignment
     greedy_loss = torch.zeros(batch_size).to(cat_slots.device)
     cat_indices_holder = torch.arange(0, num_slots, dtype=int).unsqueeze(0).repeat(4*batch_size, 1).to(cat_slots.device)
