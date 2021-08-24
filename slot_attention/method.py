@@ -186,20 +186,24 @@ class SlotAttentionMethod(pl.LightningModule):
             avg_obj_greedy_loss_nodup = torch.cat(obj_greedy_losses_nodup, 0)
             avg_obj_greedy_loss_nodup_en = (torch.cat(obj_greedy_losses_nodup_en, 0)-avg_obj_greedy_loss_nodup).mean()
             avg_obj_greedy_loss_nodup_hn = (torch.cat(obj_greedy_losses_nodup_hn, 0)-avg_obj_greedy_loss_nodup).mean()
+            std_obj_greedy_loss_nodup = avg_obj_greedy_loss_nodup.std()
             avg_obj_greedy_loss_nodup = avg_obj_greedy_loss_nodup.mean()
 
             avg_attr_greedy_loss_nodup = torch.cat(attr_greedy_losses_nodup, 0)
             avg_attr_greedy_loss_nodup_en = (torch.cat(attr_greedy_losses_nodup_en, 0)-avg_attr_greedy_loss_nodup).mean()
             avg_attr_greedy_loss_nodup_hn = (torch.cat(attr_greedy_losses_nodup_hn, 0)-avg_attr_greedy_loss_nodup).mean()
+            std_attr_greedy_loss_nodup = avg_attr_greedy_loss_nodup.std()
             avg_attr_greedy_loss_nodup = avg_attr_greedy_loss_nodup.mean()
 
             avg_obj_pd_greedy_loss = torch.cat(obj_pd_greedy_losses, 0)
             avg_obj_pd_greedy_loss_en = (torch.cat(obj_pd_greedy_losses_en, 0)-avg_obj_pd_greedy_loss).mean()
             avg_obj_pd_greedy_loss_hn = (torch.cat(obj_pd_greedy_losses_hn, 0)-avg_obj_pd_greedy_loss).mean()
+            std_obj_pd_greedy_loss = avg_obj_pd_greedy_loss.std()
             avg_obj_pd_greedy_loss = avg_obj_pd_greedy_loss.mean()
             avg_attr_pd_greedy_loss = torch.cat(attr_pd_greedy_losses, 0)
             avg_attr_pd_greedy_loss_en = (torch.cat(attr_pd_greedy_losses_en, 0)-avg_attr_pd_greedy_loss).mean()
             avg_attr_pd_greedy_loss_hn = (torch.cat(attr_pd_greedy_losses_hn, 0)-avg_attr_pd_greedy_loss).mean()
+            std_attr_pd_greedy_loss = avg_attr_pd_greedy_loss.std()
             avg_attr_pd_greedy_loss = avg_attr_pd_greedy_loss.mean()
 
             logs = {
@@ -222,6 +226,10 @@ class SlotAttentionMethod(pl.LightningModule):
                 "avg_attr_greedy_loss_nodup_hn": avg_attr_greedy_loss_nodup_hn,
                 "avg_obj_pseudo_greedy_loss_hn": avg_obj_pd_greedy_loss_hn,
                 "avg_attr_pseudo_greedy_loss_hn": avg_attr_pd_greedy_loss_hn,
+                "std_obj_greedy_loss_nodup": std_obj_greedy_loss_nodup,
+                "std_attr_greedy_loss_nodup": std_attr_greedy_loss_nodup,
+                "std_obj_pseudo_greedy_loss_hn": std_obj_pd_greedy_loss,
+                "std_attr_pseudo_greedy_loss_hn": std_attr_pd_greedy_loss,
             }
             self.log_dict(logs, sync_dist=True)
 
