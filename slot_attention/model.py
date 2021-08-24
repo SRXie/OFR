@@ -260,7 +260,7 @@ class SlotAttentionModel(nn.Module):
             self.slots_log_sigma = self.slots_log_sigma.to(slots.device)
             blank_slots = self.slots_mu.squeeze(0) # + self.slots_log_sigma.squeeze(0).exp() * slots_init
             # fill in deuplicated slots with blank slots
-            slots_nodup[duplicated_index[0], duplicated_index[1]] = blank_slots
+            slots_nodup[duplicated_index[0], duplicated_index[1]] = slots.view(-1, slot_size).mean(0).unsqueeze(0)
 
         if slots_only:
             return slots, attn, slots_nodup
