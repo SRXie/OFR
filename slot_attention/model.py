@@ -11,6 +11,7 @@ from slot_attention.utils import conv_transpose_out_shape
 from slot_attention.utils import compute_cos_distance
 from slot_attention.utils import batched_index_select
 from slot_attention.utils import compute_mask_ari
+from slot_attention.utils import to_rgb_from_tensor
 
 
 class SlotAttention(nn.Module):
@@ -320,7 +321,7 @@ class SlotAttentionModel(nn.Module):
             pred_mask = masks.squeeze(2)
 
             batch_size, num_slots, H, W = pred_mask.size()
-            mask_gt = torch.stack(mask_gt, 1)[:,:,0,:,:]
+            mask_gt = to_rgb_from_tensor(torch.stack(mask_gt, 1)[:,:,0,:,:])
             assert_shape(mask_gt.shape, pred_mask.shape)
             # index shape (batch_size, H, W)
             index = torch.argmax(pred_mask, dim=1)
