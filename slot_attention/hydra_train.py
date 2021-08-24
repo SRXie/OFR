@@ -57,7 +57,7 @@ class _Workplace(object):
                 csv_reader = reader(f)
                 self.attr_algebra_test_cases = list(csv_reader)
         else:
-            attr_algebra_test_cases = None
+            self.attr_algebra_test_cases = None
             print(os.path.join(cfg.test_root, "attr_test", "CLEVR_test_cases.csv")+" does not exist.")
         if os.path.exists(os.path.join(cfg.val_root, "CLEVR_val_list.csv")):
             with open(os.path.join(cfg.val_root, "CLEVR_val_list.csv"), "r") as f:
