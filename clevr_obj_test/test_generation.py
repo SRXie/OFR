@@ -140,7 +140,6 @@ def attr_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0):
                     image_B_path = create_path(test_root, main_scene_idx, b_idx)
                     image_C_path = create_path(test_root, main_scene_idx, c_idx)
                     image_D_path = create_path(test_root, main_scene_idx, d_idx)
-                    tuples.append((image_A_path, image_B_path, image_C_path, image_D_path))
                     image_E_path = create_path(test_root, main_scene_idx, e_idx)
                     tuples.append((image_A_path, image_B_path, image_C_path, image_D_path, image_E_path))
                     i+=1
