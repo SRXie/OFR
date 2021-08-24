@@ -1,5 +1,6 @@
 import pytorch_lightning as pl
 import torch
+import math
 import numpy as np
 from torch import optim
 from torchvision import utils as vutils
@@ -186,24 +187,24 @@ class SlotAttentionMethod(pl.LightningModule):
             avg_obj_greedy_loss_nodup = torch.cat(obj_greedy_losses_nodup, 0)
             avg_obj_greedy_loss_nodup_en = (torch.cat(obj_greedy_losses_nodup_en, 0)-avg_obj_greedy_loss_nodup).mean()
             avg_obj_greedy_loss_nodup_hn = (torch.cat(obj_greedy_losses_nodup_hn, 0)-avg_obj_greedy_loss_nodup).mean()
-            std_obj_greedy_loss_nodup = avg_obj_greedy_loss_nodup.std()
+            std_obj_greedy_loss_nodup = avg_obj_greedy_loss_nodup.std()/math.sqrt(avg_obj_greedy_loss_nodup.shape[0])
             avg_obj_greedy_loss_nodup = avg_obj_greedy_loss_nodup.mean()
 
             avg_attr_greedy_loss_nodup = torch.cat(attr_greedy_losses_nodup, 0)
             avg_attr_greedy_loss_nodup_en = (torch.cat(attr_greedy_losses_nodup_en, 0)-avg_attr_greedy_loss_nodup).mean()
             avg_attr_greedy_loss_nodup_hn = (torch.cat(attr_greedy_losses_nodup_hn, 0)-avg_attr_greedy_loss_nodup).mean()
-            std_attr_greedy_loss_nodup = avg_attr_greedy_loss_nodup.std()
+            std_attr_greedy_loss_nodup = avg_attr_greedy_loss_nodup.std()/math.sqrt(avg_attr_greedy_loss_nodup.shape[0])
             avg_attr_greedy_loss_nodup = avg_attr_greedy_loss_nodup.mean()
 
             avg_obj_pd_greedy_loss = torch.cat(obj_pd_greedy_losses, 0)
             avg_obj_pd_greedy_loss_en = (torch.cat(obj_pd_greedy_losses_en, 0)-avg_obj_pd_greedy_loss).mean()
             avg_obj_pd_greedy_loss_hn = (torch.cat(obj_pd_greedy_losses_hn, 0)-avg_obj_pd_greedy_loss).mean()
-            std_obj_pd_greedy_loss = avg_obj_pd_greedy_loss.std()
+            std_obj_pd_greedy_loss = avg_obj_pd_greedy_loss.std()/math.sqrt(avg_obj_pd_greedy_loss.shape[0])
             avg_obj_pd_greedy_loss = avg_obj_pd_greedy_loss.mean()
             avg_attr_pd_greedy_loss = torch.cat(attr_pd_greedy_losses, 0)
             avg_attr_pd_greedy_loss_en = (torch.cat(attr_pd_greedy_losses_en, 0)-avg_attr_pd_greedy_loss).mean()
             avg_attr_pd_greedy_loss_hn = (torch.cat(attr_pd_greedy_losses_hn, 0)-avg_attr_pd_greedy_loss).mean()
-            std_attr_pd_greedy_loss = avg_attr_pd_greedy_loss.std()
+            std_attr_pd_greedy_loss = avg_attr_pd_greedy_loss.std()/math.sqrt(avg_attr_pd_greedy_loss.shape[0])
             avg_attr_pd_greedy_loss = avg_attr_pd_greedy_loss.mean()
 
             logs = {
