@@ -44,17 +44,21 @@ class _Workplace(object):
             ]
         )
 
-        self.obj_algebra_test_cases, self.attr_algebra_test_cases = None, None
-        for test_type in cfg.test_type:
-            if os.path.exists(os.path.join(cfg.test_root, f"{test_type}_test", "CLEVR_test_cases.csv")):
-                with open(os.path.join(cfg.test_root, f"{test_type}_test", "CLEVR_test_cases.csv"), "r") as f:
-                    csv_reader = reader(f)
-                    #print(test_type+"_algebra_test_cases = list(csv_reader)")
-                    #assert test_type+"_algebra_test_cases = list(csv_reader)" == "obj_algebra_test_cases = list(csv_reader)"
-                    # obj_algebra_test_cases = list(csv_reader)
-                    exec("self."+test_type+"_algebra_test_cases = list(csv_reader)")
-            else:
-                print(os.path.join(cfg.test_root, f"{test_type}_test", "CLEVR_test_cases.csv")+" does not exist.")
+        if os.path.exists(os.path.join(params.test_root, "obj_test", "CLEVR_test_cases.csv")):
+            with open(os.path.join(params.test_root, "obj_test", "CLEVR_test_cases.csv"), "r") as f:
+                csv_reader = reader(f)
+                obj_algebra_test_cases = list(csv_reader)
+        else:
+            obj_algebra_test_cases = None
+            print(os.path.join(params.test_root, "obj_test", "CLEVR_test_cases.csv")+" does not exist.")
+
+        if os.path.exists(os.path.join(params.test_root, "attr_test", "CLEVR_test_cases.csv")):
+            with open(os.path.join(params.test_root, "attr_test", "CLEVR_test_cases.csv"), "r") as f:
+                csv_reader = reader(f)
+                attr_algebra_test_cases = list(csv_reader)
+        else:
+            attr_algebra_test_cases = None
+            print(os.path.join(params.test_root, "attr_test", "CLEVR_test_cases.csv")+" does not exist.")
         if os.path.exists(os.path.join(cfg.val_root, "CLEVR_val_list.csv")):
             with open(os.path.join(cfg.val_root, "CLEVR_val_list.csv"), "r") as f:
                 csv_reader = reader(f)

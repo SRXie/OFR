@@ -5,6 +5,7 @@ from math import log2, factorial
 import os
 import json
 import itertools
+import random
 
 SCENE_SUMMARY = None
 
@@ -81,6 +82,7 @@ def obj_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0, decomposed=No
 
             image_B_path = create_path(test_root, main_scene_idx, subset_idx_B)
             image_D_path = create_path(test_root, main_scene_idx, subset_idx_D)
+            image_E_path = create_path(test_root, main_scene_idx, subset_idx_E)
 
             # Then decompose part_23 into part_2 and part_3:
             for num_decomp_2 in range(1,len(part_23)):
@@ -97,7 +99,11 @@ def obj_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0, decomposed=No
                     image_A_path = create_path(test_root, main_scene_idx, subset_idx_A)
                     image_C_path = create_path(test_root, main_scene_idx, subset_idx_C)
 
-                    tuples.append((image_A_path, image_B_path, image_C_path, image_D_path))
+                    # hard negative
+                    drop_idx = random.randint(0, len(subset_idx_list_D)-1)
+                    subset_idx_E = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_D[:drop_idx]+subset_idx_list_D[drop_idx+1:])]
+
+                    tuples.append((image_A_path, image_B_path, image_C_path, image_D_path, image_E_path))
 
             if not subset_idx_list_B in decomposed:
                 tuples += obj_algebra_test(test_root, main_scene_idx, subset_idx_B, decomposed)
@@ -120,17 +126,23 @@ def attr_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0):
         for attr_subset in combinations(scene.get_obj_attrs(), num_edit):
             attr_complementary = scene.get_obj_attrs().difference(attr_subset)
 
-            image_D_idxs = scene.objects[0].edit_attrs(list(attr_subset), return_imgs=True) # converst set to list to enforce order for matching itertools.prod(D, B) and C
+            image_D_idxs = scene.objects[0].edit_attrs(list(attr_subset), return_imgs=True) # convert set to list to enforce order for matching itertools.prod(D, B) and C
             image_B_idxs = scene.objects[0].edit_attrs(list(attr_complementary), return_imgs=True)
             image_C_idxs = scene.objects[0].edit_attrs(list(attr_subset)+list(attr_complementary), return_imgs=True)
+            # Hard negatives
+            image_E_idxs = image_C_idxs.copy()
+            random.shuffle(image_E_idxs)
             i = 0
             for d_idx in image_D_idxs:
                 for b_idx  in image_B_idxs:
                     c_idx = image_C_idxs[i]
+                    e_idx = image_E_idxs[i]
                     image_B_path = create_path(test_root, main_scene_idx, b_idx)
                     image_C_path = create_path(test_root, main_scene_idx, c_idx)
                     image_D_path = create_path(test_root, main_scene_idx, d_idx)
                     tuples.append((image_A_path, image_B_path, image_C_path, image_D_path))
+                    image_E_path = create_path(test_root, main_scene_idx, e_idx)
+                    tuples.append((image_A_path, image_B_path, image_C_path, image_D_path, image_E_path))
                     i+=1
             assert i == len(image_C_idxs)
     return tuples
