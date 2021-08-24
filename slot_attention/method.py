@@ -228,8 +228,8 @@ class SlotAttentionMethod(pl.LightningModule):
                 "avg_attr_pseudo_greedy_loss_hn": avg_attr_pd_greedy_loss_hn,
                 "std_obj_greedy_loss_nodup": std_obj_greedy_loss_nodup,
                 "std_attr_greedy_loss_nodup": std_attr_greedy_loss_nodup,
-                "std_obj_pseudo_greedy_loss_hn": std_obj_pd_greedy_loss,
-                "std_attr_pseudo_greedy_loss_hn": std_attr_pd_greedy_loss,
+                "std_obj_pseudo_greedy_loss": std_obj_pd_greedy_loss,
+                "std_attr_pseudo_greedy_loss": std_attr_pd_greedy_loss,
             }
             self.log_dict(logs, sync_dist=True)
 
