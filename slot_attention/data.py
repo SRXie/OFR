@@ -1,4 +1,3 @@
-
 import json
 import csv
 import os
@@ -9,6 +8,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
+import torch
 import pytorch_lightning as pl
 import torch
 import random
@@ -98,9 +98,12 @@ class CLEVRValset(Dataset):
 
     def __getitem__(self, index: int):
         image_paths = self.img_files[index]
-        imgs = [Image.open(image_path) for image_path in image_paths]
+        imgs = [Image.open(image_path) for image_path in image_paths[:-1]]
         imgs = [img.convert("RGB") for img in imgs]
-        return [self.clevr_transforms(img) for img in imgs]
+        meta = np.load(image_paths[-1])
+        schema = np.concatenate([meta['size'], meta['material'], meta['shape'], meta['color'], meta['x'], meta['y'], meta['z'], meta['rotation']], axis=0)
+        schema = torch.from_numpy(schema).permute(1,0)
+        return [self.clevr_transforms(img) for img in imgs]+[schema]
 
     def __len__(self):
         return len(self.img_files)
@@ -122,7 +125,7 @@ class CLEVRValset(Dataset):
                     mask_path = os.path.join(self.mask_root, '{}_{}.png'.format(i, j))
                     assert os.path.exists(mask_path), f"{mask_path} does not exist"
                     img_paths.append(mask_path)
-                paths.append(img_paths)
+                paths.append(img_paths+[meta_path])
             i += 1
         with open(os.path.join(self.data_root, "CLEVR_val_list.csv"), "w") as f:
             wr = csv.writer(f)

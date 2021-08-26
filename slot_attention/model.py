@@ -1,5 +1,7 @@
 from typing import Tuple
 
+import math
+import itertools
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -12,6 +14,7 @@ from slot_attention.utils import compute_cos_distance
 from slot_attention.utils import batched_index_select
 from slot_attention.utils import compute_mask_ari
 from slot_attention.utils import to_rgb_from_tensor
+from slot_attention.utils import compute_corr_coef
 
 
 class SlotAttention(nn.Module):
@@ -307,7 +310,7 @@ class SlotAttentionModel(nn.Module):
         else:
             return recon_combined, recons, masks, slots, attn
 
-    def loss_function(self, input, mask_gt=None):
+    def loss_function(self, input, mask_gt=None, schema_gt=None):
         recon_combined, recons, masks, slots, attn = self.forward(input)
         loss = F.mse_loss(recon_combined, input)
 
@@ -329,29 +332,58 @@ class SlotAttentionModel(nn.Module):
             pred_mask = torch.zeros_like(pred_mask)
             pred_mask[torch.arange(batch_size)[:, None, None], index, torch.arange(H)[None, :, None], torch.arange(W)[None, None, :]] = 1.0
 
-            assert_shape(attn.shape, (batch_size, H*W, num_slots))
-            attn = attn.permute(0,2,1).view(batch_size, num_slots, H, W)
-            index = torch.argmax(attn, dim=1)
-            # get binarized masks (batch_size, , H, W)
-            attn_mask = torch.zeros_like(attn)
-            attn_mask[torch.arange(batch_size)[:, None, None], index, torch.arange(H)[None, :, None], torch.arange(W)[None, None, :]] = 1.0
-
-            mask_aris, attn_ari = None, None
+            mask_aris = None
             for b in range(batch_size):
                 mask_ari = compute_mask_ari(mask_gt[b].detach().cpu(), pred_mask[b].detach().cpu())
-                attn_ari = compute_mask_ari(mask_gt[b].detach().cpu(), attn_mask[b].detach().cpu())
                 if not mask_aris:
                     mask_aris = mask_ari
-                    attn_aris = attn_ari
                 else:
                     mask_aris += mask_ari
-                    attn_aris = attn_ari
             mask_ari = mask_aris/batch_size
-            attn_ari = attn_aris/batch_size
+
+            # Here we start to calculate the correlation between the distance in the schema and the l2 distance in the slot features
+
+            perm_num = math.factorial(num_slots)
+            perm_idx = list(itertools.permutations([a for a in range(num_slots)]))
+            perm_idx = torch.stack([torch.Tensor(idx) for idx in perm_idx], dim=0).long()
+            perm_idx = perm_idx.repeat(batch_size, 1)
+
+            # First we get the best-matched distance for all schema pairs in this batch
+            schema_gt = schema_gt[:, :num_slots]
+            schema_a = torch.reshape(schema_gt, (batch_size, 1, 1, num_slots, -1))
+            schema_a = schema_a.repeat(1, batch_size, perm_num, 1, 1)
+            schema_b = schema_gt.unsqueeze(1).repeat(1, perm_num, 1, 1).view(batch_size*perm_num, num_slots, -1)
+            schema_b = schema_b[torch.arange(batch_size*perm_num).unsqueeze(-1), perm_idx]
+            schema_b = schema_b.view(1, batch_size, perm_num, num_slots, -1).repeat(batch_size, 1, 1, 1, 1)
+            schema_a_disc = torch.reshape(schema_a[:,:,:,:, :4], (batch_size, batch_size, perm_num, -1))
+            schema_b_disc = torch.reshape(schema_b[:,:,:,:, :4], (batch_size, batch_size, perm_num, -1))
+            schema_a_pos = torch.reshape(schema_a[:,:,:,:, 4:6], (batch_size, batch_size, perm_num, -1))/6.0
+            schema_b_pos = torch.reshape(schema_b[:,:,:,:, 4:6], (batch_size, batch_size, perm_num, -1))/6.0
+            schema_distance_disc = torch.where(schema_a_disc == schema_b_disc, 1.0, 0.0).sum(-1)/(num_slots)
+            schema_distance_disc, _ = schema_distance_disc.max(-1)
+            schema_distance_disc = 4.0 - schema_distance_disc
+            schema_distance_pos, _ = torch.norm(schema_a_pos - schema_b_pos, p=2, dim=-1).min(-1)
+            # get rid of the diagonal
+            schema_distance_disc = schema_distance_disc.flatten()[1:].view(batch_size-1, batch_size+1)[:,:-1].reshape(batch_size, batch_size-1).flatten()
+            schema_distance_pos = schema_distance_pos.flatten()[1:].view(batch_size-1, batch_size+1)[:,:-1].reshape(batch_size, batch_size-1).flatten()
+
+            # Then we get the best-matched l2 distance for all image pairs
+            slots_a = slots.view(batch_size, 1, 1, -1)
+            slots_a = slots_a.repeat(1, batch_size, perm_num, 1)
+            slots_b = slots.unsqueeze(1).repeat(1, perm_num, 1, 1).view(batch_size*perm_num, num_slots, -1)
+            slots_b = slots_b[torch.arange(batch_size*perm_num).unsqueeze(-1), perm_idx]
+            slots_b = slots_b.view(1, batch_size, perm_num, -1).repeat(batch_size, 1, 1, 1)
+            slots_distance, _ = torch.norm(slots_a - slots_b, p = 2, dim=-1).min(-1)
+            slots_distance = slots_distance/(num_slots*slots.shape[-1])
+            # get rid of the diagonal
+            slots_distance = slots_distance.flatten()[1:].view(batch_size-1, batch_size+1)[:,:-1].reshape(batch_size, batch_size-1).flatten()
+
             return {
                 "loss": loss,
-                "attn_ari": attn_ari,
                 "mask_ari": mask_ari,
+                "schema_distance_disc": schema_distance_disc,
+                "schema_distance_pos": schema_distance_pos,
+                "slots_distance": slots_distance,
             }
 
 

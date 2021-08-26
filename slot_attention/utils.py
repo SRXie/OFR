@@ -77,6 +77,13 @@ def to_rgb_from_tensor(x: Tensor):
 def to_tensor_from_rgb(x: Tensor):
     return 2.0*(x - 0.5)
 
+def compute_corr_coef(x, y):
+    vx = x - torch.mean(x)
+    vy = y - torch.mean(y)
+
+    cost = torch.sum(vx * vy) / (torch.sqrt(torch.sum(vx ** 2)) * torch.sqrt(torch.sum(vy ** 2)))
+    return cost
+
 def compute_cos_distance(x: Tensor):
     """
     Tensor x should have shape (batch_size, num_slot, emb_size)
