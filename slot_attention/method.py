@@ -18,6 +18,7 @@ from slot_attention.utils import compute_greedy_loss, compute_pseudo_greedy_loss
 from slot_attention.utils import swap_bg_slot_back
 from slot_attention.utils import captioned_masked_recons
 from slot_attention.utils import split_and_interleave_stack
+from slot_attention.utils import compute_corr_coef
 
 
 class SlotAttentionMethod(pl.LightningModule):
@@ -122,11 +123,27 @@ class SlotAttentionMethod(pl.LightningModule):
         avg_ari_mask = np.stack([x["mask_ari"] for x in outputs]).mean()
         schema_distance_disc = torch.cat([x["schema_distance_disc"] for x in outputs])
         schema_distance_pos = torch.cat([x["schema_distance_pos"] for x in outputs])
+        schema_distance_size = torch.cat([x["schema_distance_size"] for x in outputs])
+        schema_distance_material = torch.cat([x["schema_distance_material"] for x in outputs])
+        schema_distance_shape = torch.cat([x["schema_distance_shape"] for x in outputs])
+        schema_distance_color = torch.cat([x["schema_distance_color"] for x in outputs])
         schema_distance = schema_distance_disc + schema_distance_pos
         slots_distance = torch.cat([x["slots_distance"] for x in outputs])
         corr_coef_disc = compute_corr_coef(schema_distance_disc, slots_distance)
+        corr_coef_size = compute_corr_coef(schema_distance_size, slots_distance)
+        corr_coef_material = compute_corr_coef(schema_distance_material, slots_distance)
+        corr_coef_shape = compute_corr_coef(schema_distance_shape, slots_distance)
+        corr_coef_color = compute_corr_coef(schema_distance_color, slots_distance)
         corr_coef_pos = compute_corr_coef(schema_distance_pos, slots_distance)
         corr_coef = compute_corr_coef(schema_distance, slots_distance)
+
+        corr_rank_disc = compute_rank_correlation(schema_distance_disc.unsqueeze(0), slots_distance.unsqueeze(0))
+        corr_rank_size = compute_rank_correlation(schema_distance_size.unsqueeze(0), slots_distance.unsqueeze(0))
+        corr_rank_material = compute_rank_correlation(schema_distance_material.unsqueeze(0), slots_distance.unsqueeze(0))
+        corr_rank_shape = compute_rank_correlation(schema_distance_shape.unsqueeze(0), slots_distance.unsqueeze(0))
+        corr_rank_color = compute_rank_correlation(schema_distance_color.unsqueeze(0), slots_distance.unsqueeze(0))
+        corr_rank_pos = compute_rank_correlation(schema_distance_pos.unsqueeze(0), slots_distance.unsqueeze(0))
+        corr_rank = compute_rank_correlation(schema_distance.unsqueeze(0), slots_distance.unsqueeze(0))
         # Algebra Test starts here
         odl = self.datamodule.obj_test_dataloader()
         adl = self.datamodule.attr_test_dataloader()
@@ -138,13 +155,21 @@ class SlotAttentionMethod(pl.LightningModule):
         obj_pd_greedy_losses_en, attr_pd_greedy_losses_en = [], []
         obj_pd_greedy_losses_hn, attr_pd_greedy_losses_hn = [], []
 
+        obj_greedy_cos_losses_nodup, attr_greedy_cos_losses_nodup = [], []
+        obj_greedy_cos_losses_nodup_en, attr_greedy_cos_losses_nodup_en = [], []
+        obj_greedy_cos_losses_nodup_hn, attr_greedy_cos_losses_nodup_hn = [], []
+        obj_pd_greedy_cos_losses, attr_pd_greedy_cos_losses = [], []
+        obj_pd_greedy_cos_losses_en, attr_pd_greedy_cos_losses_en = [], []
+        obj_pd_greedy_cos_losses_hn, attr_pd_greedy_cos_losses_hn = [], []
+
         # rand = torch.rand(self.params.batch_size*sample_size*3, self.params.num_slots)
         # batch_rand_perm = rand.argsort(dim=1)
         # del rand
         # if self.params.gpus > 0:
             # batch_rand_perm = batch_rand_perm.to(self.device)
 
-        def compute_test_losses(dataloader, pseudo_losses, pseudo_losses_en, pseudo_losses_hn, losses_nodup, losses_nodup_en, losses_nodup_hn, dup_threshold=None):
+        def compute_test_losses(dataloader, seudo_losses, pseudo_losses_en, pseudo_losses_hn, losses_nodup, losses_nodup_en, losses_nodup_hn,
+                pseudo_cos_losses, pseudo_cos_losses_en, pseudo_cos_losses_hn, cos_losses_nodup, cos_losses_nodup_en, cos_losses_nodup_hn, dup_threshold=None):
             b_prev = datetime.now()
             for batch in dataloader:
                 print("load data:", datetime.now()-b_prev)
@@ -169,6 +194,14 @@ class SlotAttentionMethod(pl.LightningModule):
                 compute_pseudo_greedy_loss(cat_slots, pseudo_losses_en, easy_neg=True)
                 compute_pseudo_greedy_loss(cat_slots_hn, pseudo_losses_hn)
 
+                compute_greedy_loss(cat_slots_nodup, cos_losses_nodup, cos_sim=True)
+                compute_greedy_loss(cat_slots_nodup, cos_losses_nodup_en, easy_neg=True, cos_sim=True)
+                compute_greedy_loss(cat_slots_nodup_hn, cos_losses_nodup_hn, cos_sim=True)
+
+                compute_pseudo_greedy_loss(cat_slots, pseudo_cos_losses, cos_sim=True)
+                compute_pseudo_greedy_loss(cat_slots, pseudo_cos_losses_en, easy_neg=True, cos_sim=True)
+                compute_pseudo_greedy_loss(cat_slots_hn, pseudo_cos_losses_hn, cos_sim=True)
+
                 # slots_A = slots_A.repeat(sample_size, 1, 1)
                 # slots_B = slots_B.repeat(sample_size, 1, 1)
                 # slots_C = slots_C.repeat(sample_size, 1, 1)
@@ -188,8 +221,10 @@ class SlotAttentionMethod(pl.LightningModule):
                 b_prev = datetime.now()
 
         with torch.no_grad():
-            compute_test_losses(odl, obj_pd_greedy_losses, obj_pd_greedy_losses_en, obj_pd_greedy_losses_hn, obj_greedy_losses_nodup, obj_greedy_losses_nodup_en, obj_greedy_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
-            compute_test_losses(adl, attr_pd_greedy_losses, attr_pd_greedy_losses_en, attr_pd_greedy_losses_hn, attr_greedy_losses_nodup, attr_greedy_losses_nodup_en, attr_greedy_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
+            compute_test_losses(odl, obj_pd_greedy_losses, obj_pd_greedy_losses_en, obj_pd_greedy_losses_hn, obj_greedy_losses_nodup, obj_greedy_losses_nodup_en, obj_greedy_losses_nodup_hn,
+                obj_pd_greedy_cos_losses, obj_pd_greedy_cos_losses_en, obj_pd_greedy_cos_losses_hn, obj_greedy_cos_losses_nodup, obj_greedy_cos_losses_nodup_en, obj_greedy_cos_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
+            compute_test_losses(adl, attr_pd_greedy_losses, attr_pd_greedy_losses_en, attr_pd_greedy_losses_hn, attr_greedy_losses_nodup, attr_greedy_losses_nodup_en, attr_greedy_losses_nodup_hn,
+                attr_pd_greedy_cos_losses, attr_pd_greedy_cos_losses_en, attr_pd_greedy_cos_losses_hn, attr_greedy_cos_losses_nodup, attr_greedy_cos_losses_nodup_en, attr_greedy_cos_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
 
             avg_obj_greedy_loss_nodup = torch.cat(obj_greedy_losses_nodup, 0)
             avg_obj_greedy_loss_nodup_en = (torch.cat(obj_greedy_losses_nodup_en, 0)-avg_obj_greedy_loss_nodup).mean()
@@ -214,12 +249,46 @@ class SlotAttentionMethod(pl.LightningModule):
             std_attr_pd_greedy_loss = avg_attr_pd_greedy_loss.std()/math.sqrt(avg_attr_pd_greedy_loss.shape[0])
             avg_attr_pd_greedy_loss = avg_attr_pd_greedy_loss.mean()
 
+            avg_obj_greedy_cos_loss_nodup = torch.cat(obj_greedy_cos_losses_nodup, 0)
+            avg_obj_greedy_cos_loss_nodup_en = (torch.cat(obj_greedy_cos_losses_nodup_en, 0)-avg_obj_greedy_cos_loss_nodup).mean()
+            avg_obj_greedy_cos_loss_nodup_hn = (torch.cat(obj_greedy_cos_losses_nodup_hn, 0)-avg_obj_greedy_cos_loss_nodup).mean()
+            std_obj_greedy_cos_loss_nodup = avg_obj_greedy_cos_loss_nodup.std()/(math.sqrt(avg_obj_greedy_cos_loss_nodup.shape[0]))
+            avg_obj_greedy_cos_loss_nodup = avg_obj_greedy_cos_loss_nodup.mean()
+            # avg_attr_aggr_loss_nodup = torch.cat(attr_aggr_losses_nodup, 0).mean()
+            avg_attr_greedy_cos_loss_nodup = torch.cat(attr_greedy_cos_losses_nodup, 0)
+            avg_attr_greedy_cos_loss_nodup_en = (torch.cat(attr_greedy_cos_losses_nodup_en, 0)-avg_attr_greedy_cos_loss_nodup).mean()
+            avg_attr_greedy_cos_loss_nodup_hn = (torch.cat(attr_greedy_cos_losses_nodup_hn, 0)-avg_attr_greedy_cos_loss_nodup).mean()
+            std_attr_greedy_cos_loss_nodup = avg_attr_greedy_cos_loss_nodup.std()/(math.sqrt(avg_attr_greedy_cos_loss_nodup.shape[0]))
+            avg_attr_greedy_cos_loss_nodup = avg_attr_greedy_cos_loss_nodup.mean()
+
+            avg_obj_pd_greedy_cos_loss = torch.cat(obj_pd_greedy_cos_losses, 0)
+            avg_obj_pd_greedy_cos_loss_en = (torch.cat(obj_pd_greedy_cos_losses_en, 0)-avg_obj_pd_greedy_cos_loss).mean()
+            avg_obj_pd_greedy_cos_loss_hn = (torch.cat(obj_pd_greedy_cos_losses_hn, 0)-avg_obj_pd_greedy_cos_loss).mean()
+            std_obj_pd_greedy_cos_loss = avg_obj_pd_greedy_cos_loss.std()/(math.sqrt(avg_obj_pd_greedy_cos_loss.shape[0]))
+            avg_obj_pd_greedy_cos_loss = avg_obj_pd_greedy_cos_loss.mean()
+            avg_attr_pd_greedy_cos_loss = torch.cat(attr_pd_greedy_cos_losses, 0)
+            avg_attr_pd_greedy_cos_loss_en = (torch.cat(attr_pd_greedy_cos_losses_en, 0)-avg_attr_pd_greedy_cos_loss).mean()
+            avg_attr_pd_greedy_cos_loss_hn = (torch.cat(attr_pd_greedy_cos_losses_hn, 0)-avg_attr_pd_greedy_cos_loss).mean()
+            std_attr_pd_greedy_cos_loss = avg_attr_pd_greedy_cos_loss.std()/(math.sqrt(avg_attr_pd_greedy_cos_loss.shape[0]))
+            avg_attr_pd_greedy_cos_loss = avg_attr_pd_greedy_cos_loss.mean()
+
             logs = {
                 "avg_val_loss": avg_loss,
                 "avg_ari_mask": avg_ari_mask,
                 "corr_coef_disc": corr_coef_disc,
                 "corr_coef_pos": corr_coef_pos,
+                "corr_coef_size": corr_coef_size,
+                "corr_coef_material": corr_coef_material,
+                "corr_coef_shape": corr_coef_shape,
+                "corr_coef_color": corr_coef_color,
                 "corr_coef": corr_coef,
+                "corr_rank_disc": corr_rank_disc,
+                "corr_rank_pos": corr_rank_pos,
+                "corr_rank_size": corr_rank_size,
+                "corr_rank_material": corr_rank_material,
+                "corr_rank_shape": corr_rank_shape,
+                "corr_rank_color": corr_rank_color,
+                "corr_rank": corr_rank,
                 "avg_obj_greedy_loss_nodup": avg_obj_greedy_loss_nodup,
                 "avg_attr_greedy_loss_nodup": avg_attr_greedy_loss_nodup,
                 "avg_obj_pseudo_greedy_loss": avg_obj_pd_greedy_loss,
@@ -236,6 +305,22 @@ class SlotAttentionMethod(pl.LightningModule):
                 "std_attr_greedy_loss_nodup": std_attr_greedy_loss_nodup,
                 "std_obj_pseudo_greedy_loss": std_obj_pd_greedy_loss,
                 "std_attr_pseudo_greedy_loss": std_attr_pd_greedy_loss,
+                "avg_obj_greedy_cos_loss_nodup": avg_obj_greedy_cos_loss_nodup,
+                "avg_attr_greedy_cos_loss_nodup": avg_attr_greedy_cos_loss_nodup,
+                "avg_obj_pseudo_greedy_cos_loss": avg_obj_pd_greedy_cos_loss,
+                "avg_attr_pseudo_greedy_cos_loss": avg_attr_pd_greedy_cos_loss,
+                "avg_obj_greedy_cos_loss_nodup_en": avg_obj_greedy_cos_loss_nodup_en,
+                "avg_attr_greedy_cos_loss_nodup_en": avg_attr_greedy_cos_loss_nodup_en,
+                "avg_obj_pseudo_greedy_cos_loss_en": avg_obj_pd_greedy_cos_loss_en,
+                "avg_attr_pseudo_greedy_cos_loss_en": avg_attr_pd_greedy_cos_loss_en,
+                "avg_obj_greedy_cos_loss_nodup_hn": avg_obj_greedy_cos_loss_nodup_hn,
+                "avg_attr_greedy_cos_loss_nodup_hn": avg_attr_greedy_cos_loss_nodup_hn,
+                "avg_obj_pseudo_greedy_cos_loss_hn": avg_obj_pd_greedy_cos_loss_hn,
+                "avg_attr_pseudo_greedy_cos_loss_hn": avg_attr_pd_greedy_cos_loss_hn,
+                "std_obj_greedy_cos_loss_nodup": std_obj_greedy_cos_loss_nodup,
+                "std_attr_greedy_cos_loss_nodup": std_attr_greedy_cos_loss_nodup,
+                "std_obj_pseudo_greedy_cos_loss": std_obj_pd_greedy_cos_loss,
+                "std_attr_pseudo_greedy_cos_loss": std_attr_pd_greedy_cos_loss,
             }
             self.log_dict(logs, sync_dist=True)
 
