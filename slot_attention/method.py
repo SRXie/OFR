@@ -168,7 +168,7 @@ class SlotAttentionMethod(pl.LightningModule):
         # if self.params.gpus > 0:
             # batch_rand_perm = batch_rand_perm.to(self.device)
 
-        def compute_test_losses(dataloader, seudo_losses, pseudo_losses_en, pseudo_losses_hn, losses_nodup, losses_nodup_en, losses_nodup_hn,
+        def compute_test_losses(dataloader, pseudo_losses, pseudo_losses_en, pseudo_losses_hn, losses_nodup, losses_nodup_en, losses_nodup_hn,
                 pseudo_cos_losses, pseudo_cos_losses_en, pseudo_cos_losses_hn, cos_losses_nodup, cos_losses_nodup_en, cos_losses_nodup_hn, dup_threshold=None):
             b_prev = datetime.now()
             for batch in dataloader:
