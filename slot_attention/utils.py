@@ -169,8 +169,8 @@ def compute_pseudo_greedy_loss(cat_slots, losses, easy_neg=False, cos_sim=False)
         norm_term = torch.max(norm_term, dim=-1)[0]
         greedy_criterion = greedy_criterion.div(norm_term+0.0001)
     else:
-        vector_a = (ext_A-ext_B).div(torch.norm(ext_A-ext_B, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size))
-        vector_b = (ext_D-ext_C).div(torch.norm(ext_D-ext_C, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size))
+        vector_a = (ext_A-ext_B).div(torch.norm(ext_A-ext_B, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size)+0.0001)
+        vector_b = (ext_D-ext_C).div(torch.norm(ext_D-ext_C, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size)+0.0001)
         greedy_criterion = torch.norm(vector_a-vector_b, 2, -1)/2
     # backtrace for greedy matching (3 times)
     greedy_criterion, _ = greedy_criterion.min(-1)
@@ -200,8 +200,8 @@ def compute_greedy_loss(cat_slots, losses, easy_neg=False, cos_sim=False):
             norm_term = torch.max(norm_term, dim=-1)[0]
             greedy_criterion = greedy_criterion.div(norm_term+0.0001)
         else:
-            vector_a = (ext_A-ext_B).div(torch.norm(ext_A-ext_B, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size))
-            vector_b = (ext_D-ext_C).div(torch.norm(ext_D-ext_C, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size))
+            vector_a = (ext_A-ext_B).div(torch.norm(ext_A-ext_B, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size)+0.0001)
+            vector_b = (ext_D-ext_C).div(torch.norm(ext_D-ext_C, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size)+0.0001)
             greedy_criterion = torch.norm(vector_a-vector_b, 2, -1)/2
         # backtrace for greedy matching (3 times)
         greedy_criterion, indices_D = greedy_criterion.min(-1)
