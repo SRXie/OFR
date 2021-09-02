@@ -1,25 +1,25 @@
 #! /bin/bash
 
-#SBATCH --job-name=clevr_data_gen
+SBATCH --job-name=clevr_data_gen
 
-# Use to change the number of replicates
-#SBATCH --array=0-1000
+Use to change the number of replicates
+SBATCH --array=0-1000
 
-#SBATCH --output=/private/home/%u/runs/ad_hoc_categories/logs/%x_%A_%a.out
+# SBATCH --output=/private/home/%u/runs/ad_hoc_categories/logs/%x_%A_%a.out
 
-#SBATCH --partition=uninterrupted
+SBATCH --partition=uninterrupted
 
-#SBATCH --ntasks=1
+SBATCH --ntasks=1
 
-#SBATCH --gres=gpu:1
+SBATCH --gres=gpu:1
 
-#SBATCH --cpus-per-task=1
+SBATCH --cpus-per-task=1
 
-#SBATCH --time=40:00:00
+SBATCH --time=40:00:00
 
-#SBATCH --signal=USR1@60
+SBATCH --signal=USR1@60
 
-#SBATCH --open-mode=append
+SBATCH --open-mode=append
 job_name=${SLURM_JOB_NAME}
 job_date=$(date +%y%m%d:%H)
 experiment_name="${job_name}_${job_date}_${SLURM_ARRAY_JOB_ID}"
@@ -31,6 +31,7 @@ echo "Job array Max: ${SLURM_ARRAY_TASK_MAX}"
 echo "Job array Min: ${SLURM_ARRAY_TASK_MIN}"
 
 USE_GPU=1
+SIGMA=0.1
 
 if [ ${USE_GPU} == 1 ]; then
   module load cuda/10.0
@@ -60,8 +61,8 @@ srun blender --background -noaudio --python \
     --output_scene_dir "${OUTPUT_DIR}/scenes/${SLURM_ARRAY_TASK_ID}"\
     --output_scene_file "${OUTPUT_DIR}/ADHOC_scenes_${SLURM_ARRAY_TASK_ID}.json"\
     --use_gpu ${USE_GPU}\
-    --color_correlated
-    --en_sigma 0.1
+    --color_correlated\
+    --en_sigma ${SIGMA}\
     --max_job_id ${SLURM_ARRAY_TASK_MAX}\
     --current_job_id ${SLURM_ARRAY_TASK_ID}
 
