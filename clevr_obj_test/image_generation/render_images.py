@@ -9,6 +9,8 @@ from __future__ import print_function
 import math, sys, random, argparse, json, os, tempfile
 from datetime import datetime as dt
 from collections import Counter
+from itertools import product, combinations
+import numpy as np
 
 """
 Renders random scenes using Blender, each with with a random number of objects;
@@ -16,9 +18,7 @@ each object has a random size, position, color, and shape. Objects will be
 nonintersecting but may partially occlude each other. Output images will be
 written to disk as PNGs, and we will also write a JSON file for each image with
 ground-truth scene information.
-
 This file expects to be run from Blender like this:
-
 blender --background --python render_images.py -- [arguments to this script]
 """
 
@@ -33,7 +33,7 @@ if INSIDE_BLENDER:
     import utils
   except ImportError as e:
     print("\nERROR")
-    print("Running render_images.py from Blender and cannot import utils.py.") 
+    print("Running render_images.py from Blender and cannot import utils.py.")
     print("You may need to add a .pth file to the site-packages of Blender's")
     print("bundled python with a command like this:\n")
     print("echo $PWD >> $BLENDER/$VERSION/python/lib/python3.5/site-packages/clevr.pth")
@@ -66,7 +66,7 @@ parser.add_argument('--shape_color_combos_json', default=None,
 # Settings for objects
 parser.add_argument('--min_objects', default=3, type=int,
     help="The minimum number of objects to place in each scene")
-parser.add_argument('--max_objects', default=10, type=int,
+parser.add_argument('--max_objects', default=6, type=int,
     help="The maximum number of objects to place in each scene")
 parser.add_argument('--min_dist', default=0.25, type=float,
     help="The minimum allowed distance between object centers")
@@ -81,6 +81,18 @@ parser.add_argument('--min_pixels_per_object', default=200, type=int,
 parser.add_argument('--max_retries', default=50, type=int,
     help="The number of times to try placing an object before giving up and " +
          "re-placing all objects in the scene.")
+parser.add_argument('--size_correlated', action='store_true',
+    help="If the sizes of objects are correlated.")
+parser.add_argument('--shape_correlated', action='store_true',
+    help="If the shapes of objects are correlated.")
+parser.add_argument('--color_correlated', action='store_true',
+    help="If the colors of objects are correlated.")
+parser.add_argument('--material_correlated', action='store_true',
+    help="If the materials of objects are correlated.")
+parser.add_argument('--en_margin', default=-1, type=int,
+    help="The margin for hard cap on energy.")
+parser.add_argument('--en_sigma', default=0.05, type=float,
+    help="The sigma of the energy term")
 
 # Output settings
 parser.add_argument('--start_idx', default=0, type=int,
@@ -158,9 +170,28 @@ def main(args):
   img_template = '%s%%0%dd.png' % (prefix, num_digits)
   scene_template = '%s%%0%dd.json' % (prefix, num_digits)
   blend_template = '%s%%0%dd.blend' % (prefix, num_digits)
-  img_template = os.path.join(args.output_image_dir, img_template)
-  scene_template = os.path.join(args.output_scene_dir, scene_template)
-  blend_template = os.path.join(args.output_blend_dir, blend_template)
+
+  if args.size_correlated:
+    args.output_image_dir = os.path.join(args.output_image_dir, "size_corr_"+str(args.en_margin))
+    args.output_scene_dir = os.path.join(args.output_scene_dir, "size_corr_"+str(args.en_margin))
+    args.output_blend_dir = os.path.join(args.output_blend_dir, "size_corr_"+str(args.en_margin))
+  if args.material_correlated:
+    args.output_image_dir = os.path.join(args.output_image_dir, "material_corr_"+str(args.en_margin))
+    args.output_scene_dir = os.path.join(args.output_scene_dir, "material_corr_"+str(args.en_margin))
+    args.output_blend_dir = os.path.join(args.output_blend_dir, "material_corr_"+str(args.en_margin))
+  if args.shape_correlated:
+    args.output_image_dir = os.path.join(args.output_image_dir, "shape_corr_"+str(args.en_margin))
+    args.output_scene_dir = os.path.join(args.output_scene_dir, "shape_corr_"+str(args.en_margin))
+    args.output_blend_dir = os.path.join(args.output_blend_dir, "shape_corr_"+str(args.en_margin))
+  if args.color_correlated:
+    if args.en_margin>=0:
+      args.output_image_dir = os.path.join(args.output_image_dir, "color_corr_"+str(args.en_margin))
+      args.output_scene_dir = os.path.join(args.output_scene_dir, "color_corr_"+str(args.en_margin))
+      args.output_blend_dir = os.path.join(args.output_blend_dir, "color_corr_"+str(args.en_margin))
+    else:
+      args.output_image_dir = os.path.join(args.output_image_dir, "color_corr_"+str(args.en_sigma))
+      args.output_scene_dir = os.path.join(args.output_scene_dir, "color_corr_"+str(args.en_sigma))
+      args.output_blend_dir = os.path.join(args.output_blend_dir, "color_corr_"+str(args.en_sigma))
 
   if not os.path.isdir(args.output_image_dir):
     os.makedirs(args.output_image_dir)
@@ -168,7 +199,11 @@ def main(args):
     os.makedirs(args.output_scene_dir)
   if args.save_blendfiles == 1 and not os.path.isdir(args.output_blend_dir):
     os.makedirs(args.output_blend_dir)
-  
+
+  img_template = os.path.join(args.output_image_dir, img_template)
+  scene_template = os.path.join(args.output_scene_dir, scene_template)
+  blend_template = os.path.join(args.output_blend_dir, blend_template)
+
   all_scene_paths = []
   for i in range(args.num_images):
     img_path = img_template % (i + args.start_idx)
@@ -205,7 +240,29 @@ def main(args):
   with open(args.output_scene_file, 'w') as f:
     json.dump(output, f)
 
-
+def generate_distr_dict(num_obj, num_val, sigma, margin=-1):
+  energy_tensor = np.zeros([num_val]*num_obj)
+  distr_dict = {}
+  for vals in product(range(num_val), repeat=num_obj):
+    if margin >= 0:
+      valid = True
+    for pair in combinations(vals, 2):
+      if margin >= 0:
+        valid = valid and abs(pair[0]-pair[1])<=margin
+        if valid:
+          energy_tensor[vals] = 1.0
+        else:
+          energy_tensor[vals] = 0.0
+          break
+      else:
+        energy_tensor[vals] += np.exp(-(pair[0]-pair[1])**2/(2*sigma**2))
+  if num_obj> 1:
+    energy_tensor = energy_tensor/energy_tensor.sum()
+  else:
+    energy_tensor = (energy_tensor+1.0)/num_val
+  for vals in product(range(num_val), repeat=num_obj):
+    distr_dict["-".join(str(v) for v in vals)] = energy_tensor[vals]
+  return distr_dict
 
 def render_scene(args,
     num_objects=5,
@@ -335,12 +392,12 @@ def add_random_objects(scene_struct, num_objects, args, camera):
   with open(args.properties_json, 'r') as f:
     properties = json.load(f)
     color_name_to_rgba = {}
-    for name, rgb in properties['colors'].items():
+    for name, rgb in properties['color'].items():
       rgba = [float(c) / 255.0 for c in rgb] + [1.0]
       color_name_to_rgba[name] = rgba
-    material_mapping = [(v, k) for k, v in properties['materials'].items()]
-    object_mapping = [(v, k) for k, v in properties['shapes'].items()]
-    size_mapping = list(properties['sizes'].items())
+    material_mapping = [(v, k) for k, v in properties['material'].items()]
+    object_mapping = [(v, k) for k, v in properties['shape'].items()]
+    size_mapping = list(properties['size'].items())
 
   shape_color_combos = None
   if args.shape_color_combos_json is not None:
@@ -350,9 +407,19 @@ def add_random_objects(scene_struct, num_objects, args, camera):
   positions = []
   objects = []
   blender_objects = []
+
+  for attr in ("shape", "material", "size", "color"):
+    if eval("args."+attr+"_correlated"):
+      exec("global "+attr+"_distr_"+str(num_objects))
+      # exec("tmp=np.random.choice(list("+attr+"_distr_"+str(num_objects)+".keys()), p=list("+attr+"_distr_"+str(num_objects)+".values()))", globals())
+      exec("correlated_"+attr+"_list=np.random.choice(list("+attr+"_distr_"+str(num_objects)+".keys()), p=list("+attr+"_distr_"+str(num_objects)+".values())).split('-')", globals())
+
   for i in range(num_objects):
     # Choose a random size
-    size_name, r = random.choice(size_mapping)
+    if not args.size_correlated:
+      size_name, r = random.choice(size_mapping)
+    else:
+      size_name, r = size_mapping[int(correlated_size_list[i])]
 
     # Try to place the object, ensuring that we don't intersect any existing
     # objects and that we are more than the desired margin away from all existing
@@ -395,8 +462,14 @@ def add_random_objects(scene_struct, num_objects, args, camera):
 
     # Choose random color and shape
     if shape_color_combos is None:
-      obj_name, obj_name_out = random.choice(object_mapping)
-      color_name, rgba = random.choice(list(color_name_to_rgba.items()))
+      if not args.shape_correlated:
+        obj_name, obj_name_out = random.choice(object_mapping)
+      else:
+        obj_name, obj_name_out = object_mapping[int(correlated_shape_list[i])]
+      if not args.color_correlated:
+        color_name, rgba = random.choice(list(color_name_to_rgba.items()))
+      else:
+        color_name, rgba = list(color_name_to_rgba.items())[int(correlated_color_list[i])]
     else:
       obj_name_out, color_choices = random.choice(shape_color_combos)
       color_name = random.choice(color_choices)
@@ -417,7 +490,10 @@ def add_random_objects(scene_struct, num_objects, args, camera):
     positions.append((x, y, r))
 
     # Attach a random material
-    mat_name, mat_name_out = random.choice(material_mapping)
+    if not args.material_correlated:
+      mat_name, mat_name_out = random.choice(material_mapping)
+    else:
+      mat_name, mat_name_out = material_mapping[int(correlated_material_list[i])]
     utils.add_material(mat_name, Color=rgba)
 
     # Record data about the object in the scene data structure
@@ -448,7 +524,6 @@ def add_random_objects(scene_struct, num_objects, args, camera):
 def compute_all_relationships(scene_struct, eps=0.2):
   """
   Computes relationships between all pairs of objects in the scene.
-  
   Returns a dictionary mapping string relationship names to lists of lists of
   integers, where output[rel][i] gives a list of object indices that have the
   relationship rel with object i. For example if j is in output['left'][i] then
@@ -480,7 +555,6 @@ def check_visibility(blender_objects, min_pixels_per_object):
   ensures that each object is just a solid uniform color. We can then count
   the number of pixels of each color in the output image to check the visibility
   of each object.
-
   Returns True if all objects are visible and False otherwise.
   """
   f, path = tempfile.mkstemp(suffix='.png')
@@ -565,6 +639,18 @@ if __name__ == '__main__':
     # Run normally
     argv = utils.extract_args()
     args = parser.parse_args(argv)
+    if args.shape_correlated:
+      for i in range(args.max_objects):
+        exec("shape_distr_"+str(i+1)+"=generate_distr_dict(i+1, 3, 0.1, margin=args.en_margin)")
+    if args.size_correlated:
+      for i in range(args.max_objects):
+        exec("size_distr_"+str(i+1)+"=generate_distr_dict(i+1, 2, 0.1, margin=args.en_margin)")
+    if args.material_correlated:
+      for i in range(args.max_objects):
+        exec("material_distr_"+str(i+1)+"=generate_distr_dict(i+1, 2, 0.1, margin=args.en_margin)")
+    if args.color_correlated:
+      for i in range(args.max_objects):
+        exec("color_distr_"+str(i+1)+"=generate_distr_dict(i+1, 8, args.en_sigma, margin=args.en_margin)")
     main(args)
   elif '--help' in sys.argv or '-h' in sys.argv:
     parser.print_help()
@@ -577,4 +663,3 @@ if __name__ == '__main__':
     print('arguments like this:')
     print()
     print('python render_images.py --help')
-
