@@ -1,25 +1,25 @@
 #! /bin/bash
 
-# SBATCH --job-name=clevr_data_gen
+#SBATCH --job-name=clevr_data_gen
 
-# # Use to change the number of replicates
-# SBATCH --array=0-1000
+# Use to change the number of replicates
+#SBATCH --array=0
 
-# # SBATCH --output=/private/home/%u/runs/clevr_corr/logs/%x_%A_%a.out
+#SBATCH --output=/private/home/%u/runs/clevr_corr/logs/%x_%A_%a.out
 
-# SBATCH --partition=dev
+#SBATCH --partition=dev
 
-# SBATCH --ntasks=1
+#SBATCH --ntasks=1
 
-# SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:2
 
-# SBATCH --cpus-per-task=6
+#SBATCH --cpus-per-task=6
 
-# SBATCH --time=40:00:00
+#SBATCH --time=72:00:00
 
-# SBATCH --signal=USR1@60
+#SBATCH --signal=USR1@60
 
-# SBATCH --open-mode=append
+#SBATCH --open-mode=append
 job_name=${SLURM_JOB_NAME}
 job_date=$(date +%y%m%d:%H)
 experiment_name="${job_name}_${job_date}_${SLURM_ARRAY_JOB_ID}"
@@ -35,7 +35,7 @@ SIGMA=0.1
 NUM_IMAGES=40000
 
 if [ ${USE_GPU} == 1 ]; then
-  module load cuda/10.0
+  module load cuda/11.0
 fi
 
 if [ ! -e "/checkpoint/siruixie/clevr_corr" ]; then
@@ -63,9 +63,7 @@ srun ~/Sirui/blender-2.78c-linux-glibc219-x86_64/blender --background -noaudio -
     --output_scene_file "${OUTPUT_DIR}/ADHOC_scenes_${SLURM_ARRAY_TASK_ID}.json"\
     --use_gpu ${USE_GPU}\
     --color_correlated\
-    --en_sigma ${SIGMA}\
-    --max_job_id ${SLURM_ARRAY_TASK_MAX}\
-    --current_job_id ${SLURM_ARRAY_TASK_ID}
+    --en_sigma ${SIGMA}
 
 # Uncomment to render.
 
