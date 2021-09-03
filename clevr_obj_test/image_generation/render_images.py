@@ -44,19 +44,19 @@ if INSIDE_BLENDER:
 parser = argparse.ArgumentParser()
 
 # Input options
-parser.add_argument('--base_scene_blendfile', default='data/base_scene.blend',
+parser.add_argument('--base_scene_blendfile', default='clevr_obj_test/image_generation/data/base_scene.blend',
     help="Base blender file on which all scenes are based; includes " +
           "ground plane, lights, and camera.")
-parser.add_argument('--properties_json', default='data/properties.json',
+parser.add_argument('--properties_json', default='clevr_obj_test/image_generation/data/properties.json',
     help="JSON file defining objects, materials, sizes, and colors. " +
          "The \"colors\" field maps from CLEVR color names to RGB values; " +
          "The \"sizes\" field maps from CLEVR size names to scalars used to " +
          "rescale object models; the \"materials\" and \"shapes\" fields map " +
          "from CLEVR material and shape names to .blend files in the " +
          "--object_material_dir and --shape_dir directories respectively.")
-parser.add_argument('--shape_dir', default='data/shapes',
+parser.add_argument('--shape_dir', default='clevr_obj_test/image_generation/data/shapes',
     help="Directory where .blend files for object models are stored")
-parser.add_argument('--material_dir', default='data/materials',
+parser.add_argument('--material_dir', default='clevr_obj_test/image_generation/data/materials',
     help="Directory where .blend files for materials are stored")
 parser.add_argument('--shape_color_combos_json', default=None,
     help="Optional path to a JSON file mapping shape names to a list of " +

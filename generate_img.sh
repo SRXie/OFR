@@ -1,25 +1,25 @@
 #! /bin/bash
 
-SBATCH --job-name=clevr_data_gen
+# SBATCH --job-name=clevr_data_gen
 
-Use to change the number of replicates
-SBATCH --array=0-1000
+# # Use to change the number of replicates
+# SBATCH --array=0-1000
 
-# SBATCH --output=/private/home/%u/runs/ad_hoc_categories/logs/%x_%A_%a.out
+# # SBATCH --output=/private/home/%u/runs/clevr_corr/logs/%x_%A_%a.out
 
-SBATCH --partition=uninterrupted
+# SBATCH --partition=dev
 
-SBATCH --ntasks=1
+# SBATCH --ntasks=1
 
-SBATCH --gres=gpu:1
+# SBATCH --gres=gpu:2
 
-SBATCH --cpus-per-task=1
+# SBATCH --cpus-per-task=6
 
-SBATCH --time=40:00:00
+# SBATCH --time=40:00:00
 
-SBATCH --signal=USR1@60
+# SBATCH --signal=USR1@60
 
-SBATCH --open-mode=append
+# SBATCH --open-mode=append
 job_name=${SLURM_JOB_NAME}
 job_date=$(date +%y%m%d:%H)
 experiment_name="${job_name}_${job_date}_${SLURM_ARRAY_JOB_ID}"
@@ -32,6 +32,7 @@ echo "Job array Min: ${SLURM_ARRAY_TASK_MIN}"
 
 USE_GPU=1
 SIGMA=0.1
+NUM_IMAGES=40000
 
 if [ ${USE_GPU} == 1 ]; then
   module load cuda/10.0
@@ -54,9 +55,9 @@ if [ ! -e ${OUTPUT_DIR}/images/${SLURM_ARRAY_TASK_ID} ]; then
   mkdir ${OUTPUT_DIR}/scenes/${SLURM_ARRAY_TASK_ID}
 fi
 
-srun blender --background -noaudio --python \
+srun ~/Sirui/blender-2.78c-linux-glibc219-x86_64/blender --background -noaudio --python \
     clevr_obj_test/image_generation/render_images.py -- \
-    --num_images ${RAW_DATASET_NUM_IMAGES} \
+    --num_images ${NUM_IMAGES} \
     --output_image_dir "${OUTPUT_DIR}/images/${SLURM_ARRAY_TASK_ID}"\
     --output_scene_dir "${OUTPUT_DIR}/scenes/${SLURM_ARRAY_TASK_ID}"\
     --output_scene_file "${OUTPUT_DIR}/ADHOC_scenes_${SLURM_ARRAY_TASK_ID}.json"\
