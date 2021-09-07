@@ -36,7 +36,7 @@ class CLEVRDataset(Dataset):
         self.data_root = data_root
         self.clevr_transforms = clevr_transforms
         self.max_num_images = max_num_images
-        self.data_path = os.path.join(data_root, "images", split)
+        self.data_path = data_root
         self.max_n_objects = max_n_objects
         self.split = split
         assert os.path.exists(self.data_root), f"Path {self.data_root} does not exist"
