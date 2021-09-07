@@ -67,7 +67,7 @@ class CLEVRDataset(Dataset):
         #         assert os.path.exists(image_path), f"{image_path} does not exist"
         #         paths.append(image_path)
         #     i += 1
-        return sorted(compact(paths))
+        return sorted(compact(paths[:self.max_num_images]))
 
 class CLEVRValset(Dataset):
     def __init__(
