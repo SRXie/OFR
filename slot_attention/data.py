@@ -54,7 +54,7 @@ class CLEVRDataset(Dataset):
         return len(self.files)
 
     def get_files(self) -> List[str]:
-        paths = [f for f in os.listdir(self.data_root) if os.path.isfile(os.path.join(self.data_root, f))]
+        paths = [os.path.join(self.data_root, f) for f in os.listdir(self.data_root) if os.path.isfile(os.path.join(self.data_root, f))]
         # with open(os.path.join(self.data_root, f"scenes/CLEVR_{self.split}_scenes.json")) as f:
         #     scene = json.load(f)
         # paths: List[Optional[str]] = []
