@@ -264,6 +264,38 @@ def main(args):
   with open(args.output_scene_file, 'w') as f:
     json.dump(output, f)
 
+def stirling2 (n, m):
+  """ computes the Stirling numbers of the second kind.
+    S2(N,M) represents the number of distinct partitions of N elements
+    into M nonempty sets.  For a fixed N, the sum of the Stirling
+    numbers S2(N,M) is represented by B(N), called "Bell's number",
+    and represents the number of distinct partitions of N elements.
+  Parameters:
+    Input, integer N, the number of rows of the table.
+    Input, integer M, the number of columns of the table.
+    Output, integer S2(N,M), the Stirling numbers of the second kind."""
+
+  s2 = np.zeros ( ( n, m ) )
+
+  if ( n <= 0 ):
+    return s2
+
+  if ( m <= 0 ):
+    return s2
+
+  s2[0,0] = 1
+  for j in range ( 1, m ):
+    s2[0,j] = 0
+
+  for i in range ( 1, n ):
+
+    s2[i,0] = 1
+
+    for j in range ( 1, m ):
+      s2[i,j] = ( j + 1 ) * s2[i-1,j] + s2[i-1,j-1]
+
+  return s2[n-1, m-1]
+
 def generate_distr_dict(num_obj, num_val, sigma=0.0, margin=0):
   from itertools import product, combinations
   energy_tensor = np.zeros([num_val]*num_obj)
