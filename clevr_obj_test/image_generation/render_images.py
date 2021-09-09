@@ -543,6 +543,7 @@ def add_random_objects(scene_struct, num_objects, args, camera):
         exec("global "+attr+"_distr_"+str(len(cluster)))
         exec("correlated_"+attr+"_list=np.random.choice(list("+attr+"_distr_"+str(len(cluster))+".keys()), p=list("+attr+"_distr_"+str(len(cluster))+".values())).split('-')", globals())
     if args.pos_margin> 0.0 and args.mutex:
+      global correlated_color_list
       correlated_color_list = [correlated_color_lists[k]]*len(cluster)
     for j, obj_idx in enumerate(cluster):
       # Choose random color
