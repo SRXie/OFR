@@ -89,9 +89,17 @@ parser.add_argument('--color_correlated', action='store_true',
     help="If the colors of objects are correlated.")
 parser.add_argument('--material_correlated', action='store_true',
     help="If the materials of objects are correlated.")
-parser.add_argument('--en_margin', default=-1, type=int,
+parser.add_argument('--appr_correlated', action='store_true',
+    help="If the appearence (color+material) of objects are correlated.")
+parser.add_argument('--intr_correlated', action='store_true',
+    help="If the intrinsic attributes (color+material+size+shape) of objects are correlated.")
+parser.add_argument('--pos_margin', default=0.0, type=float,
+    help="The margin for positional clustering.")
+parser.add_argument('--mutex', action='store_true',
+    help="If the color of object clusters are mutually exclusive.")
+parser.add_argument('--en_margin', default=0, type=int,
     help="The margin for hard cap on energy.")
-parser.add_argument('--en_sigma', default=0.05, type=float,
+parser.add_argument('--en_sigma', default=0.0, type=float,
     help="The sigma of the energy term")
 
 # Output settings
@@ -164,6 +172,38 @@ parser.add_argument('--render_tile_size', default=256, type=int,
          "rendering may achieve better performance using smaller tile sizes " +
          "while larger tile sizes may be optimal for GPU-based rendering.")
 
+def insert_corr_to_dir(dir_path, scene_file=False):
+  dir_list = dir_path.split("/")
+  index = -1 if scene_file else -2
+  if args.pos_margin>0.0:
+    if args.mutex:
+      dir_list.insert(index, "pos_mutex_"+str(args.pos_margin))
+    else:
+      dir_list.insert(index, "pos_corr_"+str(args.pos_margin))
+  elif args.intr_correlated:
+    if args.en_sigma > 0.0:
+      dir_list.insert(index, "intr_corr_"+str(args.en_sigma))
+    else:
+      dir_list.insert(index, "intr_corr_"+str(args.en_margin))
+  elif args.appr_correlated:
+    if args.en_sigma > 0.0:
+      dir_list.insert(index, "appr_corr_"+str(args.en_sigma))
+    else:
+      dir_list.insert(index, "appr_corr_"+str(args.en_margin))
+  elif args.size_correlated:
+    dir_list.insert(index, "size_corr_"+str(args.pos_margin))
+  elif args.material_correlated:
+    dir_list.insert(index, "material_corr_"+str(args.pos_margin))
+  elif args.shape_correlated:
+    dir_list.insert(index, "shape_corr_"+str(args.pos_margin))
+  elif args.color_correlated:
+    if args.en_sigma > 0.0:
+      dir_list.insert(index, "color_corr_"+str(args.en_sigma))
+    else:
+      dir_list.insert(index, "color_corr_"+str(args.en_margin))
+  dir_path = "/".join(dir_list)
+  return dir_path
+
 def main(args):
   num_digits = 6
   prefix = '%s_%s_' % (args.filename_prefix, args.split)
@@ -171,27 +211,11 @@ def main(args):
   scene_template = '%s%%0%dd.json' % (prefix, num_digits)
   blend_template = '%s%%0%dd.blend' % (prefix, num_digits)
 
-  if args.size_correlated:
-    args.output_image_dir = os.path.join(args.output_image_dir, "size_corr_"+str(args.en_margin))
-    args.output_scene_dir = os.path.join(args.output_scene_dir, "size_corr_"+str(args.en_margin))
-    args.output_blend_dir = os.path.join(args.output_blend_dir, "size_corr_"+str(args.en_margin))
-  if args.material_correlated:
-    args.output_image_dir = os.path.join(args.output_image_dir, "material_corr_"+str(args.en_margin))
-    args.output_scene_dir = os.path.join(args.output_scene_dir, "material_corr_"+str(args.en_margin))
-    args.output_blend_dir = os.path.join(args.output_blend_dir, "material_corr_"+str(args.en_margin))
-  if args.shape_correlated:
-    args.output_image_dir = os.path.join(args.output_image_dir, "shape_corr_"+str(args.en_margin))
-    args.output_scene_dir = os.path.join(args.output_scene_dir, "shape_corr_"+str(args.en_margin))
-    args.output_blend_dir = os.path.join(args.output_blend_dir, "shape_corr_"+str(args.en_margin))
-  if args.color_correlated:
-    if args.en_margin>=0:
-      args.output_image_dir = os.path.join(args.output_image_dir, "color_corr_"+str(args.en_margin))
-      args.output_scene_dir = os.path.join(args.output_scene_dir, "color_corr_"+str(args.en_margin))
-      args.output_blend_dir = os.path.join(args.output_blend_dir, "color_corr_"+str(args.en_margin))
-    else:
-      args.output_image_dir = os.path.join(args.output_image_dir, "color_corr_"+str(args.en_sigma))
-      args.output_scene_dir = os.path.join(args.output_scene_dir, "color_corr_"+str(args.en_sigma))
-      args.output_blend_dir = os.path.join(args.output_blend_dir, "color_corr_"+str(args.en_sigma))
+  if args.pos_margin>0.0 or args.intr_correlated or args.appr_correlated or args.size_correlated or args.material_correlated or args.shape_correlated or args.color_correlated:
+    args.output_image_dir=insert_corr_to_dir(args.output_image_dir)
+    args.output_scene_dir=insert_corr_to_dir(args.output_scene_dir)
+    args.output_blen_dir=insert_corr_to_dir(args.output_blend_dir)
+    args.output_scene_file=insert_corr_to_dir(args.output_scene_file, True)
 
   if not os.path.isdir(args.output_image_dir):
     os.makedirs(args.output_image_dir)
@@ -240,22 +264,23 @@ def main(args):
   with open(args.output_scene_file, 'w') as f:
     json.dump(output, f)
 
-def generate_distr_dict(num_obj, num_val, sigma, margin=-1):
+def generate_distr_dict(num_obj, num_val, sigma=0.0, margin=0):
+  from itertools import product, combinations
   energy_tensor = np.zeros([num_val]*num_obj)
   distr_dict = {}
   for vals in product(range(num_val), repeat=num_obj):
-    if margin >= 0:
+    if sigma == 0.0:
       valid = True
-    for pair in combinations(vals, 2):
-      if margin >= 0:
-        valid = valid and abs(pair[0]-pair[1])<=margin
-        if valid:
-          energy_tensor[vals] = 1.0
-        else:
-          energy_tensor[vals] = 0.0
-          break
-      else:
-        energy_tensor[vals] += np.exp(-(pair[0]-pair[1])**2/(2*sigma**2))
+      for pair in combinations(vals, 2):
+          valid = valid and abs(pair[0]-pair[1])<=margin
+          if valid:
+            energy_tensor[vals] = 1.0
+          else:
+            energy_tensor[vals] = 0.0
+            break
+    elif num_obj> 1:
+      # we define the energy over the count of unique values in the axis and then distribute this energy equally to all its possible partitions
+      energy_tensor[vals] += np.exp(-(len(set(vals))-1)**2/(2*stirling2(num_obj, len(set(vals)))*(num_obj/6.0*sigma)**2))
   if num_obj> 1:
     energy_tensor = energy_tensor/energy_tensor.sum()
   else:
@@ -406,9 +431,15 @@ def add_random_objects(scene_struct, num_objects, args, camera):
 
   positions = []
   objects = []
+  obj_cluster = {}
+  size_names = []
+  obj_names = []
+  obj_name_outs = []
+  clusters = []
+  cluster_means = []
   blender_objects = []
 
-  for attr in ("shape", "material", "size", "color"):
+  for attr in ("shape", "size"):
     if eval("args."+attr+"_correlated"):
       exec("global "+attr+"_distr_"+str(num_objects))
       # exec("tmp=np.random.choice(list("+attr+"_distr_"+str(num_objects)+".keys()), p=list("+attr+"_distr_"+str(num_objects)+".values()))", globals())
@@ -420,6 +451,12 @@ def add_random_objects(scene_struct, num_objects, args, camera):
       size_name, r = random.choice(size_mapping)
     else:
       size_name, r = size_mapping[int(correlated_size_list[i])]
+
+    # Choose random shape
+    if not args.shape_correlated:
+      obj_name, obj_name_out = random.choice(object_mapping)
+    else:
+      obj_name, obj_name_out = object_mapping[int(correlated_shape_list[i])]
 
     # Try to place the object, ensuring that we don't intersect any existing
     # objects and that we are more than the desired margin away from all existing
@@ -460,53 +497,94 @@ def add_random_objects(scene_struct, num_objects, args, camera):
       if dists_good and margins_good:
         break
 
-    # Choose random color and shape
-    if shape_color_combos is None:
-      if not args.shape_correlated:
-        obj_name, obj_name_out = random.choice(object_mapping)
-      else:
-        obj_name, obj_name_out = object_mapping[int(correlated_shape_list[i])]
-      if not args.color_correlated:
-        color_name, rgba = random.choice(list(color_name_to_rgba.items()))
-      else:
-        color_name, rgba = list(color_name_to_rgba.items())[int(correlated_color_list[i])]
-    else:
-      obj_name_out, color_choices = random.choice(shape_color_combos)
-      color_name = random.choice(color_choices)
-      obj_name = [k for k, v in object_mapping if v == obj_name_out][0]
-      rgba = color_name_to_rgba[color_name]
-
     # For cube, adjust the size a bit
     if obj_name == 'Cube':
       r /= math.sqrt(2)
 
-    # Choose random orientation for the object.
-    theta = 360.0 * random.random()
-
-    # Actually add the object to the scene
-    utils.add_object(args.shape_dir, obj_name, r, (x, y), theta=theta)
-    obj = bpy.context.object
-    blender_objects.append(obj)
-    positions.append((x, y, r))
-
-    # Attach a random material
-    if not args.material_correlated:
-      mat_name, mat_name_out = random.choice(material_mapping)
+    # now we register the new object to object clusters
+    if len(cluster_means) == 0:
+      cluster_means.append((1, x, y))
+      clusters.append([i])
+      obj_cluster[i] = len(clusters)-1
     else:
-      mat_name, mat_name_out = material_mapping[int(correlated_material_list[i])]
-    utils.add_material(mat_name, Color=rgba)
+      cluster_found = False
+      dist_min = 100.0
+      cluster_min_idx = -1
+      for idx, (n, xm, ym) in enumerate(cluster_means):
+        dx, dy = x - xm, y - ym
+        dist = math.sqrt(dx * dx + dy * dy)
+        if dist < dist_min:
+          dist_min = dist
+          cluster_min_idx = idx
+      if dist_min - r < args.pos_margin: # TODO: adjust with pixel coordinate
+        cluster_means[cluster_min_idx] = (n+1, (n*xm+x)/(n+1), (n*ym+y)/(n+1))
+        clusters[cluster_min_idx].append(i)
+        obj_cluster[i] = cluster_min_idx
+        cluster_found = True
+      if not cluster_found:
+        cluster_means.append((1, x, y))
+        clusters.append([i])
+        obj_cluster[i] = len(clusters)-1
 
-    # Record data about the object in the scene data structure
-    pixel_coords = utils.get_camera_coords(camera, obj.location)
-    objects.append({
-      'shape': obj_name_out,
-      'size': size_name,
-      'material': mat_name_out,
-      '3d_coords': tuple(obj.location),
-      'rotation': theta,
-      'pixel_coords': pixel_coords,
-      'color': color_name,
-    })
+    positions.append((x, y, r))
+    size_names.append(size_name)
+    obj_names.append(obj_name)
+    obj_name_outs.append(obj_name_out)
+    if args.pos_margin == 0.0:
+      clusters = [[item for cluster in clusters for item in cluster]]
+    print(clusters, "-----------------------")
+
+  if args.pos_margin> 0.0 and args.mutex:
+    correlated_color_lists = np.random.permutation(8)[:len(clusters)]
+
+  for k, cluster in enumerate(clusters):
+    for attr in ("material", "color"):
+      if eval("args."+attr+"_correlated"):
+        exec("global "+attr+"_distr_"+str(len(cluster)))
+        exec("correlated_"+attr+"_list=np.random.choice(list("+attr+"_distr_"+str(len(cluster))+".keys()), p=list("+attr+"_distr_"+str(len(cluster))+".values())).split('-')", globals())
+    if args.pos_margin> 0.0 and args.mutex:
+      correlated_color_list = [correlated_color_lists[k]]*len(cluster)
+    for j, obj_idx in enumerate(cluster):
+      # Choose random color
+      if shape_color_combos is None:
+        if not args.color_correlated:
+          color_name, rgba = random.choice(list(color_name_to_rgba.items()))
+        else:
+          color_name, rgba = list(color_name_to_rgba.items())[int(correlated_color_list[j])]
+      else:
+        raise NotImplementedError
+        # obj_name_out, color_choices = random.choice(shape_color_combos)
+        # color_name = random.choice(color_choices)
+        # obj_name = [k for k, v in object_mapping if v == obj_name_out][0]
+        # rgba = color_name_to_rgba[color_name]
+
+      # Attach a random material
+      if not args.material_correlated:
+        mat_name, mat_name_out = random.choice(material_mapping)
+      else:
+        mat_name, mat_name_out = material_mapping[int(correlated_material_list[j])]
+
+      # Choose random orientation for the object.
+      theta = 360.0 * random.random()
+
+      # Actually add the object to the scene
+      utils.add_object(args.shape_dir, obj_names[obj_idx], positions[obj_idx][2], (positions[obj_idx][0], positions[obj_idx][1]), theta=theta)
+      obj = bpy.context.object
+      blender_objects.append(obj)
+
+      utils.add_material(mat_name, Color=rgba)
+
+      # Record data about the object in the scene data structure
+      pixel_coords = utils.get_camera_coords(camera, obj.location)
+      objects.append({
+        'shape': obj_name_outs[obj_idx],
+        'size': size_names[obj_idx],
+        'material': mat_name_out,
+        '3d_coords': tuple(obj.location),
+        'rotation': theta,
+        'pixel_coords': pixel_coords,
+        'color': color_name,
+      })
 
   # Check that all objects are at least partially visible in the rendered image
   all_visible = check_visibility(blender_objects, args.min_pixels_per_object)
@@ -639,15 +717,25 @@ if __name__ == '__main__':
     # Run normally
     argv = utils.extract_args()
     args = parser.parse_args(argv)
+    if args.pos_margin > 0.0 or args.appr_correlated:
+      args.en_margin = 0
+      args.color_correlated = True
+      args.material_correlated = True
+    if args.intr_correlated:
+      args.en_margin = 0
+      args.color_correlated = True
+      args.material_correlated = True
+      args.shape_correlated = True
+      args.size_correlated = True
     if args.shape_correlated:
       for i in range(args.max_objects):
-        exec("shape_distr_"+str(i+1)+"=generate_distr_dict(i+1, 3, 0.1, margin=args.en_margin)")
+        exec("shape_distr_"+str(i+1)+"=generate_distr_dict(i+1, 3, 0.0, margin=args.en_margin)")
     if args.size_correlated:
       for i in range(args.max_objects):
-        exec("size_distr_"+str(i+1)+"=generate_distr_dict(i+1, 2, 0.1, margin=args.en_margin)")
+        exec("size_distr_"+str(i+1)+"=generate_distr_dict(i+1, 2, 0.0, margin=args.en_margin)")
     if args.material_correlated:
       for i in range(args.max_objects):
-        exec("material_distr_"+str(i+1)+"=generate_distr_dict(i+1, 2, 0.1, margin=args.en_margin)")
+        exec("material_distr_"+str(i+1)+"=generate_distr_dict(i+1, 2, 0.0, margin=args.en_margin)")
     if args.color_correlated:
       for i in range(args.max_objects):
         exec("color_distr_"+str(i+1)+"=generate_distr_dict(i+1, 8, args.en_sigma, margin=args.en_margin)")
