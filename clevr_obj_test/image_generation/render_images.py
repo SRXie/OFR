@@ -311,8 +311,11 @@ def generate_distr_dict(num_obj, num_val, sigma=0.0, margin=0):
             energy_tensor[vals] = 0.0
             break
     elif num_obj> 1:
-      # we define the energy over the count of unique values in the axis and then distribute this energy equally to all its possible partitions
-      energy_tensor[vals] += np.exp(-(len(set(vals))-1)**2/(2*stirling2(num_obj, len(set(vals)))*(num_obj/6.0*sigma)**2))
+      if num_val == 2:
+        energy_tensor[vals] += np.exp(-(sum(vals)-num_obj)**2/(2*math.factorial(num_obj)/math.factorial(num_obj-num_val)*(num_obj/6.0*sigma)**2))
+      else:
+        # we define the energy over the count of unique values in the axis and then distribute this energy equally to all its possible partitions
+        energy_tensor[vals] += np.exp(-(len(set(vals))-1)**2/(2*stirling2(num_obj, len(set(vals)))*(num_obj/6.0*sigma)**2))
   if num_obj> 1:
     energy_tensor = energy_tensor/energy_tensor.sum()
   else:
@@ -765,10 +768,10 @@ if __name__ == '__main__':
         exec("shape_distr_"+str(i+1)+"=generate_distr_dict(i+1, 3, 0.0, margin=args.en_margin)")
     if args.size_correlated:
       for i in range(args.max_objects):
-        exec("size_distr_"+str(i+1)+"=generate_distr_dict(i+1, 2, 0.0, margin=args.en_margin)")
+        exec("size_distr_"+str(i+1)+"=generate_distr_dict(i+1, 2, args.en_sigma, margin=args.en_margin)")
     if args.material_correlated:
       for i in range(args.max_objects):
-        exec("material_distr_"+str(i+1)+"=generate_distr_dict(i+1, 2, 0.0, margin=args.en_margin)")
+        exec("material_distr_"+str(i+1)+"=generate_distr_dict(i+1, 2, args.en_sigma, margin=args.en_margin)")
     if args.color_correlated:
       for i in range(args.max_objects):
         exec("color_distr_"+str(i+1)+"=generate_distr_dict(i+1, 8, args.en_sigma, margin=args.en_margin)")
