@@ -20,6 +20,7 @@ weight_decay: 0.0
 num_train_images: null # Optional[int]
 num_val_images: 10000  # Optional[int]
 num_test_images: 1000
+eval_every_n_epoch: 20
 empty_cache: True
 is_logger_enabled: True
 is_verbose: True
@@ -31,5 +32,9 @@ test_type: [obj, attr]
 dup_threshold: 0.15
 
 hydra:
+  sweep:
+    dir: /checkpoint/${env:USER}/runs/objectness/${hydra.job.name}_${sweep_name}
+    subdir: ${hydra.job.override_dirname}
+
   run:
     dir: outputs/${hydra.job.override_dirname}

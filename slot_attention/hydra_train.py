@@ -93,6 +93,12 @@ class _Workplace(object):
             num_iterations=cfg.num_iterations,
             empty_cache=cfg.empty_cache,
         )
+        # The following code is for loading a saved checkpoint
+        # ckpt = torch.load("path_to_checkpoint")
+        # state_dict = ckpt['state_dict']
+        # for key in list(state_dict.keys()):
+        #     state_dict[key.replace('model.', '')] = state_dict.pop(key)
+        # model.load_state_dict(state_dict)
 
         self.method = SlotAttentionMethod(model=model, datamodule=clevr_datamodule, params=cfg)
 
@@ -107,9 +113,13 @@ class _Workplace(object):
             num_sanity_val_steps=cfg.num_sanity_val_steps,
             gpus=cfg.gpus,
             max_epochs=cfg.max_epochs,
+            check_val_every_n_epoch=cfg.eval_every_n_epoch,
             log_every_n_steps=50,
             callbacks=[LearningRateMonitor("step"), ImageLogCallback(),] if cfg.is_logger_enabled else [],
         )
+        # Here we get the metrics from the final epoch
+        print("-----------------")
+        print(trainer.logged_metrics)
 
     def run_training(self):
         self.trainer.fit(self.method)

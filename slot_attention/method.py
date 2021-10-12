@@ -337,7 +337,7 @@ class SlotAttentionMethod(pl.LightningModule):
             step = step * self.params.gpus # to make the decay consistent over multi-GPU
             warmup_steps = warmup_steps_pct * total_steps
             decay_steps = decay_steps_pct * total_steps
-            assert step < total_steps
+            # assert step < total_steps
             if step < warmup_steps:
                 factor = step / warmup_steps
             else:

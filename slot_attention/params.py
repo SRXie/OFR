@@ -26,6 +26,7 @@ class SlotAttentionParams:
     num_train_images: Optional[int] = None
     num_val_images: Optional[int] = None
     num_test_images: Optional[int] = 1
+    eval_every_n_epoch = 20
     empty_cache: bool = True
     is_logger_enabled: bool = True
     is_verbose: bool = True
