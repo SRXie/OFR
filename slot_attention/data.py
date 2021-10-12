@@ -30,7 +30,7 @@ class CLEVRDataset(Dataset):
         max_num_images: Optional[int],
         clevr_transforms: Callable,
         max_n_objects: int = 10,
-        data_weights: Dict[Optional] = None,
+        data_weights: Dict = None,
         split: str = "train",
     ):
         super().__init__()
@@ -241,7 +241,7 @@ class CLEVRDataModule(pl.LightningDataModule):
         num_train_images: Optional[int] = None,
         num_val_images: Optional[int] = None,
         num_test_images: Optional[int] = None,
-        data_weights: Dict[Optional]=None,
+        data_weights: Dict=None,
         val_list: List[List[Optional[str]]] = None,
         obj_algebra_test_cases: List[List[Optional[str]]] = None,
         attr_algebra_test_cases: List[List[Optional[str]]] = None,
