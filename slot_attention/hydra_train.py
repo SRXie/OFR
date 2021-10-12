@@ -37,8 +37,9 @@ class _Workplace(object):
 
         # open the csv file to get the seed and the dataset mixing weights
         df = pd.read_csv(cfg.data_mix_csv)
-        self.data_weights = df.at[str(cfg.data_mix_idx), :-1]
-        seed = df.at[str(cfg.data_mix_idx), "seed"]
+        self.data_weights = df.loc[cfg.data_mix_idx, :]
+        del self.data_weights["seed"]
+        seed = df.loc[cfg.data_mix_idx, "seed"]
 
         seed_everything(seed)
 
