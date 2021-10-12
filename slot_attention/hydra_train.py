@@ -10,6 +10,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.utilities.seed import seed_everything
 from torchvision import transforms
+import pandas as pd
 
 from slot_attention.data import CLEVRDataModule
 from slot_attention.method import SlotAttentionMethod
@@ -34,7 +35,12 @@ class _Workplace(object):
             if cfg.num_val_images:
                 print(f"INFO: restricting the validation dataset size to `num_val_images`: {cfg.num_val_images}")
 
-        seed_everything(cfg.seed)
+        # open the csv file to get the seed and the dataset mixing weights
+        df = pd.read_csv(cfg.data_mix_csv)
+        self.data_weights = df.at[str(cfg.data_mix_idx), :-1]
+        seed = df.at[str(cfg.data_mix_idx), "seed"]
+
+        seed_everything(seed)
 
         clevr_transforms = transforms.Compose(
             [
@@ -81,6 +87,7 @@ class _Workplace(object):
             num_test_images=cfg.num_test_images,
             num_workers=cfg.num_workers,
             val_list = self.val_list,
+            data_weights = self.data_weights,
             obj_algebra_test_cases = self.obj_algebra_test_cases,
             attr_algebra_test_cases = self.attr_algebra_test_cases,
         )
@@ -102,7 +109,7 @@ class _Workplace(object):
 
         self.method = SlotAttentionMethod(model=model, datamodule=clevr_datamodule, params=cfg)
 
-        logger_name = "slot-attn-f/mean-seed-"+str(cfg.seed)+"-dup-"+str(cfg.dup_threshold)
+        logger_name = "slot-attn-f/dsmix-"+str(cfg.data_mix_idx)+ "-seed-" + str(cfg.seed) #"-dup-"+str(cfg.dup_threshold)
         logger = pl_loggers.WandbLogger(project="objectness-test-clevr6", name=logger_name)
         # Use this line for Tensorboard logger
         # logger = pl_loggers.TensorBoardLogger("./logs/"+logger_name+strftime("-%Y%m%d%H%M%S", localtime()))
@@ -120,6 +127,9 @@ class _Workplace(object):
         # Here we get the metrics from the final epoch
         print("-----------------")
         print(self.trainer.logged_metrics)
+        result = pd.read_csv(cfg.result_csv)
+        result.at[cfg.data_mix_idx, :] = {**self.data_weights, **self.trainer.logged_metrics}
+        result.to_csv(cfg.result_csv)
 
     def run_training(self):
         self.trainer.fit(self.method)

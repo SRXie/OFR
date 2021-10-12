@@ -4,7 +4,7 @@ import os
 import random
 import numpy as np
 from typing import Callable
-from typing import List
+from typing import List, Dict
 from typing import Optional
 from typing import Tuple
 
@@ -30,6 +30,7 @@ class CLEVRDataset(Dataset):
         max_num_images: Optional[int],
         clevr_transforms: Callable,
         max_n_objects: int = 10,
+        data_weights: Dict[Optional] = None,
         split: str = "train",
     ):
         super().__init__()
@@ -38,6 +39,7 @@ class CLEVRDataset(Dataset):
         self.max_num_images = max_num_images
         self.data_path = data_root
         self.max_n_objects = max_n_objects
+        self.data_weights = data_weights
         self.split = split
         assert os.path.exists(self.data_root), f"Path {self.data_root} does not exist"
         assert self.split == "train" or self.split == "val" or self.split == "test"
@@ -54,7 +56,28 @@ class CLEVRDataset(Dataset):
         return len(self.files)
 
     def get_files(self) -> List[str]:
-        paths = [os.path.join(self.data_root, f) for f in os.listdir(self.data_root) if os.path.isfile(os.path.join(self.data_root, f))]
+        paths = []
+        for dataset, weight in self.data_weights.items:
+            if dataset == "iid":
+                with open(os.path.join(self.data_root, f"scenes/CLEVR_{self.split}_scenes.json")) as f:
+                    scene = json.load(f)
+                image_paths: List[Optional[str]] = []
+                total_num_images = len(scene["scenes"])
+                i = 0
+                while (self.max_num_images is None or len(image_paths) < self.max_num_images*weight) and i < total_num_images:
+                    num_objects_in_scene = len(scene["scenes"][i]["objects"])
+                    if num_objects_in_scene <= self.max_n_objects:
+                        image_path = os.path.join(self.data_path, scene["scenes"][i]["image_filename"])
+                        assert os.path.exists(image_path), f"{image_path} does not exist"
+                        image_paths.append(image_path)
+                    i += 1
+                path += image_paths
+            else:
+                data_path = os.path.join(self.data_root, dataset, "images")
+                assert os.path.exists(data_path), f"Path {data_path} does not exist"
+                image_paths = [os.path.join(data_path, f) for f in os.listdir(data_path) if os.path.isfile(os.path.join(data_path, f))]
+                paths += image_paths[:self.max_num_images*weight]
+        ##paths = [os.path.join(self.data_root, f) for f in os.listdir(self.data_root) if os.path.isfile(os.path.join(self.data_root, f))]
         # with open(os.path.join(self.data_root, f"scenes/CLEVR_{self.split}_scenes.json")) as f:
         #     scene = json.load(f)
         # paths: List[Optional[str]] = []
@@ -218,6 +241,7 @@ class CLEVRDataModule(pl.LightningDataModule):
         num_train_images: Optional[int] = None,
         num_val_images: Optional[int] = None,
         num_test_images: Optional[int] = None,
+        data_weights: Dict[Optional]=None,
         val_list: List[List[Optional[str]]] = None,
         obj_algebra_test_cases: List[List[Optional[str]]] = None,
         attr_algebra_test_cases: List[List[Optional[str]]] = None,
@@ -242,6 +266,7 @@ class CLEVRDataModule(pl.LightningDataModule):
             clevr_transforms=self.clevr_transforms,
             split="train",
             max_n_objects=self.max_n_objects,
+            data_weights=data_weights,
         )
         self.val_dataset = CLEVRValset(
             data_root=self.val_root,

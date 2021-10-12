@@ -9,7 +9,9 @@ test_batch_size: 256
 resolution: [64, 64] # Tuple[int, int]
 num_slots: 7
 num_iterations: 4
-data_root: /datasets01/CLEVR_v1.0/060817/images/
+data_mix_idx: 0
+data_mix_csv: /checkpoint/siruixie/data_mix.csv
+data_root: /checkpoint/siruixie/clevr_corr/ #/datasets01/CLEVR_v1.0/060817/images/train/
 val_root: /checkpoint/siruixie/clevr_with_masks/
 test_root: /checkpoint/siruixie/clevr_obj_test/output/
 gpus: 2
@@ -30,6 +32,7 @@ warmup_steps_pct: 0.02
 decay_steps_pct: 0.2
 test_type: [obj, attr]
 dup_threshold: 0.15
+result_csv: /checkpoint/siruixie/data_mix_result.csv
 
 hydra:
   sweep:
