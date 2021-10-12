@@ -119,7 +119,7 @@ class _Workplace(object):
         )
         # Here we get the metrics from the final epoch
         print("-----------------")
-        print(trainer.logged_metrics)
+        print(self.trainer.logged_metrics)
 
     def run_training(self):
         self.trainer.fit(self.method)
