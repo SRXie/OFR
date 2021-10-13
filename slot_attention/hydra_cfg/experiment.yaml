@@ -1,7 +1,7 @@
 # A yaml version of params.py
 sweep_name: null
 seed: 0
-gpu_id: '0'
+gpu_id: '0, 1'
 lr: 0.0004
 batch_size: 64
 val_batch_size: 16
@@ -14,7 +14,7 @@ data_mix_csv: /checkpoint/siruixie/data_mix.csv
 data_root: /checkpoint/siruixie/clevr_corr/ #/datasets01/CLEVR_v1.0/060817/images/train/
 val_root: /checkpoint/siruixie/clevr_with_masks/
 test_root: /checkpoint/siruixie/clevr_obj_test/output/
-gpus: 1
+gpus: 2
 max_epochs: 100
 num_sanity_val_steps: 1
 scheduler_gamma: 0.5

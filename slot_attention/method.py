@@ -121,29 +121,29 @@ class SlotAttentionMethod(pl.LightningModule):
     def validation_epoch_end(self, outputs):
         avg_loss = torch.stack([x["loss"] for x in outputs]).mean()
         avg_ari_mask = np.stack([x["mask_ari"] for x in outputs]).mean()
-        schema_distance_disc = torch.cat([x["schema_distance_disc"] for x in outputs])
-        schema_distance_pos = torch.cat([x["schema_distance_pos"] for x in outputs])
-        schema_distance_size = torch.cat([x["schema_distance_size"] for x in outputs])
-        schema_distance_material = torch.cat([x["schema_distance_material"] for x in outputs])
-        schema_distance_shape = torch.cat([x["schema_distance_shape"] for x in outputs])
-        schema_distance_color = torch.cat([x["schema_distance_color"] for x in outputs])
-        schema_distance = schema_distance_disc + schema_distance_pos
-        slots_distance = torch.cat([x["slots_distance"] for x in outputs])
-        corr_coef_disc = compute_corr_coef(schema_distance_disc, slots_distance)
-        corr_coef_size = compute_corr_coef(schema_distance_size, slots_distance)
-        corr_coef_material = compute_corr_coef(schema_distance_material, slots_distance)
-        corr_coef_shape = compute_corr_coef(schema_distance_shape, slots_distance)
-        corr_coef_color = compute_corr_coef(schema_distance_color, slots_distance)
-        corr_coef_pos = compute_corr_coef(schema_distance_pos, slots_distance)
-        corr_coef = compute_corr_coef(schema_distance, slots_distance)
+        # schema_distance_disc = torch.cat([x["schema_distance_disc"] for x in outputs])
+        # schema_distance_pos = torch.cat([x["schema_distance_pos"] for x in outputs])
+        # schema_distance_size = torch.cat([x["schema_distance_size"] for x in outputs])
+        # schema_distance_material = torch.cat([x["schema_distance_material"] for x in outputs])
+        # schema_distance_shape = torch.cat([x["schema_distance_shape"] for x in outputs])
+        # schema_distance_color = torch.cat([x["schema_distance_color"] for x in outputs])
+        # schema_distance = schema_distance_disc + schema_distance_pos
+        # slots_distance = torch.cat([x["slots_distance"] for x in outputs])
+        # corr_coef_disc = compute_corr_coef(schema_distance_disc, slots_distance)
+        # corr_coef_size = compute_corr_coef(schema_distance_size, slots_distance)
+        # corr_coef_material = compute_corr_coef(schema_distance_material, slots_distance)
+        # corr_coef_shape = compute_corr_coef(schema_distance_shape, slots_distance)
+        # corr_coef_color = compute_corr_coef(schema_distance_color, slots_distance)
+        # corr_coef_pos = compute_corr_coef(schema_distance_pos, slots_distance)
+        # corr_coef = compute_corr_coef(schema_distance, slots_distance)
 
-        corr_rank_disc = compute_rank_correlation(schema_distance_disc.unsqueeze(0), slots_distance.unsqueeze(0))
-        corr_rank_size = compute_rank_correlation(schema_distance_size.unsqueeze(0), slots_distance.unsqueeze(0))
-        corr_rank_material = compute_rank_correlation(schema_distance_material.unsqueeze(0), slots_distance.unsqueeze(0))
-        corr_rank_shape = compute_rank_correlation(schema_distance_shape.unsqueeze(0), slots_distance.unsqueeze(0))
-        corr_rank_color = compute_rank_correlation(schema_distance_color.unsqueeze(0), slots_distance.unsqueeze(0))
-        corr_rank_pos = compute_rank_correlation(schema_distance_pos.unsqueeze(0), slots_distance.unsqueeze(0))
-        corr_rank = compute_rank_correlation(schema_distance.unsqueeze(0), slots_distance.unsqueeze(0))
+        # corr_rank_disc = compute_rank_correlation(schema_distance_disc.unsqueeze(0), slots_distance.unsqueeze(0))
+        # corr_rank_size = compute_rank_correlation(schema_distance_size.unsqueeze(0), slots_distance.unsqueeze(0))
+        # corr_rank_material = compute_rank_correlation(schema_distance_material.unsqueeze(0), slots_distance.unsqueeze(0))
+        # corr_rank_shape = compute_rank_correlation(schema_distance_shape.unsqueeze(0), slots_distance.unsqueeze(0))
+        # corr_rank_color = compute_rank_correlation(schema_distance_color.unsqueeze(0), slots_distance.unsqueeze(0))
+        # corr_rank_pos = compute_rank_correlation(schema_distance_pos.unsqueeze(0), slots_distance.unsqueeze(0))
+        # corr_rank = compute_rank_correlation(schema_distance.unsqueeze(0), slots_distance.unsqueeze(0))
         # Algebra Test starts here
         odl = self.datamodule.obj_test_dataloader()
         adl = self.datamodule.attr_test_dataloader()
@@ -273,22 +273,22 @@ class SlotAttentionMethod(pl.LightningModule):
             avg_attr_pd_greedy_cos_loss = avg_attr_pd_greedy_cos_loss.mean()
 
             logs = {
-                "avg_val_loss": avg_loss,
-                "avg_ari_mask": avg_ari_mask,
-                "corr_coef_disc": corr_coef_disc,
-                "corr_coef_pos": corr_coef_pos,
-                "corr_coef_size": corr_coef_size,
-                "corr_coef_material": corr_coef_material,
-                "corr_coef_shape": corr_coef_shape,
-                "corr_coef_color": corr_coef_color,
-                "corr_coef": corr_coef,
-                "corr_rank_disc": corr_rank_disc,
-                "corr_rank_pos": corr_rank_pos,
-                "corr_rank_size": corr_rank_size,
-                "corr_rank_material": corr_rank_material,
-                "corr_rank_shape": corr_rank_shape,
-                "corr_rank_color": corr_rank_color,
-                "corr_rank": corr_rank,
+                # "avg_val_loss": avg_loss,
+                # "avg_ari_mask": avg_ari_mask,
+                # "corr_coef_disc": corr_coef_disc,
+                # "corr_coef_pos": corr_coef_pos,
+                # "corr_coef_size": corr_coef_size,
+                # "corr_coef_material": corr_coef_material,
+                # "corr_coef_shape": corr_coef_shape,
+                # "corr_coef_color": corr_coef_color,
+                # "corr_coef": corr_coef,
+                # "corr_rank_disc": corr_rank_disc,
+                # "corr_rank_pos": corr_rank_pos,
+                # "corr_rank_size": corr_rank_size,
+                # "corr_rank_material": corr_rank_material,
+                # "corr_rank_shape": corr_rank_shape,
+                # "corr_rank_color": corr_rank_color,
+                # "corr_rank": corr_rank,
                 "avg_obj_greedy_loss_nodup": avg_obj_greedy_loss_nodup,
                 "avg_attr_greedy_loss_nodup": avg_attr_greedy_loss_nodup,
                 "avg_obj_pseudo_greedy_loss": avg_obj_pd_greedy_loss,
