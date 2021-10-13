@@ -37,9 +37,11 @@ class _Workplace(object):
 
         # open the csv file to get the seed and the dataset mixing weights
         df = pd.read_csv(cfg.data_mix_csv)
-        self.data_weights = df.loc[cfg.data_mix_idx, :]
-        del self.data_weights["seed"]
+        self.data_weights = df.iloc[cfg.data_mix_idx, 1:-1]
         seed = df.loc[cfg.data_mix_idx, "seed"]
+
+        self.result_csv = cfg.result_csv
+        self.data_mix_idx = cfg.data_mix_idx
 
         seed_everything(seed)
 
@@ -125,15 +127,23 @@ class _Workplace(object):
             log_every_n_steps=50,
             callbacks=[LearningRateMonitor("step"), ImageLogCallback(),] if cfg.is_logger_enabled else [],
         )
-        # Here we get the metrics from the final epoch
-        print("-----------------")
-        print(self.trainer.logged_metrics)
-        result = pd.read_csv(cfg.result_csv)
-        result.at[cfg.data_mix_idx, :] = {**self.data_weights, **self.trainer.logged_metrics}
-        result.to_csv(cfg.result_csv)
 
     def run_training(self):
         self.trainer.fit(self.method)
+        # Here we get the metrics from the final epoch
+        print("-----------------")
+        print(self.trainer.logged_metrics)
+        logged_metrics = self.trainer.logged_metrics
+        del logged_metrics["loss"]
+        del logged_metrics["epoch"]
+        row = {**self.data_weights, **logged_metrics}
+        if os.path.exists(self.result_csv):
+            result = pd.read_csv(self.result_csv)
+            result.at[self.data_mix_idx, :] = row
+        else:
+            result = pd.DataFrame(columns=list(row.keys()))
+            result.at[self.data_mix_idx, :] = row
+        result.to_csv(self.result_csv)
 
 @hydra.main(config_path='hydra_cfg', config_name='experiment')
 def main(cfg):

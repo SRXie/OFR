@@ -57,9 +57,10 @@ class CLEVRDataset(Dataset):
 
     def get_files(self) -> List[str]:
         paths = []
-        for dataset, weight in self.data_weights.items:
+        for dataset, weight in self.data_weights.items():
+            print(dataset, weight)
             if dataset == "iid":
-                with open(os.path.join(self.data_root, f"scenes/CLEVR_{self.split}_scenes.json")) as f:
+                with open(os.path.join("/datasets01/CLEVR_v1.0/060817", f"scenes/CLEVR_{self.split}_scenes.json")) as f:
                     scene = json.load(f)
                 image_paths: List[Optional[str]] = []
                 total_num_images = len(scene["scenes"])
@@ -67,16 +68,18 @@ class CLEVRDataset(Dataset):
                 while (self.max_num_images is None or len(image_paths) < self.max_num_images*weight) and i < total_num_images:
                     num_objects_in_scene = len(scene["scenes"][i]["objects"])
                     if num_objects_in_scene <= self.max_n_objects:
-                        image_path = os.path.join(self.data_path, scene["scenes"][i]["image_filename"])
+                        image_path = os.path.join("/datasets01/CLEVR_v1.0/060817/images/train", scene["scenes"][i]["image_filename"])
                         assert os.path.exists(image_path), f"{image_path} does not exist"
                         image_paths.append(image_path)
                     i += 1
-                path += image_paths
+                paths += image_paths
             else:
-                data_path = os.path.join(self.data_root, dataset, "images")
-                assert os.path.exists(data_path), f"Path {data_path} does not exist"
-                image_paths = [os.path.join(data_path, f) for f in os.listdir(data_path) if os.path.isfile(os.path.join(data_path, f))]
-                paths += image_paths[:self.max_num_images*weight]
+                if not np.isnan(weight):
+                    print("here")
+                    data_path = os.path.join(self.data_root, dataset, "images")
+                    assert os.path.exists(data_path), f"Path {data_path} does not exist"
+                    image_paths = [os.path.join(data_path, f) for f in os.listdir(data_path) if os.path.isfile(os.path.join(data_path, f))]
+                    paths += image_paths[:int(self.max_num_images*weight)]
         ##paths = [os.path.join(self.data_root, f) for f in os.listdir(self.data_root) if os.path.isfile(os.path.join(self.data_root, f))]
         # with open(os.path.join(self.data_root, f"scenes/CLEVR_{self.split}_scenes.json")) as f:
         #     scene = json.load(f)
