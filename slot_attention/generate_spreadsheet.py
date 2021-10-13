@@ -14,10 +14,10 @@ for comb in combinations(data_list, 2):
             d1 = {prod[0]: 0.1, prod[1]:0.9, "seed": seed}
             d2 = {prod[0]: 0.5, prod[1]:0.5, "seed": seed}
             d3 = {prod[0]: 0.9, prod[1]:0.1, "seed": seed}
-            df.at[str(3*r), :] = d1
-            df.at[str(3*r+1), :] = d2
-            df.at[str(3*r+2), :] = d3
-            r +=1
+            df.at[str(r), :] = d1
+            df.at[str(r+1), :] = d2
+            df.at[str(r+2), :] = d3
+            r +=3
 
 # three datasets
 for comb in combinations(data_list, 3):
@@ -27,11 +27,11 @@ for comb in combinations(data_list, 3):
             d2 = {prod[0]: 0.45, prod[1]:0.1, prod[2]:0.45, "seed": seed}
             d3 = {prod[0]: 0.45, prod[1]:0.45, prod[2]:0.1, "seed": seed}
             d4 = {prod[0]: 0.33, prod[1]:0.34, prod[2]:0.33, "seed": seed}
-            df.at[str(4*r), :] = d1
-            df.at[str(4*r+1), :] = d2
-            df.at[str(4*r+2), :] = d3
-            df.at[str(4*r+3), :] = d4
-            r += 1
+            df.at[str(r), :] = d1
+            df.at[str(r+1), :] = d2
+            df.at[str(r+2), :] = d3
+            df.at[str(r+3), :] = d4
+            r += 4
 
 # four datasets
 for comb in combinations(data_list, 4):
@@ -42,11 +42,11 @@ for comb in combinations(data_list, 4):
             d3 = {prod[0]: 0.3, prod[1]:0.3, prod[2]:0.1, prod[3]:0.3, "seed": seed}
             d4 = {prod[0]: 0.3, prod[1]:0.3, prod[2]:0.3, prod[3]:0.1, "seed": seed}
             d5 = {prod[0]: 0.25, prod[1]:0.25, prod[2]:0.25, prod[3]:0.25, "seed": seed}
-            df.at[str(5*r), :] = d1
-            df.at[str(5*r+1), :] = d2
-            df.at[str(5*r+2), :] = d3
-            df.at[str(5*r+3), :] = d4
-            df.at[str(5*r+4), :] = d5
-            r += 1
+            df.at[str(r), :] = d1
+            df.at[str(r+1), :] = d2
+            df.at[str(r+2), :] = d3
+            df.at[str(r+3), :] = d4
+            df.at[str(r+4), :] = d5
+            r += 5
 
 df.to_csv("/checkpoint/siruixie/data_mix.csv")
