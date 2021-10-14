@@ -190,17 +190,23 @@ def insert_corr_to_dir(dir_path, scene_file=False):
       dir_list.insert(index, "appr_corr_"+str(args.en_sigma))
     else:
       dir_list.insert(index, "appr_corr_"+str(args.en_margin))
-  elif args.size_correlated:
-    dir_list.insert(index, "size_corr_"+str(args.pos_margin))
-  elif args.material_correlated:
-    dir_list.insert(index, "material_corr_"+str(args.pos_margin))
-  elif args.shape_correlated:
-    dir_list.insert(index, "shape_corr_"+str(args.pos_margin))
-  elif args.color_correlated:
-    if args.en_sigma > 0.0:
-      dir_list.insert(index, "color_corr_"+str(args.en_sigma))
+  else:
+    corr_name = ""
+    if args.size_correlated:
+      corr_name += ("size_"+str(args.en_margin))
+    if args.material_correlated:
+      corr_name += ("material_"+str(args.en_margin))
+    if args.shape_correlated:
+      corr_name += ("shape_"+str(args.en_margin))
+    if args.color_correlated:
+      if args.en_sigma > 0.0:
+        corr_name += ("color_"+str(args.en_sigma))
+      else:
+        corr_name += ("color_"+str(args.en_margin))
+    if len(corr_name) > 0:
+      dir_list.insert(index, corr_name)
     else:
-      dir_list.insert(index, "color_corr_"+str(args.en_margin))
+      dir_list.insert(index, "iid")
   dir_path = "/".join(dir_list)
   return dir_path
 
@@ -211,11 +217,10 @@ def main(args):
   scene_template = '%s%%0%dd.json' % (prefix, num_digits)
   blend_template = '%s%%0%dd.blend' % (prefix, num_digits)
 
-  if args.pos_margin>0.0 or args.intr_correlated or args.appr_correlated or args.size_correlated or args.material_correlated or args.shape_correlated or args.color_correlated:
-    args.output_image_dir=insert_corr_to_dir(args.output_image_dir)
-    args.output_scene_dir=insert_corr_to_dir(args.output_scene_dir)
-    args.output_blen_dir=insert_corr_to_dir(args.output_blend_dir)
-    args.output_scene_file=insert_corr_to_dir(args.output_scene_file, True)
+  args.output_image_dir=insert_corr_to_dir(args.output_image_dir)
+  args.output_scene_dir=insert_corr_to_dir(args.output_scene_dir)
+  args.output_blen_dir=insert_corr_to_dir(args.output_blend_dir)
+  args.output_scene_file=insert_corr_to_dir(args.output_scene_file, True)
 
   if not os.path.isdir(args.output_image_dir):
     os.makedirs(args.output_image_dir)
@@ -403,6 +408,22 @@ def render_scene(args,
   # Delete the plane; we only used it for normals anyway. The base scene file
   # contains the actual ground plane.
   utils.delete_object(plane)
+
+  bg_mapping = {}
+  with open(args.properties_json, 'r') as f:
+    properties = json.load(f)
+    for name, rgb in properties['bg_color'].items():
+      rgba = [float(c) / 255.0 for c in rgb]+[1.0]
+      bg_mapping[name] = rgba
+
+  color_name, rgba = random.choice(list(bg_mapping.items()))
+  bpy.data.objects["Ground"].color = rgba
+  gt_mat = bpy.data.materials.new("bgcolor")
+  gt_mat.use_nodes = True
+  diffuse_bsdf = gt_mat.node_tree.nodes["Diffuse BSDF"]
+  diffuse_bsdf.inputs[0].default_value = rgba
+  # gt_mat.use_object_color = True
+  bpy.data.objects["Ground"].active_material = gt_mat
 
   # Save all six axis-aligned directions in the scene struct
   scene_struct['directions']['behind'] = tuple(plane_behind)
