@@ -9,7 +9,7 @@ parser.add_argument('--date', help="date of the experiments")
 parser.add_argument('--num_exp', default=1, type=int, help="The number of experiments to collect.")
 
 def reduce_logs(date, num_entries):
-    result_csv = "/checkpoint/siruixie/data_mix_result.csv"
+    result_csv = "/checkpoint/siruixie/data_mix_result_{}.csv".format(date)
     df = pd.read_csv("/checkpoint/siruixie/data_mix.csv")
     if os.path.exists(result_csv):
         result = pd.read_csv(result_csv)
