@@ -133,17 +133,6 @@ class _Workplace(object):
         # Here we get the metrics from the final epoch
         print("-----------------")
         print(self.trainer.logged_metrics)
-        logged_metrics = self.trainer.logged_metrics
-        del logged_metrics["loss"]
-        del logged_metrics["epoch"]
-        row = {**self.data_weights, **logged_metrics}
-        if os.path.exists(self.result_csv):
-            result = pd.read_csv(self.result_csv)
-            result.at[self.data_mix_idx, :] = row
-        else:
-            result = pd.DataFrame(columns=list(row.keys()))
-            result.at[self.data_mix_idx, :] = row
-        result.to_csv(self.result_csv)
 
 @hydra.main(config_path='hydra_cfg', config_name='experiment')
 def main(cfg):
