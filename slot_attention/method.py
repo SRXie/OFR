@@ -274,7 +274,7 @@ class SlotAttentionMethod(pl.LightningModule):
 
             logs = {
                 # "avg_val_loss": avg_loss,
-                # "avg_ari_mask": avg_ari_mask,
+                "avg_ari_mask": avg_ari_mask,
                 # "corr_coef_disc": corr_coef_disc,
                 # "corr_coef_pos": corr_coef_pos,
                 # "corr_coef_size": corr_coef_size,

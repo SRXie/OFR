@@ -23,29 +23,30 @@ def reduce_logs(date, num_entries):
             if dir_name.startswith("run-"+str(date)):
                 json_path = os.path.join(path, dir_name, "files/wandb-summary.json")
                 count += 1
-        assert count == 1, "Multiple experiments on this date!"
-        assert not len(json_path) == 0, "No experiment on this date for index "+str(i)
+        assert count <= 1, "Multiple experiments on this date!"
+        # assert not len(json_path) == 0, "No experiment on this date for index "+str(i)
+        if len(json_path) == 0:
+            pass
+        else:
+            data_weights = df.iloc[i+1, 1:]
+            print(data_weights)
 
-        data_weights = df.iloc[i+1, 1:]
-        print(data_weights)
+            with open(json_path, 'r') as f:
+                logged_metrics = json.load(f)
 
-        with open(json_path, 'r') as f:
-            logged_metrics = json.load(f)
-
-            del logged_metrics["images"]
-            del logged_metrics["_runtime"]
-            del logged_metrics["_timestamp"]
-            del logged_metrics["_step"]
-            del logged_metrics["lr-Adam"]
-            del logged_metrics["loss"]
-            del logged_metrics["epoch"]
-            row = {**data_weights, **logged_metrics}
-            print(row)
-            if result is not None:
-                result.at[str(i), :] = row
-            else:
-                result = pd.DataFrame(columns=list(row.keys()))
-                result.at[str(i), :] = row
+                del logged_metrics["images"]
+                del logged_metrics["_runtime"]
+                del logged_metrics["_timestamp"]
+                del logged_metrics["_step"]
+                del logged_metrics["lr-Adam"]
+                del logged_metrics["epoch"]
+                row = {**data_weights, **logged_metrics}
+                print(row)
+                if result is not None:
+                    result.at[str(i), :] = row
+                else:
+                    result = pd.DataFrame(columns=list(row.keys()))
+                    result.at[str(i), :] = row
     result.to_csv(result_csv)
 
 if __name__ == '__main__':
