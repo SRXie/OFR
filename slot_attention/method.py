@@ -46,7 +46,7 @@ class SlotAttentionMethod(pl.LightningModule):
         # perm = torch.randperm(self.params.val_batch_size)
         # idx = perm[: self.params.n_samples]
         # batch = torch.cat([b[idx] for b in batch[:4]], 0)
-        dl = self.datamodule.val_dataloader()
+        dl = self.datamodule.train_dataloader()
         perm = torch.randperm(self.params.batch_size)
         idx = perm[: self.params.n_samples]
         batch = next(iter(dl))[idx]
