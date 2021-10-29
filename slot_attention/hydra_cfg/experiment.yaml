@@ -15,21 +15,21 @@ data_root:  /checkpoint/siruixie/clevr_corr/ #/datasets01/CLEVR_v1.0/060817/imag
 val_root: /checkpoint/siruixie/clevr_with_masks/
 test_root: /checkpoint/siruixie/clevr_obj_test/output/
 gpus: 2
-max_epochs: 400
+max_epochs: 500
 num_sanity_val_steps: 1
 scheduler_gamma: 0.5
 weight_decay: 0.0
 num_train_images: 23000 # Optional[int]
 num_val_images: 10000  # Optional[int]
 num_test_images: 1000
-eval_every_n_epoch: 1
+eval_every_n_epoch: 50
 empty_cache: True
 is_logger_enabled: True
 is_verbose: True
 num_workers: 10
 n_samples: 5
-warmup_steps_pct: 10000
-decay_steps_pct: 100000
+warmup_steps: 10000
+decay_steps: 100000
 test_type: [obj, attr]
 dup_threshold: 0.15
 result_csv: /checkpoint/siruixie/data_mix_result.csv

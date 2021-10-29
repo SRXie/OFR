@@ -40,16 +40,12 @@ class SlotAttentionMethod(pl.LightningModule):
         return train_loss
 
     def sample_images(self):
-        # dl = self.datamodule.obj_test_dataloader()
-        # random_idx = torch.randint(high=len(dl), size=(1,))
-        # batch = next(iter(dl))  # list of A, B, C, D, E -- E is the hard negative
-        # perm = torch.randperm(self.params.val_batch_size)
-        # idx = perm[: self.params.n_samples]
-        # batch = torch.cat([b[idx] for b in batch[:4]], 0)
-        dl = self.datamodule.train_dataloader()
-        perm = torch.randperm(self.params.batch_size)
+        dl = self.datamodule.obj_test_dataloader()
+        random_idx = torch.randint(high=len(dl), size=(1,))
+        batch = next(iter(dl))  # list of A, B, C, D, E -- E is the hard negative
+        perm = torch.randperm(self.params.val_batch_size)
         idx = perm[: self.params.n_samples]
-        batch = next(iter(dl))[idx]
+        batch = torch.cat([b[idx] for b in batch[:4]], 0)
 
         if self.params.gpus > 0:
             batch = batch.to(self.device)
@@ -58,13 +54,54 @@ class SlotAttentionMethod(pl.LightningModule):
 
             recon_combined, recons, masks, slots, attns, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold)
 
+            # throw background slot back
+            cat_indices = swap_bg_slot_back(attns)
+            recons = batched_index_select(recons, 1, cat_indices)
+            masks = batched_index_select(masks, 1, cat_indices)
+            slots = batched_index_select(slots, 1, cat_indices)
+            attns = batched_index_select(attns, 2, cat_indices)
+            recons_nodup = batched_index_select(recons_nodup, 1, cat_indices)
+            masks_nodup = batched_index_select(masks_nodup, 1, cat_indices)
+            slots_nodup = batched_index_select(slots_nodup, 1, cat_indices)
+
+            # reorder with matching
+            cat_indices = compute_greedy_loss(slots, [])
+            recons_perm = batched_index_select(recons, 1, cat_indices)
+            masks_perm = batched_index_select(masks, 1, cat_indices)
+            slots_perm = batched_index_select(slots, 1, cat_indices)
+            attns_perm = batched_index_select(attns, 2, cat_indices)
+            masked_recons_perm, masked_attn_perm, masks_perm = captioned_masked_recons(recons_perm, masks_perm, slots_perm, attns_perm)
+
+            cat_indices_nodup = compute_greedy_loss(slots_nodup, [])
+            recons_perm_nodup = batched_index_select(recons_nodup, 1, cat_indices_nodup)
+            masks_perm_nodup = batched_index_select(masks_nodup, 1, cat_indices_nodup)
+            slots_perm_nodup = batched_index_select(slots_nodup, 1, cat_indices_nodup)
+            attns_perm_nodup = batched_index_select(attns, 2, cat_indices_nodup)
+            masked_recons_perm_nodup, masked_attn_perm_nodup, masks_perm_nodup = captioned_masked_recons(recons_perm_nodup, masks_perm_nodup, slots_perm_nodup, attns_perm_nodup)
+
+            batch = split_and_interleave_stack(batch, self.params.n_samples)
+            recon_combined = split_and_interleave_stack(recon_combined, self.params.n_samples)
+            recons_perm = split_and_interleave_stack(recons_perm, self.params.n_samples)
+            masks_perm = split_and_interleave_stack(masks_perm, self.params.n_samples)
+            slots_perm = split_and_interleave_stack(slots_perm, self.params.n_samples)
+            masked_attn_perm = split_and_interleave_stack(masked_attn_perm, self.params.n_samples)
+            recon_combined_nodup = split_and_interleave_stack(recon_combined_nodup, self.params.n_samples)
+            recons_perm_nodup = split_and_interleave_stack(recons_perm_nodup, self.params.n_samples)
+            masks_perm_nodup = split_and_interleave_stack(masks_perm_nodup, self.params.n_samples)
+            slots_perm_nodup = split_and_interleave_stack(slots_perm_nodup, self.params.n_samples)
+            masked_recons_perm = split_and_interleave_stack(masked_recons_perm, self.params.n_samples)
+            masked_recons_perm_nodup = split_and_interleave_stack(masked_recons_perm_nodup, self.params.n_samples)
+            masked_attn_perm_nodup = split_and_interleave_stack(masked_attn_perm_nodup, self.params.n_samples)
+
             # combine images in a nice way so we can display all outputs in one grid, output rescaled to be between 0 and 1
             out = to_rgb_from_tensor(
                 torch.cat(
                     [
-                        batch.unsqueeze(1),  # original images
-                        recon_combined.unsqueeze(1),  # reconstructions
-                        recons * masks + (1 - masks),  # each slot
+                        torch.cat([batch.unsqueeze(1), batch.unsqueeze(1)], dim=0),  # original images
+                        torch.cat([recon_combined.unsqueeze(1),recon_combined_nodup.unsqueeze(1)], dim=0),  # reconstructions
+                        torch.cat([masked_recons_perm, masked_recons_perm_nodup], dim=0),
+                        torch.cat([masks_perm, masks_perm_nodup], dim=0),
+                        torch.cat([masked_attn_perm, masked_attn_perm_nodup], dim=0),  # each slot
                     ],
                     dim=1,
                 )
@@ -72,65 +109,8 @@ class SlotAttentionMethod(pl.LightningModule):
 
             batch_size, num_slots, C, H, W = recons.shape
             images = vutils.make_grid(
-                out.view(batch_size * out.shape[1], C, H, W).cpu(), normalize=False, nrow=out.shape[1],
+                out.view(2 * batch_size * out.shape[1], C, H, W).cpu(), normalize=False, nrow=out.shape[1],
             )
-            # # throw background slot back
-            # cat_indices = swap_bg_slot_back(attns)
-            # recons = batched_index_select(recons, 1, cat_indices)
-            # masks = batched_index_select(masks, 1, cat_indices)
-            # slots = batched_index_select(slots, 1, cat_indices)
-            # attns = batched_index_select(attns, 2, cat_indices)
-            # recons_nodup = batched_index_select(recons_nodup, 1, cat_indices)
-            # masks_nodup = batched_index_select(masks_nodup, 1, cat_indices)
-            # slots_nodup = batched_index_select(slots_nodup, 1, cat_indices)
-
-            # # reorder with matching
-            # cat_indices = compute_greedy_loss(slots, [])
-            # recons_perm = batched_index_select(recons, 1, cat_indices)
-            # masks_perm = batched_index_select(masks, 1, cat_indices)
-            # slots_perm = batched_index_select(slots, 1, cat_indices)
-            # attns_perm = batched_index_select(attns, 2, cat_indices)
-            # masked_recons_perm, masked_attn_perm, masks_perm = captioned_masked_recons(recons_perm, masks_perm, slots_perm, attns_perm)
-
-            # cat_indices_nodup = compute_greedy_loss(slots_nodup, [])
-            # recons_perm_nodup = batched_index_select(recons_nodup, 1, cat_indices_nodup)
-            # masks_perm_nodup = batched_index_select(masks_nodup, 1, cat_indices_nodup)
-            # slots_perm_nodup = batched_index_select(slots_nodup, 1, cat_indices_nodup)
-            # attns_perm_nodup = batched_index_select(attns, 2, cat_indices_nodup)
-            # masked_recons_perm_nodup, masked_attn_perm_nodup, masks_perm_nodup = captioned_masked_recons(recons_perm_nodup, masks_perm_nodup, slots_perm_nodup, attns_perm_nodup)
-
-            # batch = split_and_interleave_stack(batch, self.params.n_samples)
-            # recon_combined = split_and_interleave_stack(recon_combined, self.params.n_samples)
-            # recons_perm = split_and_interleave_stack(recons_perm, self.params.n_samples)
-            # masks_perm = split_and_interleave_stack(masks_perm, self.params.n_samples)
-            # slots_perm = split_and_interleave_stack(slots_perm, self.params.n_samples)
-            # masked_attn_perm = split_and_interleave_stack(masked_attn_perm, self.params.n_samples)
-            # recon_combined_nodup = split_and_interleave_stack(recon_combined_nodup, self.params.n_samples)
-            # recons_perm_nodup = split_and_interleave_stack(recons_perm_nodup, self.params.n_samples)
-            # masks_perm_nodup = split_and_interleave_stack(masks_perm_nodup, self.params.n_samples)
-            # slots_perm_nodup = split_and_interleave_stack(slots_perm_nodup, self.params.n_samples)
-            # masked_recons_perm = split_and_interleave_stack(masked_recons_perm, self.params.n_samples)
-            # masked_recons_perm_nodup = split_and_interleave_stack(masked_recons_perm_nodup, self.params.n_samples)
-            # masked_attn_perm_nodup = split_and_interleave_stack(masked_attn_perm_nodup, self.params.n_samples)
-
-            # # combine images in a nice way so we can display all outputs in one grid, output rescaled to be between 0 and 1
-            # out = to_rgb_from_tensor(
-            #     torch.cat(
-            #         [
-            #             torch.cat([batch.unsqueeze(1), batch.unsqueeze(1)], dim=0),  # original images
-            #             torch.cat([recon_combined.unsqueeze(1),recon_combined_nodup.unsqueeze(1)], dim=0),  # reconstructions
-            #             torch.cat([masked_recons_perm, masked_recons_perm_nodup], dim=0),
-            #             torch.cat([masks_perm, masks_perm_nodup], dim=0),
-            #             torch.cat([masked_attn_perm, masked_attn_perm_nodup], dim=0),  # each slot
-            #         ],
-            #         dim=1,
-            #     )
-            # )
-
-            # batch_size, num_slots, C, H, W = recons.shape
-            # images = vutils.make_grid(
-            #     out.view(2 * batch_size * out.shape[1], C, H, W).cpu(), normalize=False, nrow=out.shape[1],
-            # )
 
         return images
 
@@ -143,29 +123,29 @@ class SlotAttentionMethod(pl.LightningModule):
     def validation_epoch_end(self, outputs):
         avg_loss = torch.stack([x["loss"] for x in outputs]).mean()
         avg_ari_mask = np.stack([x["mask_ari"] for x in outputs]).mean()
-        # schema_distance_disc = torch.cat([x["schema_distance_disc"] for x in outputs])
-        # schema_distance_pos = torch.cat([x["schema_distance_pos"] for x in outputs])
-        # schema_distance_size = torch.cat([x["schema_distance_size"] for x in outputs])
-        # schema_distance_material = torch.cat([x["schema_distance_material"] for x in outputs])
-        # schema_distance_shape = torch.cat([x["schema_distance_shape"] for x in outputs])
-        # schema_distance_color = torch.cat([x["schema_distance_color"] for x in outputs])
-        # schema_distance = schema_distance_disc + schema_distance_pos
-        # slots_distance = torch.cat([x["slots_distance"] for x in outputs])
-        # corr_coef_disc = compute_corr_coef(schema_distance_disc, slots_distance)
-        # corr_coef_size = compute_corr_coef(schema_distance_size, slots_distance)
-        # corr_coef_material = compute_corr_coef(schema_distance_material, slots_distance)
-        # corr_coef_shape = compute_corr_coef(schema_distance_shape, slots_distance)
-        # corr_coef_color = compute_corr_coef(schema_distance_color, slots_distance)
-        # corr_coef_pos = compute_corr_coef(schema_distance_pos, slots_distance)
-        # corr_coef = compute_corr_coef(schema_distance, slots_distance)
+        schema_distance_disc = torch.cat([x["schema_distance_disc"] for x in outputs])
+        schema_distance_pos = torch.cat([x["schema_distance_pos"] for x in outputs])
+        schema_distance_size = torch.cat([x["schema_distance_size"] for x in outputs])
+        schema_distance_material = torch.cat([x["schema_distance_material"] for x in outputs])
+        schema_distance_shape = torch.cat([x["schema_distance_shape"] for x in outputs])
+        schema_distance_color = torch.cat([x["schema_distance_color"] for x in outputs])
+        schema_distance = schema_distance_disc + schema_distance_pos
+        slots_distance = torch.cat([x["slots_distance"] for x in outputs])
+        corr_coef_disc = compute_corr_coef(schema_distance_disc, slots_distance)
+        corr_coef_size = compute_corr_coef(schema_distance_size, slots_distance)
+        corr_coef_material = compute_corr_coef(schema_distance_material, slots_distance)
+        corr_coef_shape = compute_corr_coef(schema_distance_shape, slots_distance)
+        corr_coef_color = compute_corr_coef(schema_distance_color, slots_distance)
+        corr_coef_pos = compute_corr_coef(schema_distance_pos, slots_distance)
+        corr_coef = compute_corr_coef(schema_distance, slots_distance)
 
-        # corr_rank_disc = compute_rank_correlation(schema_distance_disc.unsqueeze(0), slots_distance.unsqueeze(0))
-        # corr_rank_size = compute_rank_correlation(schema_distance_size.unsqueeze(0), slots_distance.unsqueeze(0))
-        # corr_rank_material = compute_rank_correlation(schema_distance_material.unsqueeze(0), slots_distance.unsqueeze(0))
-        # corr_rank_shape = compute_rank_correlation(schema_distance_shape.unsqueeze(0), slots_distance.unsqueeze(0))
-        # corr_rank_color = compute_rank_correlation(schema_distance_color.unsqueeze(0), slots_distance.unsqueeze(0))
-        # corr_rank_pos = compute_rank_correlation(schema_distance_pos.unsqueeze(0), slots_distance.unsqueeze(0))
-        # corr_rank = compute_rank_correlation(schema_distance.unsqueeze(0), slots_distance.unsqueeze(0))
+        corr_rank_disc = compute_rank_correlation(schema_distance_disc.unsqueeze(0), slots_distance.unsqueeze(0))
+        corr_rank_size = compute_rank_correlation(schema_distance_size.unsqueeze(0), slots_distance.unsqueeze(0))
+        corr_rank_material = compute_rank_correlation(schema_distance_material.unsqueeze(0), slots_distance.unsqueeze(0))
+        corr_rank_shape = compute_rank_correlation(schema_distance_shape.unsqueeze(0), slots_distance.unsqueeze(0))
+        corr_rank_color = compute_rank_correlation(schema_distance_color.unsqueeze(0), slots_distance.unsqueeze(0))
+        corr_rank_pos = compute_rank_correlation(schema_distance_pos.unsqueeze(0), slots_distance.unsqueeze(0))
+        corr_rank = compute_rank_correlation(schema_distance.unsqueeze(0), slots_distance.unsqueeze(0))
         # Algebra Test starts here
         odl = self.datamodule.obj_test_dataloader()
         adl = self.datamodule.attr_test_dataloader()
@@ -243,106 +223,106 @@ class SlotAttentionMethod(pl.LightningModule):
                 b_prev = datetime.now()
 
         with torch.no_grad():
-            # compute_test_losses(odl, obj_pd_greedy_losses, obj_pd_greedy_losses_en, obj_pd_greedy_losses_hn, obj_greedy_losses_nodup, obj_greedy_losses_nodup_en, obj_greedy_losses_nodup_hn,
-            #     obj_pd_greedy_cos_losses, obj_pd_greedy_cos_losses_en, obj_pd_greedy_cos_losses_hn, obj_greedy_cos_losses_nodup, obj_greedy_cos_losses_nodup_en, obj_greedy_cos_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
-            # compute_test_losses(adl, attr_pd_greedy_losses, attr_pd_greedy_losses_en, attr_pd_greedy_losses_hn, attr_greedy_losses_nodup, attr_greedy_losses_nodup_en, attr_greedy_losses_nodup_hn,
-            #     attr_pd_greedy_cos_losses, attr_pd_greedy_cos_losses_en, attr_pd_greedy_cos_losses_hn, attr_greedy_cos_losses_nodup, attr_greedy_cos_losses_nodup_en, attr_greedy_cos_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
+            compute_test_losses(odl, obj_pd_greedy_losses, obj_pd_greedy_losses_en, obj_pd_greedy_losses_hn, obj_greedy_losses_nodup, obj_greedy_losses_nodup_en, obj_greedy_losses_nodup_hn,
+                obj_pd_greedy_cos_losses, obj_pd_greedy_cos_losses_en, obj_pd_greedy_cos_losses_hn, obj_greedy_cos_losses_nodup, obj_greedy_cos_losses_nodup_en, obj_greedy_cos_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
+            compute_test_losses(adl, attr_pd_greedy_losses, attr_pd_greedy_losses_en, attr_pd_greedy_losses_hn, attr_greedy_losses_nodup, attr_greedy_losses_nodup_en, attr_greedy_losses_nodup_hn,
+                attr_pd_greedy_cos_losses, attr_pd_greedy_cos_losses_en, attr_pd_greedy_cos_losses_hn, attr_greedy_cos_losses_nodup, attr_greedy_cos_losses_nodup_en, attr_greedy_cos_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
 
-            # avg_obj_greedy_loss_nodup = torch.cat(obj_greedy_losses_nodup, 0)
-            # avg_obj_greedy_loss_nodup_en = (torch.cat(obj_greedy_losses_nodup_en, 0)-avg_obj_greedy_loss_nodup).mean()
-            # avg_obj_greedy_loss_nodup_hn = (torch.cat(obj_greedy_losses_nodup_hn, 0)-avg_obj_greedy_loss_nodup).mean()
-            # std_obj_greedy_loss_nodup = avg_obj_greedy_loss_nodup.std()/math.sqrt(avg_obj_greedy_loss_nodup.shape[0])
-            # avg_obj_greedy_loss_nodup = avg_obj_greedy_loss_nodup.mean()
+            avg_obj_greedy_loss_nodup = torch.cat(obj_greedy_losses_nodup, 0)
+            avg_obj_greedy_loss_nodup_en = (torch.cat(obj_greedy_losses_nodup_en, 0)-avg_obj_greedy_loss_nodup).mean()
+            avg_obj_greedy_loss_nodup_hn = (torch.cat(obj_greedy_losses_nodup_hn, 0)-avg_obj_greedy_loss_nodup).mean()
+            std_obj_greedy_loss_nodup = avg_obj_greedy_loss_nodup.std()/math.sqrt(avg_obj_greedy_loss_nodup.shape[0])
+            avg_obj_greedy_loss_nodup = avg_obj_greedy_loss_nodup.mean()
 
-            # avg_attr_greedy_loss_nodup = torch.cat(attr_greedy_losses_nodup, 0)
-            # avg_attr_greedy_loss_nodup_en = (torch.cat(attr_greedy_losses_nodup_en, 0)-avg_attr_greedy_loss_nodup).mean()
-            # avg_attr_greedy_loss_nodup_hn = (torch.cat(attr_greedy_losses_nodup_hn, 0)-avg_attr_greedy_loss_nodup).mean()
-            # std_attr_greedy_loss_nodup = avg_attr_greedy_loss_nodup.std()/math.sqrt(avg_attr_greedy_loss_nodup.shape[0])
-            # avg_attr_greedy_loss_nodup = avg_attr_greedy_loss_nodup.mean()
+            avg_attr_greedy_loss_nodup = torch.cat(attr_greedy_losses_nodup, 0)
+            avg_attr_greedy_loss_nodup_en = (torch.cat(attr_greedy_losses_nodup_en, 0)-avg_attr_greedy_loss_nodup).mean()
+            avg_attr_greedy_loss_nodup_hn = (torch.cat(attr_greedy_losses_nodup_hn, 0)-avg_attr_greedy_loss_nodup).mean()
+            std_attr_greedy_loss_nodup = avg_attr_greedy_loss_nodup.std()/math.sqrt(avg_attr_greedy_loss_nodup.shape[0])
+            avg_attr_greedy_loss_nodup = avg_attr_greedy_loss_nodup.mean()
 
-            # avg_obj_pd_greedy_loss = torch.cat(obj_pd_greedy_losses, 0)
-            # avg_obj_pd_greedy_loss_en = (torch.cat(obj_pd_greedy_losses_en, 0)-avg_obj_pd_greedy_loss).mean()
-            # avg_obj_pd_greedy_loss_hn = (torch.cat(obj_pd_greedy_losses_hn, 0)-avg_obj_pd_greedy_loss).mean()
-            # std_obj_pd_greedy_loss = avg_obj_pd_greedy_loss.std()/math.sqrt(avg_obj_pd_greedy_loss.shape[0])
-            # avg_obj_pd_greedy_loss = avg_obj_pd_greedy_loss.mean()
-            # avg_attr_pd_greedy_loss = torch.cat(attr_pd_greedy_losses, 0)
-            # avg_attr_pd_greedy_loss_en = (torch.cat(attr_pd_greedy_losses_en, 0)-avg_attr_pd_greedy_loss).mean()
-            # avg_attr_pd_greedy_loss_hn = (torch.cat(attr_pd_greedy_losses_hn, 0)-avg_attr_pd_greedy_loss).mean()
-            # std_attr_pd_greedy_loss = avg_attr_pd_greedy_loss.std()/math.sqrt(avg_attr_pd_greedy_loss.shape[0])
-            # avg_attr_pd_greedy_loss = avg_attr_pd_greedy_loss.mean()
+            avg_obj_pd_greedy_loss = torch.cat(obj_pd_greedy_losses, 0)
+            avg_obj_pd_greedy_loss_en = (torch.cat(obj_pd_greedy_losses_en, 0)-avg_obj_pd_greedy_loss).mean()
+            avg_obj_pd_greedy_loss_hn = (torch.cat(obj_pd_greedy_losses_hn, 0)-avg_obj_pd_greedy_loss).mean()
+            std_obj_pd_greedy_loss = avg_obj_pd_greedy_loss.std()/math.sqrt(avg_obj_pd_greedy_loss.shape[0])
+            avg_obj_pd_greedy_loss = avg_obj_pd_greedy_loss.mean()
+            avg_attr_pd_greedy_loss = torch.cat(attr_pd_greedy_losses, 0)
+            avg_attr_pd_greedy_loss_en = (torch.cat(attr_pd_greedy_losses_en, 0)-avg_attr_pd_greedy_loss).mean()
+            avg_attr_pd_greedy_loss_hn = (torch.cat(attr_pd_greedy_losses_hn, 0)-avg_attr_pd_greedy_loss).mean()
+            std_attr_pd_greedy_loss = avg_attr_pd_greedy_loss.std()/math.sqrt(avg_attr_pd_greedy_loss.shape[0])
+            avg_attr_pd_greedy_loss = avg_attr_pd_greedy_loss.mean()
 
-            # avg_obj_greedy_cos_loss_nodup = torch.cat(obj_greedy_cos_losses_nodup, 0)
-            # avg_obj_greedy_cos_loss_nodup_en = (torch.cat(obj_greedy_cos_losses_nodup_en, 0)-avg_obj_greedy_cos_loss_nodup).mean()
-            # avg_obj_greedy_cos_loss_nodup_hn = (torch.cat(obj_greedy_cos_losses_nodup_hn, 0)-avg_obj_greedy_cos_loss_nodup).mean()
-            # std_obj_greedy_cos_loss_nodup = avg_obj_greedy_cos_loss_nodup.std()/(math.sqrt(avg_obj_greedy_cos_loss_nodup.shape[0]))
-            # avg_obj_greedy_cos_loss_nodup = avg_obj_greedy_cos_loss_nodup.mean()
-            # # avg_attr_aggr_loss_nodup = torch.cat(attr_aggr_losses_nodup, 0).mean()
-            # avg_attr_greedy_cos_loss_nodup = torch.cat(attr_greedy_cos_losses_nodup, 0)
-            # avg_attr_greedy_cos_loss_nodup_en = (torch.cat(attr_greedy_cos_losses_nodup_en, 0)-avg_attr_greedy_cos_loss_nodup).mean()
-            # avg_attr_greedy_cos_loss_nodup_hn = (torch.cat(attr_greedy_cos_losses_nodup_hn, 0)-avg_attr_greedy_cos_loss_nodup).mean()
-            # std_attr_greedy_cos_loss_nodup = avg_attr_greedy_cos_loss_nodup.std()/(math.sqrt(avg_attr_greedy_cos_loss_nodup.shape[0]))
-            # avg_attr_greedy_cos_loss_nodup = avg_attr_greedy_cos_loss_nodup.mean()
+            avg_obj_greedy_cos_loss_nodup = torch.cat(obj_greedy_cos_losses_nodup, 0)
+            avg_obj_greedy_cos_loss_nodup_en = (torch.cat(obj_greedy_cos_losses_nodup_en, 0)-avg_obj_greedy_cos_loss_nodup).mean()
+            avg_obj_greedy_cos_loss_nodup_hn = (torch.cat(obj_greedy_cos_losses_nodup_hn, 0)-avg_obj_greedy_cos_loss_nodup).mean()
+            std_obj_greedy_cos_loss_nodup = avg_obj_greedy_cos_loss_nodup.std()/(math.sqrt(avg_obj_greedy_cos_loss_nodup.shape[0]))
+            avg_obj_greedy_cos_loss_nodup = avg_obj_greedy_cos_loss_nodup.mean()
+            # avg_attr_aggr_loss_nodup = torch.cat(attr_aggr_losses_nodup, 0).mean()
+            avg_attr_greedy_cos_loss_nodup = torch.cat(attr_greedy_cos_losses_nodup, 0)
+            avg_attr_greedy_cos_loss_nodup_en = (torch.cat(attr_greedy_cos_losses_nodup_en, 0)-avg_attr_greedy_cos_loss_nodup).mean()
+            avg_attr_greedy_cos_loss_nodup_hn = (torch.cat(attr_greedy_cos_losses_nodup_hn, 0)-avg_attr_greedy_cos_loss_nodup).mean()
+            std_attr_greedy_cos_loss_nodup = avg_attr_greedy_cos_loss_nodup.std()/(math.sqrt(avg_attr_greedy_cos_loss_nodup.shape[0]))
+            avg_attr_greedy_cos_loss_nodup = avg_attr_greedy_cos_loss_nodup.mean()
 
-            # avg_obj_pd_greedy_cos_loss = torch.cat(obj_pd_greedy_cos_losses, 0)
-            # avg_obj_pd_greedy_cos_loss_en = (torch.cat(obj_pd_greedy_cos_losses_en, 0)-avg_obj_pd_greedy_cos_loss).mean()
-            # avg_obj_pd_greedy_cos_loss_hn = (torch.cat(obj_pd_greedy_cos_losses_hn, 0)-avg_obj_pd_greedy_cos_loss).mean()
-            # std_obj_pd_greedy_cos_loss = avg_obj_pd_greedy_cos_loss.std()/(math.sqrt(avg_obj_pd_greedy_cos_loss.shape[0]))
-            # avg_obj_pd_greedy_cos_loss = avg_obj_pd_greedy_cos_loss.mean()
-            # avg_attr_pd_greedy_cos_loss = torch.cat(attr_pd_greedy_cos_losses, 0)
-            # avg_attr_pd_greedy_cos_loss_en = (torch.cat(attr_pd_greedy_cos_losses_en, 0)-avg_attr_pd_greedy_cos_loss).mean()
-            # avg_attr_pd_greedy_cos_loss_hn = (torch.cat(attr_pd_greedy_cos_losses_hn, 0)-avg_attr_pd_greedy_cos_loss).mean()
-            # std_attr_pd_greedy_cos_loss = avg_attr_pd_greedy_cos_loss.std()/(math.sqrt(avg_attr_pd_greedy_cos_loss.shape[0]))
-            # avg_attr_pd_greedy_cos_loss = avg_attr_pd_greedy_cos_loss.mean()
+            avg_obj_pd_greedy_cos_loss = torch.cat(obj_pd_greedy_cos_losses, 0)
+            avg_obj_pd_greedy_cos_loss_en = (torch.cat(obj_pd_greedy_cos_losses_en, 0)-avg_obj_pd_greedy_cos_loss).mean()
+            avg_obj_pd_greedy_cos_loss_hn = (torch.cat(obj_pd_greedy_cos_losses_hn, 0)-avg_obj_pd_greedy_cos_loss).mean()
+            std_obj_pd_greedy_cos_loss = avg_obj_pd_greedy_cos_loss.std()/(math.sqrt(avg_obj_pd_greedy_cos_loss.shape[0]))
+            avg_obj_pd_greedy_cos_loss = avg_obj_pd_greedy_cos_loss.mean()
+            avg_attr_pd_greedy_cos_loss = torch.cat(attr_pd_greedy_cos_losses, 0)
+            avg_attr_pd_greedy_cos_loss_en = (torch.cat(attr_pd_greedy_cos_losses_en, 0)-avg_attr_pd_greedy_cos_loss).mean()
+            avg_attr_pd_greedy_cos_loss_hn = (torch.cat(attr_pd_greedy_cos_losses_hn, 0)-avg_attr_pd_greedy_cos_loss).mean()
+            std_attr_pd_greedy_cos_loss = avg_attr_pd_greedy_cos_loss.std()/(math.sqrt(avg_attr_pd_greedy_cos_loss.shape[0]))
+            avg_attr_pd_greedy_cos_loss = avg_attr_pd_greedy_cos_loss.mean()
 
             logs = {
                 # "avg_val_loss": avg_loss,
                 "avg_ari_mask": avg_ari_mask,
-                # "corr_coef_disc": corr_coef_disc,
-                # "corr_coef_pos": corr_coef_pos,
-                # "corr_coef_size": corr_coef_size,
-                # "corr_coef_material": corr_coef_material,
-                # "corr_coef_shape": corr_coef_shape,
-                # "corr_coef_color": corr_coef_color,
-                # "corr_coef": corr_coef,
-                # "corr_rank_disc": corr_rank_disc,
-                # "corr_rank_pos": corr_rank_pos,
-                # "corr_rank_size": corr_rank_size,
-                # "corr_rank_material": corr_rank_material,
-                # "corr_rank_shape": corr_rank_shape,
-                # "corr_rank_color": corr_rank_color,
-                # "corr_rank": corr_rank,
-                # "avg_obj_greedy_loss_nodup": avg_obj_greedy_loss_nodup,
-                # "avg_attr_greedy_loss_nodup": avg_attr_greedy_loss_nodup,
-                # "avg_obj_pseudo_greedy_loss": avg_obj_pd_greedy_loss,
-                # "avg_attr_pseudo_greedy_loss": avg_attr_pd_greedy_loss,
-                # "avg_obj_greedy_loss_nodup_en": avg_obj_greedy_loss_nodup_en,
-                # "avg_attr_greedy_loss_nodup_en": avg_attr_greedy_loss_nodup_en,
-                # "avg_obj_pseudo_greedy_loss_en": avg_obj_pd_greedy_loss_en,
-                # "avg_attr_pseudo_greedy_loss_en": avg_attr_pd_greedy_loss_en,
-                # "avg_obj_greedy_loss_nodup_hn": avg_obj_greedy_loss_nodup_hn,
-                # "avg_attr_greedy_loss_nodup_hn": avg_attr_greedy_loss_nodup_hn,
-                # "avg_obj_pseudo_greedy_loss_hn": avg_obj_pd_greedy_loss_hn,
-                # "avg_attr_pseudo_greedy_loss_hn": avg_attr_pd_greedy_loss_hn,
-                # "std_obj_greedy_loss_nodup": std_obj_greedy_loss_nodup,
-                # "std_attr_greedy_loss_nodup": std_attr_greedy_loss_nodup,
-                # "std_obj_pseudo_greedy_loss": std_obj_pd_greedy_loss,
-                # "std_attr_pseudo_greedy_loss": std_attr_pd_greedy_loss,
-                # "avg_obj_greedy_cos_loss_nodup": avg_obj_greedy_cos_loss_nodup,
-                # "avg_attr_greedy_cos_loss_nodup": avg_attr_greedy_cos_loss_nodup,
-                # "avg_obj_pseudo_greedy_cos_loss": avg_obj_pd_greedy_cos_loss,
-                # "avg_attr_pseudo_greedy_cos_loss": avg_attr_pd_greedy_cos_loss,
-                # "avg_obj_greedy_cos_loss_nodup_en": avg_obj_greedy_cos_loss_nodup_en,
-                # "avg_attr_greedy_cos_loss_nodup_en": avg_attr_greedy_cos_loss_nodup_en,
-                # "avg_obj_pseudo_greedy_cos_loss_en": avg_obj_pd_greedy_cos_loss_en,
-                # "avg_attr_pseudo_greedy_cos_loss_en": avg_attr_pd_greedy_cos_loss_en,
-                # "avg_obj_greedy_cos_loss_nodup_hn": avg_obj_greedy_cos_loss_nodup_hn,
-                # "avg_attr_greedy_cos_loss_nodup_hn": avg_attr_greedy_cos_loss_nodup_hn,
-                # "avg_obj_pseudo_greedy_cos_loss_hn": avg_obj_pd_greedy_cos_loss_hn,
-                # "avg_attr_pseudo_greedy_cos_loss_hn": avg_attr_pd_greedy_cos_loss_hn,
-                # "std_obj_greedy_cos_loss_nodup": std_obj_greedy_cos_loss_nodup,
-                # "std_attr_greedy_cos_loss_nodup": std_attr_greedy_cos_loss_nodup,
-                # "std_obj_pseudo_greedy_cos_loss": std_obj_pd_greedy_cos_loss,
-                # "std_attr_pseudo_greedy_cos_loss": std_attr_pd_greedy_cos_loss,
+                "corr_coef_disc": corr_coef_disc,
+                "corr_coef_pos": corr_coef_pos,
+                "corr_coef_size": corr_coef_size,
+                "corr_coef_material": corr_coef_material,
+                "corr_coef_shape": corr_coef_shape,
+                "corr_coef_color": corr_coef_color,
+                "corr_coef": corr_coef,
+                "corr_rank_disc": corr_rank_disc,
+                "corr_rank_pos": corr_rank_pos,
+                "corr_rank_size": corr_rank_size,
+                "corr_rank_material": corr_rank_material,
+                "corr_rank_shape": corr_rank_shape,
+                "corr_rank_color": corr_rank_color,
+                "corr_rank": corr_rank,
+                "avg_obj_greedy_loss_nodup": avg_obj_greedy_loss_nodup,
+                "avg_attr_greedy_loss_nodup": avg_attr_greedy_loss_nodup,
+                "avg_obj_pseudo_greedy_loss": avg_obj_pd_greedy_loss,
+                "avg_attr_pseudo_greedy_loss": avg_attr_pd_greedy_loss,
+                "avg_obj_greedy_loss_nodup_en": avg_obj_greedy_loss_nodup_en,
+                "avg_attr_greedy_loss_nodup_en": avg_attr_greedy_loss_nodup_en,
+                "avg_obj_pseudo_greedy_loss_en": avg_obj_pd_greedy_loss_en,
+                "avg_attr_pseudo_greedy_loss_en": avg_attr_pd_greedy_loss_en,
+                "avg_obj_greedy_loss_nodup_hn": avg_obj_greedy_loss_nodup_hn,
+                "avg_attr_greedy_loss_nodup_hn": avg_attr_greedy_loss_nodup_hn,
+                "avg_obj_pseudo_greedy_loss_hn": avg_obj_pd_greedy_loss_hn,
+                "avg_attr_pseudo_greedy_loss_hn": avg_attr_pd_greedy_loss_hn,
+                "std_obj_greedy_loss_nodup": std_obj_greedy_loss_nodup,
+                "std_attr_greedy_loss_nodup": std_attr_greedy_loss_nodup,
+                "std_obj_pseudo_greedy_loss": std_obj_pd_greedy_loss,
+                "std_attr_pseudo_greedy_loss": std_attr_pd_greedy_loss,
+                "avg_obj_greedy_cos_loss_nodup": avg_obj_greedy_cos_loss_nodup,
+                "avg_attr_greedy_cos_loss_nodup": avg_attr_greedy_cos_loss_nodup,
+                "avg_obj_pseudo_greedy_cos_loss": avg_obj_pd_greedy_cos_loss,
+                "avg_attr_pseudo_greedy_cos_loss": avg_attr_pd_greedy_cos_loss,
+                "avg_obj_greedy_cos_loss_nodup_en": avg_obj_greedy_cos_loss_nodup_en,
+                "avg_attr_greedy_cos_loss_nodup_en": avg_attr_greedy_cos_loss_nodup_en,
+                "avg_obj_pseudo_greedy_cos_loss_en": avg_obj_pd_greedy_cos_loss_en,
+                "avg_attr_pseudo_greedy_cos_loss_en": avg_attr_pd_greedy_cos_loss_en,
+                "avg_obj_greedy_cos_loss_nodup_hn": avg_obj_greedy_cos_loss_nodup_hn,
+                "avg_attr_greedy_cos_loss_nodup_hn": avg_attr_greedy_cos_loss_nodup_hn,
+                "avg_obj_pseudo_greedy_cos_loss_hn": avg_obj_pd_greedy_cos_loss_hn,
+                "avg_attr_pseudo_greedy_cos_loss_hn": avg_attr_pd_greedy_cos_loss_hn,
+                "std_obj_greedy_cos_loss_nodup": std_obj_greedy_cos_loss_nodup,
+                "std_attr_greedy_cos_loss_nodup": std_attr_greedy_cos_loss_nodup,
+                "std_obj_pseudo_greedy_cos_loss": std_obj_pd_greedy_cos_loss,
+                "std_attr_pseudo_greedy_cos_loss": std_attr_pd_greedy_cos_loss,
             }
             self.log_dict(logs, sync_dist=True)
 
@@ -351,14 +331,14 @@ class SlotAttentionMethod(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = optim.Adam(self.model.parameters(), lr=self.params.lr, weight_decay=self.params.weight_decay)
 
-        warmup_steps_pct = self.params.warmup_steps_pct
-        decay_steps_pct = self.params.decay_steps_pct
+        warmup_steps = self.params.warmup_steps
+        decay_steps = self.params.decay_steps
         total_steps = self.params.max_epochs * len(self.datamodule.train_dataloader())
 
         def warm_and_decay_lr_scheduler(step: int):
-            step = step * self.params.gpus # to make the decay consistent over multi-GPU
-            warmup_steps = warmup_steps_pct * total_steps
-            decay_steps = decay_steps_pct * total_steps
+            # step = step * self.params.gpus # to make the decay consistent over multi-GPU
+            warmup_steps = warmup_steps #* total_steps
+            decay_steps = decay_steps #* total_steps
             # assert step < total_steps
             if step < warmup_steps:
                 factor = step / warmup_steps

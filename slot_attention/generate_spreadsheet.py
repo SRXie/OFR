@@ -1,7 +1,7 @@
 import pandas as pd;
 from itertools import combinations, product
 
-
+seed_list = [0,5,6,7,11,13,17,18,19,20]
 data_list = ["iid", "shape_0", "size_0", "color_0", "material_0","appr_corr_0", "material_0shape_0", "shape_0color_0", "size_0material_0", "material_0shape_0color_0", "size_0material_0color_0", "size_0material_0shape_0", "size_0shape_0color_0", "intr_corr_0"]
 df = pd.DataFrame(columns=["iid", "shape_0", "size_0", "color_0", "material_0","appr_corr_0", "material_0shape_0", "shape_0color_0", "size_0material_0", "material_0shape_0color_0", "size_0material_0color_0", "size_0material_0shape_0", "size_0shape_0color_0", "intr_corr_0", "seed"])
 
@@ -10,14 +10,14 @@ df = pd.DataFrame(columns=["iid", "shape_0", "size_0", "color_0", "material_0","
 # one dataset
 r = 0
 for ds in data_list:
-    for seed in range(5):
+    for seed in seed_list:
         d1 = {ds: 1.0, "seed": seed}
         df.at[str(r), :] = d1
         r +=1
 
 # two datasets
 for ds in data_list[1:]:
-    for seed in range(5):
+    for seed in seed_list:
         d1 = {"iid": 0.9, ds:0.1, "seed": seed}
         d2 = {"iid": 0.75, ds:0.25, "seed": seed}
         d3 = {"iid": 0.5, ds:0.5, "seed": seed}
