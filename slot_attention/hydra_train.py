@@ -38,7 +38,7 @@ class _Workplace(object):
         # open the csv file to get the seed and the dataset mixing weights
         df = pd.read_csv(cfg.data_mix_csv)
         self.data_weights = df.iloc[cfg.data_mix_idx, 1:-1]
-        seed = df.loc[cfg.data_mix_idx, "seed"]
+        seed = cfg.seed #df.loc[cfg.data_mix_idx, "seed"]
 
         self.result_csv = cfg.result_csv
         self.data_mix_idx = cfg.data_mix_idx
@@ -48,6 +48,7 @@ class _Workplace(object):
         clevr_transforms = transforms.Compose(
             [
                 transforms.ToTensor(),
+                transforms.CenterCrop(240),
                 transforms.Lambda(rescale),  # rescale between -1 and 1
                 transforms.Resize(tuple(cfg.resolution)),
             ]
@@ -112,7 +113,7 @@ class _Workplace(object):
 
         self.method = SlotAttentionMethod(model=model, datamodule=clevr_datamodule, params=cfg)
 
-        logger_name = "slot-attn-f/sbd"-lr-"+str(cfg.lr) + "-it-"+str(cfg.num_iterations)+ "-s-" + str(seed)#"-dup-"+str(cfg.dup_threshold)
+        logger_name = "slot-attn-f/ds2gpu-lr-"+str(cfg.lr) + "-it-"+str(cfg.num_iterations)+ "-s-" + str(seed)#"-dup-"+str(cfg.dup_threshold)
         logger = pl_loggers.WandbLogger(project="objectness-test-clevr6", name=logger_name)
         # Use this line for Tensorboard logger
         # logger = pl_loggers.TensorBoardLogger("./logs/"+logger_name+strftime("-%Y%m%d%H%M%S", localtime()))
