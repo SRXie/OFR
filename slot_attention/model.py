@@ -119,7 +119,7 @@ class SlotAttentionModel(nn.Module):
         in_channels: int = 3,
         kernel_size: int = 5,
         slot_size: int = 64,
-        hidden_dims: Tuple[int, ...] = (64, 64, 64), #delete one entry for 128 -> 64
+        hidden_dims: Tuple[int, ...] = (64, 64, 64, 64), #delete one entry for 128 -> 64
         decoder_resolution: Tuple[int, int] = (8, 8),
         empty_cache=False,
     ):
