@@ -147,7 +147,7 @@ parser.add_argument('--use_gpu', default=0, type=int,
     help="Setting --use_gpu 1 enables GPU-accelerated rendering using CUDA. " +
          "You must have an NVIDIA GPU with the CUDA toolkit installed for " +
          "to work.")
-parser.add_argument('--width', default=320, type=int,
+parser.add_argument('--width', default=240, type=int,
     help="The width (in pixels) for the rendered images")
 parser.add_argument('--height', default=240, type=int,
     help="The height (in pixels) for the rendered images")
@@ -526,15 +526,31 @@ def add_random_objects(scene_struct, num_objects, args, camera):
         for obj in blender_objects:
           utils.delete_object(obj)
         return add_random_objects(scene_struct, num_objects, args, camera)
-      x = random.uniform(-3, 3)
-      y = random.uniform(-3, 3)
+      while True:
+        x = random.uniform(-3, 3)
+        y = random.uniform(-3, 3)
+        if i > 0 and args.pos_margin>0.0 and num_objects<5 and size_names[0] == 'large':
+            x = positions[0][0]+x*args.pos_margin
+            y = positions[0][1]+y*args.pos_margin
+        if i > 0 and args.pos_margin>0.0 and num_objects==5 and size_names[0] == 'large':
+            x = positions[0][0]+x*0.8
+            y = positions[0][1]+y*0.8
+        elif i > 0 and args.pos_margin>0.0 and size_names[0] == 'small':
+            x = positions[0][0]+x*args.pos_margin/2.0
+            y = positions[0][1]+y*args.pos_margin/2.0
+        if x > -3 and x < 3 and y > -3 and y < 3:
+          break
       # Check to make sure the new object is further than min_dist from all
       # other objects, and further than margin along the four cardinal directions
+      corners_good = True
       dists_good = True
       margins_good = True
       for (xx, yy, rr) in positions:
         dx, dy = x - xx, y - yy
         dist = math.sqrt(dx * dx + dy * dy)
+        if x + y + 3.5 < 0 or x + y - 3.5 >0:
+          corners_good = False
+          break
         if dist - r - rr < args.min_dist:
           dists_good = False
           break
@@ -550,7 +566,7 @@ def add_random_objects(scene_struct, num_objects, args, camera):
         if not margins_good:
           break
 
-      if dists_good and margins_good:
+      if corners_good and dists_good and margins_good:
         break
 
     # For cube, adjust the size a bit
@@ -572,11 +588,11 @@ def add_random_objects(scene_struct, num_objects, args, camera):
         if dist < dist_min:
           dist_min = dist
           cluster_min_idx = idx
-      if dist_min - r < args.pos_margin: # TODO: adjust with pixel coordinate
-        cluster_means[cluster_min_idx] = (n+1, (n*xm+x)/(n+1), (n*ym+y)/(n+1))
-        clusters[cluster_min_idx].append(i)
-        obj_cluster[i] = cluster_min_idx
-        cluster_found = True
+      # if dist_min - r < args.pos_margin: # TODO: adjust with pixel coordinate
+      #   cluster_means[cluster_min_idx] = (n+1, (n*xm+x)/(n+1), (n*ym+y)/(n+1))
+      #   clusters[cluster_min_idx].append(i)
+      #   obj_cluster[i] = cluster_min_idx
+      #   cluster_found = True
       if not cluster_found:
         cluster_means.append((1, x, y))
         clusters.append([i])
@@ -586,21 +602,21 @@ def add_random_objects(scene_struct, num_objects, args, camera):
     size_names.append(size_name)
     obj_names.append(obj_name)
     obj_name_outs.append(obj_name_out)
-    if args.pos_margin == 0.0:
-      clusters = [[item for cluster in clusters for item in cluster]]
-    print(clusters, "-----------------------")
+    # if args.pos_margin == 0.0:
+    clusters = [[item for cluster in clusters for item in cluster]]
+    # print(clusters, "-----------------------")
 
-  if args.pos_margin> 0.0 and args.mutex:
-    correlated_color_lists = np.random.permutation(8)[:len(clusters)]
+  # if args.pos_margin> 0.0 and args.mutex:
+  #   correlated_color_lists = np.random.permutation(8)[:len(clusters)]
 
   for k, cluster in enumerate(clusters):
     for attr in ("material", "color"):
       if eval("args."+attr+"_correlated"):
         exec("global "+attr+"_distr_"+str(len(cluster)))
         exec("correlated_"+attr+"_list=np.random.choice(list("+attr+"_distr_"+str(len(cluster))+".keys()), p=list("+attr+"_distr_"+str(len(cluster))+".values())).split('-')", globals())
-    if args.pos_margin> 0.0 and args.mutex:
-      global correlated_color_list
-      correlated_color_list = [correlated_color_lists[k]]*len(cluster)
+    # if args.pos_margin> 0.0 and args.mutex:
+    #   global correlated_color_list
+    #   correlated_color_list = [correlated_color_lists[k]]*len(cluster)
     for j, obj_idx in enumerate(cluster):
       # Choose random color
       if shape_color_combos is None:
