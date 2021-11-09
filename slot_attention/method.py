@@ -337,8 +337,8 @@ class SlotAttentionMethod(pl.LightningModule):
 
         def warm_and_decay_lr_scheduler(step: int):
             # step = step * self.params.gpus # to make the decay consistent over multi-GPU
-            warmup_steps = warmup_steps #* total_steps
-            decay_steps = decay_steps #* total_steps
+            # warmup_steps = warmup_steps #* total_steps
+            # decay_steps = decay_steps #* total_steps
             # assert step < total_steps
             if step < warmup_steps:
                 factor = step / warmup_steps
