@@ -68,7 +68,7 @@ def obj_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0, decomposed=No
         decomposed = []
     tuples = [] # path tuples
     decomposed.append(sub_scene_idx)
-    for num_decomp in range(1, len(scene.objs_idx)-1):
+    for num_decomp in range(3, min(len(scene.objs_idx)-2, 6)):
         # generate all object algebra test for the given scene
         # First decompose it into part_23 (num_obj>=2) and part_1:
         for part_1 in itertools.combinations(set(scene.objs_idx), num_decomp):
@@ -84,7 +84,7 @@ def obj_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0, decomposed=No
             image_D_path = create_path(test_root, main_scene_idx, subset_idx_D)
 
             # Then decompose part_23 into part_2 and part_3:
-            for num_decomp_2 in range(1,len(part_23)):
+            for num_decomp_2 in range(1,min(len(part_23)-2,7-len(part_1))):
                 for part_2 in itertools.combinations(set(part_23), num_decomp_2):
                     part_3 = set(part_23).difference(set(part_2))
 

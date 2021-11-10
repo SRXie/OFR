@@ -34,7 +34,7 @@ if INSIDE_BLENDER:
     import utils
   except ImportError as e:
     print("\nERROR")
-    print("Running render_images.py from Blender and cannot import utils.py.") 
+    print("Running render_images.py from Blender and cannot import utils.py.")
     print("You may need to add a .pth file to the site-packages of Blender's")
     print("bundled python with a command like this:\n")
     print("echo $PWD >> $BLENDER/$VERSION/python/lib/python3.5/site-packages/clevr.pth")
@@ -65,9 +65,9 @@ parser.add_argument('--shape_color_combos_json', default=None,
          "for CLEVR-CoGenT.")
 
 # Settings for objects
-parser.add_argument('--min_objects', default=3, type=int,
+parser.add_argument('--min_objects', default=6, type=int,
     help="The minimum number of objects to place in each scene")
-parser.add_argument('--max_objects', default=6, type=int,
+parser.add_argument('--max_objects', default=9, type=int,
     help="The maximum number of objects to place in each scene")
 parser.add_argument('--min_dist', default=0.25, type=float,
     help="The minimum allowed distance between object centers")
@@ -131,7 +131,7 @@ parser.add_argument('--use_gpu', default=0, type=int,
     help="Setting --use_gpu 1 enables GPU-accelerated rendering using CUDA. " +
          "You must have an NVIDIA GPU with the CUDA toolkit installed for " +
          "to work.")
-parser.add_argument('--width', default=320, type=int,
+parser.add_argument('--width', default=240, type=int,
     help="The width (in pixels) for the rendered images")
 parser.add_argument('--height', default=240, type=int,
     help="The height (in pixels) for the rendered images")
@@ -157,9 +157,9 @@ parser.add_argument('--render_tile_size', default=256, type=int,
          "while larger tile sizes may be optimal for GPU-based rendering.")
 
 # Test options
-parser.add_argument('--obj_test', default=False, action="store_true", 
+parser.add_argument('--obj_test', default=False, action="store_true",
     help="Flag this to trigger obj-level test")
-parser.add_argument('--attr_test', default=False, action="store_true", 
+parser.add_argument('--attr_test', default=False, action="store_true",
     help="Flag this to trigger attr-level test")
 
 def main(args):
@@ -186,7 +186,7 @@ def main(args):
     args.output_meta_dir=insert_test_to_dir(args.output_meta_dir)
     args.output_blen_dir=insert_test_to_dir(args.output_blend_dir)
     args.output_scene_file=insert_test_to_dir(args.output_scene_file, True)
-  
+
   img_template = os.path.join(args.output_image_dir, img_template)
   scene_template = os.path.join(args.output_scene_dir, scene_template)
   meta_template = os.path.join(args.output_meta_dir, meta_template)
@@ -200,7 +200,7 @@ def main(args):
     os.makedirs(args.output_meta_dir)
   if args.save_blendfiles == 1 and not os.path.isdir(args.output_blend_dir):
     os.makedirs(args.output_blend_dir)
-  
+
   # Note: currently we do attr-level test on single-obj scene
   all_scene_paths = []
   for i in range(args.num_images):
@@ -375,7 +375,7 @@ def render_subscene_obj(scene_struct, blender_objects, output_image, output_scen
 
   map_objs_to_idx = {}
 
-  for k in range(1, len(scene_struct.objects)):
+  for k in range(3, 7):
     for objs_idx_subset in itertools.combinations(set(scene_struct.objs_idx), k):
       sub_scene_struct = copy.deepcopy(scene_struct)
       sub_scene_struct.objs_idx = sorted(list(objs_idx_subset))
@@ -391,7 +391,7 @@ def render_subscene_obj(scene_struct, blender_objects, output_image, output_scen
       blender_objects = []
       for obj in sub_scene_struct.objects:
         utils.add_object(args.shape_dir, properties['shape'][obj.shape], obj.scale, obj.threed_coords[:2], theta=obj.rotation)
-        utils.add_material(properties['material'][obj.material], Color=[float(c) / 255.0 for c in properties['color'][obj.color]] + [1.0])  
+        utils.add_material(properties['material'][obj.material], Color=[float(c) / 255.0 for c in properties['color'][obj.color]] + [1.0])
         b_obj = bpy.context.object
         blender_objects.append(b_obj)
 
@@ -402,7 +402,7 @@ def render_subscene_obj(scene_struct, blender_objects, output_image, output_scen
           break
         except Exception as e:
           print(e)
-      
+
       if k > 1:
         map_objs_to_idx["-".join([str(i) for i in sub_scene_struct.objs_idx])] = scene_index
       else:
@@ -445,7 +445,7 @@ def render_subscene_attr(scene_struct, blender_objects, output_image, output_sce
         if obj.shape == 'Cube':
           scale /= math.sqrt(2)
         utils.add_object(args.shape_dir, properties['shape'][obj.shape], scale, obj.threed_coords[:2], theta=obj.rotation)
-        utils.add_material(properties['material'][obj.material], Color=[float(c) / 255.0 for c in properties['color'][obj.color]] + [1.0])  
+        utils.add_material(properties['material'][obj.material], Color=[float(c) / 255.0 for c in properties['color'][obj.color]] + [1.0])
         b_obj = bpy.context.object
         blender_objects.append(b_obj)
 
@@ -461,7 +461,7 @@ def render_subscene_attr(scene_struct, blender_objects, output_image, output_sce
 
         with open(output_scene[:-5]+'_%04d' % scene_index+output_scene[-5:], 'w') as f:
           json.dump(sub_scene_struct.to_dictionary(), f, indent=2)
-          
+
   with open(output_meta, 'w') as f:
         json.dump(map_attrs_to_idx, f, indent=2)
 
@@ -509,11 +509,15 @@ def add_random_objects(scene_struct, num_objects, args, camera):
       y = random.uniform(-3, 3)
       # Check to make sure the new object is further than min_dist from all
       # other objects, and further than margin along the four cardinal directions
+      corners_good = True
       dists_good = True
       margins_good = True
       for (xx, yy, rr) in positions:
         dx, dy = x - xx, y - yy
         dist = math.sqrt(dx * dx + dy * dy)
+        if x + y + 3.5 < 0 or x + y - 3.5 >0:
+          corners_good = False
+          break
         if dist - r - rr < args.min_dist:
           dists_good = False
           break
@@ -529,7 +533,7 @@ def add_random_objects(scene_struct, num_objects, args, camera):
         if not margins_good:
           break
 
-      if dists_good and margins_good:
+      if corners_good and dists_good and margins_good:
         break
 
     # Choose random color and shape
@@ -581,7 +585,7 @@ def add_random_objects(scene_struct, num_objects, args, camera):
 def compute_all_relationships(scene_struct, eps=0.2):
   """
   Computes relationships between all pairs of objects in the scene.
-  
+
   Returns a dictionary mapping string relationship names to lists of lists of
   integers, where output[rel][i] gives a list of object indices that have the
   relationship rel with object i. For example if j is in output['left'][i] then
@@ -710,4 +714,3 @@ if __name__ == '__main__':
     print('arguments like this:')
     print()
     print('python render_images.py --help')
-
