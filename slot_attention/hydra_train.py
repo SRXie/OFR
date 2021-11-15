@@ -5,6 +5,7 @@ import logging
 import os
 from csv import reader
 from time import localtime, strftime
+from datetime import datetime
 import pytorch_lightning.loggers as pl_loggers
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor
@@ -111,7 +112,7 @@ class _Workplace(object):
         max_birthtime = None
         last_dir_name = None
         for dir_name in os.listdir(checkpoint_path):
-            dir_birthtime = os.stat(os.path.join(checkpoint_path, dir_name)).st_birthtime
+            dir_birthtime = os.stat(os.path.join(checkpoint_path, dir_name)).st_mtime
             dir_date = datetime.fromtimestamp(dir_birthtime).strftime('%m%d')
             if dir_date in dates:
                 if not max_birthtime:
