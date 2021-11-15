@@ -191,20 +191,20 @@ class CLEVRAlgebraTestset(Dataset):
         i = 0
         while (self.max_num_main_scenes is None or i < self.max_num_main_scenes) and i < total_num_main_scenes:
             num_objects_in_scene = len(scene["scenes"][i]["objects"])
-            if num_objects_in_scene <= self.max_n_objects:
-                # First, call obj_algebra_test or attr_algebra_test with this scene to generate path tuples for A-B+C=D
-                if self.test_type == 'obj':
-                    image_paths = obj_algebra_test(self.test_root, i)
-                elif self.test_type == 'attr':
-                    image_paths = attr_algebra_test(self.test_root, i)
-                else:
-                    raise NotImplementedError
-                # Then, assert the existence of these paths
-                for image_path in image_paths:
-                    for path in image_path:
-                        assert os.path.exists(path), f"{path} does not exist"
-                # Last, append these path tuples into paths.
-                paths+=image_paths
+            # if num_objects_in_scene <= self.max_n_objects:
+            # First, call obj_algebra_test or attr_algebra_test with this scene to generate path tuples for A-B+C=D
+            if self.test_type == 'obj':
+                image_paths = obj_algebra_test(self.test_root, i)
+            elif self.test_type == 'attr':
+                image_paths = attr_algebra_test(self.test_root, i)
+            else:
+                raise NotImplementedError
+            # Then, assert the existence of these paths
+            for image_path in image_paths:
+                for path in image_path:
+                    assert os.path.exists(path), f"{path} does not exist"
+            # Last, append these path tuples into paths.
+            paths+=image_paths
             i += 1
         random.shuffle(paths)
         with open(os.path.join(self.test_root, "CLEVR_test_cases.csv"), "w") as f:
