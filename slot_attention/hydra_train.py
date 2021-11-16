@@ -6,6 +6,7 @@ import os
 from csv import reader
 from time import localtime, strftime
 from datetime import datetime
+import torch
 import pytorch_lightning.loggers as pl_loggers
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor
@@ -114,8 +115,9 @@ class _Workplace(object):
         for dir_name in os.listdir(checkpoint_path):
             dir_birthtime = os.stat(os.path.join(checkpoint_path, dir_name)).st_mtime
             dir_date = datetime.fromtimestamp(dir_birthtime).strftime('%m%d')
-            if dir_date in dates:
-                if not max_birthtime:
+            print(dir_date)
+            if int(dir_date) in dates:
+                if max_birthtime is None:
                     max_birthtime = dir_birthtime
                     last_dir_name = dir_name
                 elif max_birthtime>dir_birthtime:
@@ -125,8 +127,8 @@ class _Workplace(object):
                     last_dir_name = dir_name
 
         # The following code is for loading a saved checkpoint
-        if last_dir_name:
-            last_dir = os.path.join(checkpoint_path, dir_name)
+        if not last_dir_name is None:
+            last_dir = os.path.join(checkpoint_path, dir_name, "checkpoints")
             checkpoint_name = os.listdir(last_dir)[0]
             print("Loading checkpoint from "+last_dir_name, ", "+checkpoint_name+" exists.")
             ckpt = torch.load(os.path.join(last_dir, checkpoint_name))
@@ -134,6 +136,9 @@ class _Workplace(object):
             for key in list(state_dict.keys()):
                 state_dict[key.replace('model.', '')] = state_dict.pop(key)
             model.load_state_dict(state_dict)
+        else:
+            print("No checkpoint exists for "+str(cfg.data_mix_idx))
+            exit(0)
 
         self.method = SlotAttentionMethod(model=model, datamodule=clevr_datamodule, params=cfg)
 
@@ -147,7 +152,7 @@ class _Workplace(object):
             accelerator="ddp" if cfg.gpus > 1 else None,
             num_sanity_val_steps=cfg.num_sanity_val_steps,
             gpus=cfg.gpus,
-            max_epochs=cfg.max_epochs,
+            max_epochs=0,#cfg.max_epochs,
             check_val_every_n_epoch=cfg.eval_every_n_epoch,
             log_every_n_steps=50,
             callbacks=[LearningRateMonitor("step"), ImageLogCallback(),] if cfg.is_logger_enabled else [],
