@@ -53,6 +53,7 @@ class BetaVAEMethod(pl.LightningModule):
 
             recons = self.model.generate(batch)
             batch = split_and_interleave_stack(batch, self.params.n_samples)
+            recons = split_and_interleave_stack(recons, self.params.n_samples)
             # combine images in a nice way so we can display all outputs in one grid, output rescaled to be between 0 and 1
             out = to_rgb_from_tensor(
                 torch.cat(
