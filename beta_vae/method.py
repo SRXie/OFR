@@ -112,7 +112,7 @@ class BetaVAEMethod(pl.LightningModule):
 
                 compute_loss(cat_zs, losses)
                 compute_loss(cat_zs, losses_en, easy_neg=True)
-                compute_loss(cat_zs, losses_hn)
+                compute_loss(cat_zs_hn, losses_hn)
 
                 print("batch time:", datetime.now()-b_prev)
                 b_prev = datetime.now()
