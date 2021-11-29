@@ -16,7 +16,8 @@ def reduce_logs(date, num_entries):
     else:
         result = None
     for i in range(num_entries):
-        path = "/checkpoint/siruixie/runs/objectness/hydra_train_dsize/data_mix_idx="+str(i)+",lr=0.0002,num_iterations=4,num_train_images=5000,sweep_name=dsize/wandb/"
+        path = "/checkpoint/siruixie/runs/objectness/hydra_test_test/data_mix_idx="+str(i)+",lr=0.0002,num_iterations=4,num_train_images=500,sweep_name=test/wandb/"
+
         json_path = ""
         count = 0
         for dir_name in os.listdir(path):
