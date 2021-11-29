@@ -96,8 +96,6 @@ def compute_loss(cat_zs, losses, easy_neg=False):
     if easy_neg:
         zs_D = zs_D[torch.randperm(batch_size)]
 
-    vector_a = (zs_A-zs_B).div(torch.norm(zs_A-zs_B, 2, -1).unsqueeze(-1)+0.0001)
-    vector_b = (zs_D-zs_C).div(torch.norm(zs_D-zs_C, 2, -1).unsqueeze(-1)+0.0001)
-    loss = torch.norm(vector_a-vector_b, 2, -1)/2
+    loss = torch.norm(zs_A-zs_B+zs_C-zs_D, 2, -1)
 
     losses.append(loss)

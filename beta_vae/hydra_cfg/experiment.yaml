@@ -10,7 +10,7 @@ resolution: [64, 64] # Tuple[int, int]
 num_slots: 7
 latent_dim: 128
 beta: 4
-gamma: 10.0
+gamma: 0.0
 data_mix_idx: 1
 data_mix_csv: /checkpoint/siruixie/data_mix.csv
 data_root:  /checkpoint/siruixie/clevr_corr/ #/datasets01/CLEVR_v1.0/060817/images/train/
