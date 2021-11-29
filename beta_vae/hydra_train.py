@@ -13,8 +13,8 @@ from torchvision import transforms
 import pandas as pd
 
 from beta_vae.data import CLEVRDataModule
-from beta_vae.method import BetaVaeMethod
-from beta_vae.model import BetaVaeModel
+from beta_vae.method import BetaVAEMethod
+from beta_vae.model import BetaVAE
 # from slot_attention.params import SlotAttentionParams
 from slot_attention.utils import ImageLogCallback
 from slot_attention.utils import rescale
@@ -94,7 +94,7 @@ class _Workplace(object):
             attr_algebra_test_cases = self.attr_algebra_test_cases,
         )
 
-        model = BetaVaeModel(
+        model = BetaVAE(
             latent_dim=cfg.latent_dim,
             beta=cfg.beta,
             gamma=cfg.gamma,
@@ -106,7 +106,7 @@ class _Workplace(object):
         #     state_dict[key.replace('model.', '')] = state_dict.pop(key)
         # model.load_state_dict(state_dict)
 
-        self.method = BetaVaeMethod(model=model, datamodule=clevr_datamodule, params=cfg)
+        self.method = BetaVAEMethod(model=model, datamodule=clevr_datamodule, params=cfg)
 
         logger_name = "beta-vae/deconv-beta-"+str(cfg.beta)+"-gamma-"+str(cfg.gamma)+ "-s-" + str(seed)#"-dup-"+str(cfg.dup_threshold)
         logger = pl_loggers.WandbLogger(project="objectness-test-clevr6", name=logger_name)

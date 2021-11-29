@@ -1,7 +1,8 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-from .types_ import *
+from typing import List, Tuple
+from beta_vae.utils import Tensor
 
 
 class BetaVAE(nn.Module):

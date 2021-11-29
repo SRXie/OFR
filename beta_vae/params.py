@@ -5,7 +5,7 @@ import attr
 
 
 @attr.s(auto_attribs=True)
-class SlotAttentionParams:
+class BetaVAEParams:
     seed = 3
     gpu_id = '0'
     lr: float = 0.0004

@@ -1,0 +1,1 @@
+python beta_vae/hydra_train.py sweep_name="bvae" data_mix_idx="range(0, 5)" lr=0.0002,0.0004,0.0005,0.0008 beta="range(0, 15, 2)" hydra/launcher=submitit_slurm hydra.launcher.timeout_min=3200 hydra.launcher.gpus_per_task=1 hydra.launcher.max_num_timeout=100 hydra.launcher.partition="learnfair" hydra.launcher.cpus_per_gpu=10 -m

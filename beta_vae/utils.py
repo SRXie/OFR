@@ -84,14 +84,20 @@ def set_seed_everywhere(seed):
     np.random.seed(seed)
     random.seed(seed)
 
+def split_and_interleave_stack(input, split_size):
+    x, y, z, w = torch.split(input, split_size, 0)
+    view_shape = [size for size in x.shape]
+    view_shape[0]*=4
+    return torch.stack((x, y, z, w), dim=1).view(view_shape)
+
 def compute_loss(cat_zs, losses, easy_neg=False):
     zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
-    batch_size, z_dim = slots_A.shape
+    batch_size, z_dim = zs_A.shape
     if easy_neg:
         zs_D = zs_D[torch.randperm(batch_size)]
 
-    vector_a = (zs_A-zs_B).div(torch.norm(zs_A-zs_B, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size)+0.0001)
-    vector_b = (zs_D-zs_C).div(torch.norm(zs_D-zs_C, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size)+0.0001)
+    vector_a = (zs_A-zs_B).div(torch.norm(zs_A-zs_B, 2, -1).unsqueeze(-1)+0.0001)
+    vector_b = (zs_D-zs_C).div(torch.norm(zs_D-zs_C, 2, -1).unsqueeze(-1)+0.0001)
     loss = torch.norm(vector_a-vector_b, 2, -1)/2
 
-    losses.append(greedy_loss)
+    losses.append(loss)

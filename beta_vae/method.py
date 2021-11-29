@@ -8,15 +8,16 @@ from torchvision.transforms import transforms
 from datetime import datetime
 
 
-from beta_vae.model import BetaVaeModel
-from beta_vae.params import BetaVaeParams
+from beta_vae.model import BetaVAE
+from beta_vae.params import BetaVAEParams
 from beta_vae.utils import Tensor
+from beta_vae.utils import split_and_interleave_stack
 from beta_vae.utils import to_rgb_from_tensor, to_tensor_from_rgb
 from beta_vae.utils import compute_loss
 
 
-class SlotAttentionMethod(pl.LightningModule):
-    def __init__(self, model: BetaVaeModel, datamodule: pl.LightningDataModule, params: BetaVaeParams):
+class BetaVAEMethod(pl.LightningModule):
+    def __init__(self, model: BetaVAE, datamodule: pl.LightningDataModule, params: BetaVAEParams):
         super().__init__()
         self.model = model
         self.datamodule = datamodule
@@ -28,7 +29,11 @@ class SlotAttentionMethod(pl.LightningModule):
         return self.model(input, **kwargs)
 
     def training_step(self, batch, batch_idx, optimizer_idx=0):
-        train_loss = self.model.loss_function(batch)
+        results = self.forward(batch)
+        train_loss = self.model.loss_function(*results,
+                                            M_N = self.datamodule.train_batch_size/self.datamodule.num_train_images,
+                                            optimizer_idx = optimizer_idx,
+                                            batch_idx = batch_idx)
         logs = {key: val.item() for key, val in train_loss.items()}
         self.log_dict(logs, sync_dist=True)
         return train_loss
@@ -47,21 +52,21 @@ class SlotAttentionMethod(pl.LightningModule):
         with torch.no_grad():
 
             recons = self.model.generate(batch)
-
+            batch = split_and_interleave_stack(batch, self.params.n_samples)
             # combine images in a nice way so we can display all outputs in one grid, output rescaled to be between 0 and 1
             out = to_rgb_from_tensor(
                 torch.cat(
                     [
-                        torch.cat([batch.unsqueeze(1), batch.unsqueeze(1)], dim=0),  # original images
-                        torch.cat([recon_combined.unsqueeze(1),recon_combined_nodup.unsqueeze(1)], dim=0),  # reconstructions
+                        batch.unsqueeze(1),  # original images
+                        recons.unsqueeze(1),  # reconstructions
                     ],
                     dim=1,
                 )
             )
 
-            batch_size, num_slots, C, H, W = recons.shape
+            batch_size, C, H, W = recons.shape
             images = vutils.make_grid(
-                out.view(2 * batch_size * out.shape[1], C, H, W).cpu(), normalize=False, nrow=out.shape[1],
+                out.view(batch_size * out.shape[1], C, H, W).cpu(), normalize=False, nrow=out.shape[1],
             )
 
         return images
@@ -69,7 +74,11 @@ class SlotAttentionMethod(pl.LightningModule):
     def validation_step(self, batch, batch_idx, optimizer_idx=0):
         # batch is a list of lengthn num_slots+1
         with torch.no_grad():
-            val_loss = self.model.loss_function(batch[0], batch[1:-1], batch[-1])
+            results = self.forward(batch[0])
+            val_loss = self.model.loss_function(*results,
+                                                M_N = self.datamodule.val_batch_size/self.datamodule.num_val_images,
+                                                optimizer_idx = optimizer_idx,
+                                                batch_idx = batch_idx)
         return val_loss
 
     def validation_epoch_end(self, outputs):
@@ -93,7 +102,7 @@ class SlotAttentionMethod(pl.LightningModule):
                 cat_batch = torch.cat(batch[:4], 0)
                 if self.params.gpus > 0:
                     cat_batch = cat_batch.to(self.device)
-                cat_zs = self.model.encode(cat_batch)
+                cat_zs = self.model.encode(cat_batch)[0]
 
                 cat_batch_hn = torch.cat(batch[:3]+[batch[-1]], 0)
                 if self.params.gpus > 0:
@@ -145,5 +154,5 @@ class SlotAttentionMethod(pl.LightningModule):
 
         return (
             [optimizer],
-            [{"scheduler": scheduler, "interval": "step",}],
+            [{"scheduler": scheduler, "interval": "epoch",}],
         )
