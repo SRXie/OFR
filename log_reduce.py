@@ -29,7 +29,7 @@ def reduce_logs(date, num_entries):
         if len(json_path) == 0:
             pass
         else:
-            data_weights = df.iloc[i+1, 1:]
+            data_weights = df.iloc[i, 1:]
             # print(data_weights)
 
             with open(json_path, 'r') as f:
