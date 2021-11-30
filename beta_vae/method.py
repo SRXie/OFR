@@ -108,7 +108,7 @@ class BetaVAEMethod(pl.LightningModule):
                 cat_batch_hn = torch.cat(batch[:3]+[batch[-1]], 0)
                 if self.params.gpus > 0:
                     cat_batch_hn = cat_batch_hn.to(self.device)
-                cat_zs_hn = self.model.forward(cat_batch_hn)[0]
+                cat_zs_hn = self.model.encode(cat_batch_hn)[0]
 
                 compute_loss(cat_zs, losses)
                 compute_loss(cat_zs, losses_en, easy_neg=True)
