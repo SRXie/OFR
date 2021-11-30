@@ -4,6 +4,7 @@ from torch.nn import functional as F
 from typing import List, Tuple
 from beta_vae.utils import Tensor
 from beta_vae.utils import conv_transpose_out_shape
+from beta_vae.utils import assert_shape
 
 
 class BetaVAE(nn.Module):
