@@ -70,6 +70,8 @@ class ImageLogCallback(Callback):
                 # trainer.logger.experiment.add_images('eval_images', images, self.step, dataformats='CHW')
             self.step += 1
 
+def conv_transpose_out_shape(in_size, stride, padding, kernel_size, out_padding, dilation=1):
+    return (in_size - 1) * stride - 2 * padding + dilation * (kernel_size - 1) + out_padding + 1
 
 def to_rgb_from_tensor(x: Tensor):
     return (x * 0.5 + 0.5).clamp(0, 1)
