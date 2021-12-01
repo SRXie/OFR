@@ -82,8 +82,8 @@ class BetaVAE(nn.Module):
                             nn.BatchNorm2d(hidden_dims[-1]),
                             nn.LeakyReLU(),
                             nn.Conv2d(hidden_dims[-1], out_channels= 3,
-                                      kernel_size= 3, padding= 1),
-                            nn.Tanh())
+                                      kernel_size= 3, padding= 1))
+                            # nn.Tanh())
 
     def encode(self, input: Tensor) -> List[Tensor]:
         """

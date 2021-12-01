@@ -8,7 +8,7 @@ val_batch_size: 16
 test_batch_size: 128
 resolution: [64, 64] # Tuple[int, int]
 num_slots: 7
-latent_dim: 128
+latent_dim: 64
 beta: 4
 gamma: 0.0
 data_mix_idx: 1
@@ -19,7 +19,7 @@ test_root: /checkpoint/siruixie/clevr_obj_test/output/
 gpus: 1
 max_epochs: 100
 num_sanity_val_steps: 1
-scheduler_gamma: 0.95
+scheduler_gamma: 1.0
 weight_decay: 0.0
 num_train_images: 23000 # Optional[int]
 num_val_images: 10000  # Optional[int]
