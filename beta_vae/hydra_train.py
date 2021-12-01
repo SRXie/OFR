@@ -132,6 +132,8 @@ class _Workplace(object):
             log_every_n_steps=1,
             callbacks=[LearningRateMonitor("step"), ImageLogCallback(),] if cfg.is_logger_enabled else [],
         )
+        # to log sanity check result
+        self.trainer.current_epoch = -1
 
     def run_training(self):
         self.trainer.fit(self.method)

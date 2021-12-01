@@ -324,7 +324,12 @@ class SlotAttentionMethod(pl.LightningModule):
                 "std_obj_pseudo_greedy_cos_loss": std_obj_pd_greedy_cos_loss,
                 "std_attr_pseudo_greedy_cos_loss": std_attr_pd_greedy_cos_loss,
             }
-            self.log_dict(logs, sync_dist=True)
+            if self.trainer.running_sanity_check:
+                self.trainer.running_sanity_check = False  # so that loggers don't skip logging
+                self.log_dict(logs, sync_dist=True)
+                self.trainer.current_epoch = 0
+            else:
+                self.log_dict(logs, sync_dist=True)
 
             print("; ".join([f"{k}: {v.item():.6f}" for k, v in logs.items()]))
 

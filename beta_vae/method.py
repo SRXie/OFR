@@ -144,7 +144,12 @@ class BetaVAEMethod(pl.LightningModule):
                 "std_obj_loss": std_obj_loss,
                 "std_attr_loss": std_attr_loss,
             }
-            self.log_dict(logs, sync_dist=True)
+            if self.trainer.running_sanity_check:
+                self.trainer.running_sanity_check = False  # so that loggers don't skip logging
+                self.log_dict(logs, sync_dist=True)
+                self.trainer.current_epoch = 0
+            else:
+                self.log_dict(logs, sync_dist=True)
 
             print("; ".join([f"{k}: {v.item():.6f}" for k, v in logs.items()]))
 
