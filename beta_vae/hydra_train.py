@@ -101,8 +101,6 @@ class _Workplace(object):
             alpha=cfg.alpha,
             beta=cfg.beta,
             gamma=cfg.gamma,
-            beta=cfg.beta,
-            gamma=cfg.gamma,
         )
         # model = BetaVAE(
         #     latent_dim=cfg.latent_dim,
