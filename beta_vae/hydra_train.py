@@ -14,7 +14,7 @@ import pandas as pd
 
 from beta_vae.data import CLEVRDataModule
 from beta_vae.method import BetaVAEMethod
-from beta_vae.model import BetaVAE
+from beta_vae.model import BetaVAE, BetaTCVAE
 # from slot_attention.params import SlotAttentionParams
 from slot_attention.utils import ImageLogCallback
 from slot_attention.utils import rescale
@@ -94,12 +94,22 @@ class _Workplace(object):
             attr_algebra_test_cases = self.attr_algebra_test_cases,
         )
 
-        model = BetaVAE(
+        model = BetaTCVAE(
             latent_dim=cfg.latent_dim,
             decoder_type=cfg.decoder_type,
+            anneal_steps=cfg.anneal_steps,
+            alpha=cfg.alpha,
+            beta=cfg.beta,
+            gamma=cfg.gamma,
             beta=cfg.beta,
             gamma=cfg.gamma,
         )
+        # model = BetaVAE(
+        #     latent_dim=cfg.latent_dim,
+        #     decoder_type=cfg.decoder_type,
+        #     beta=cfg.beta,
+        #     gamma=cfg.gamma,
+        # )
         # The following code is for loading a saved checkpoint
         # ckpt = torch.load("path_to_checkpoint")
         # state_dict = ckpt['state_dict']
@@ -109,7 +119,7 @@ class _Workplace(object):
 
         self.method = BetaVAEMethod(model=model, datamodule=clevr_datamodule, params=cfg)
 
-        logger_name = "beta-vae/"+cfg.decoder_type+"-gamma-"+str(cfg.gamma)+ "-s-" + str(seed)#"-dup-"+str(cfg.dup_threshold)
+        logger_name = "btc-vae/"+cfg.decoder_type+"-beta-"+str(cfg.beta)+"-ldim-"+str(cfg.latent_dim)+ "-s-" + str(seed)#"-dup-"+str(cfg.dup_threshold)
         logger = pl_loggers.WandbLogger(project="objectness-test-clevr6", name=logger_name)
         # Use this line for Tensorboard logger
         # logger = pl_loggers.TensorBoardLogger("./logs/"+logger_name+strftime("-%Y%m%d%H%M%S", localtime()))

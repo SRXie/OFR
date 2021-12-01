@@ -8,10 +8,12 @@ val_batch_size: 16
 test_batch_size: 128
 resolution: [64, 64] # Tuple[int, int]
 num_slots: 7
-latent_dim: 128
+latent_dim: 64
 decoder_type: sbd
-beta: 4
+alpha: 1.
+beta: 6.
 gamma: 0.0
+anneal_steps: 10000
 data_mix_idx: 1
 data_mix_csv: /checkpoint/siruixie/data_mix.csv
 data_root:  /checkpoint/siruixie/clevr_corr/ #/datasets01/CLEVR_v1.0/060817/images/train/
