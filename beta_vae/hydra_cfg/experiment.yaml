@@ -8,7 +8,8 @@ val_batch_size: 16
 test_batch_size: 128
 resolution: [64, 64] # Tuple[int, int]
 num_slots: 7
-latent_dim: 64
+latent_dim: 128
+decoder_type: sbd
 beta: 4
 gamma: 0.0
 data_mix_idx: 1
