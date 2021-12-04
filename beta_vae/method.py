@@ -89,6 +89,7 @@ class BetaVAEMethod(pl.LightningModule):
         odl = self.datamodule.obj_test_dataloader()
         adl = self.datamodule.attr_test_dataloader()
 
+        z_norms = []
         obj_losses, attr_losses = [], []
         obj_losses_en, attr_losses_en = [], []
         obj_losses_hn, attr_losses_hn = [], []
@@ -104,6 +105,11 @@ class BetaVAEMethod(pl.LightningModule):
                 if self.params.gpus > 0:
                     cat_batch = cat_batch.to(self.device)
                 cat_zs = self.model.encode(cat_batch)[0]
+
+                if dataloader is odl:
+                    znorm = torch.norm(cat_zs, 2, -1)
+                    znorm = torch.stack(torch.split(znorm, znorm.shape[0]//4, 0), 1).mean(1)
+                    z_norms.append(znorm)
 
                 cat_batch_hn = torch.cat(batch[:3]+[batch[-1]], 0)
                 if self.params.gpus > 0:
@@ -122,10 +128,13 @@ class BetaVAEMethod(pl.LightningModule):
             compute_test_losses(adl, attr_losses, attr_losses_en, attr_losses_hn)
 
             avg_obj_loss = torch.cat(obj_losses, 0)
-            avg_obj_loss_en = (torch.cat(obj_losses_en, 0)-avg_obj_loss).mean()
-            avg_obj_loss_hn = (torch.cat(obj_losses_hn, 0)-avg_obj_loss).mean()
+            avg_obj_loss_en = torch.div(avg_obj_loss, torch.cat(obj_losses_en, 0)+0.00001).mean()
+            avg_obj_loss_hn = torch.div(avg_obj_loss, torch.cat(obj_losses_hn, 0)+0.00001).mean()
+            avg_obj_loss_z_norm = torch.div(avg_obj_loss, torch.cat(z_norms, 0)+0.00001).mean()
             std_obj_loss = avg_obj_loss.std()/math.sqrt(avg_obj_loss.shape[0])
             avg_obj_loss = avg_obj_loss.mean()
+            avg_obj_loss_norm_en = avg_obj_loss/torch.cat(obj_losses_en, 0).mean()
+            avg_obj_loss_norm_hn = avg_obj_loss/torch.cat(obj_losses_hn, 0).mean()
 
             avg_attr_loss = torch.cat(attr_losses, 0)
             avg_attr_loss_en = (torch.cat(attr_losses_en, 0)-avg_attr_loss).mean()
@@ -133,10 +142,16 @@ class BetaVAEMethod(pl.LightningModule):
             std_attr_loss = avg_attr_loss.std()/math.sqrt(avg_attr_loss.shape[0])
             avg_attr_loss = avg_attr_loss.mean()
 
+            avg_z_norm = torch.cat(z_norms).mean()
+            
             logs = {
+                "avg_z_norms": avg_z_norm,
                 "avg_val_loss": avg_loss,
                 "avg_obj_loss": avg_obj_loss,
                 "avg_attr_loss": avg_attr_loss,
+                "avg_obj_loss_z_norm": avg_obj_loss_z_norm,
+                "avg_obj_loss_norm_en": avg_obj_loss_norm_en,
+                "avg_obj_loss_norm_hn":avg_obj_loss_norm_hn,
                 "avg_obj_loss_en": avg_obj_loss_en,
                 "avg_attr_loss_en": avg_attr_loss_en,
                 "avg_obj_loss_hn": avg_obj_loss_hn,

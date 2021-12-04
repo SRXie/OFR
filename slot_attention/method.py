@@ -164,6 +164,7 @@ class SlotAttentionMethod(pl.LightningModule):
         obj_pd_greedy_cos_losses_en, attr_pd_greedy_cos_losses_en = [], []
         obj_pd_greedy_cos_losses_hn, attr_pd_greedy_cos_losses_hn = [], []
 
+        slot_norm = []
         # rand = torch.rand(self.params.batch_size*sample_size*3, self.params.num_slots)
         # batch_rand_perm = rand.argsort(dim=1)
         # del rand
@@ -182,6 +183,11 @@ class SlotAttentionMethod(pl.LightningModule):
                 if self.params.gpus > 0:
                     cat_batch = cat_batch.to(self.device)
                 cat_slots, cat_attns, cat_slots_nodup = self.model.forward(cat_batch, slots_only=True, dup_threshold=dup_threshold)
+
+                if dataloader is odl:
+                    snorm = torch.norm(cat_slots, 2, -1)
+                    snorm = torch.cat(torch.split(snorm, snorm.shape[0]//4, 0), 1).mean(1)
+                    slot_norm.append(snorm)
 
                 cat_batch_hn = torch.cat(batch[:3]+[batch[-1]], 0)
                 if self.params.gpus > 0:
@@ -229,10 +235,13 @@ class SlotAttentionMethod(pl.LightningModule):
                 attr_pd_greedy_cos_losses, attr_pd_greedy_cos_losses_en, attr_pd_greedy_cos_losses_hn, attr_greedy_cos_losses_nodup, attr_greedy_cos_losses_nodup_en, attr_greedy_cos_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
 
             avg_obj_greedy_loss_nodup = torch.cat(obj_greedy_losses_nodup, 0)
-            avg_obj_greedy_loss_nodup_en = (torch.cat(obj_greedy_losses_nodup_en, 0)-avg_obj_greedy_loss_nodup).mean()
-            avg_obj_greedy_loss_nodup_hn = (torch.cat(obj_greedy_losses_nodup_hn, 0)-avg_obj_greedy_loss_nodup).mean()
+            avg_obj_greedy_loss_nodup_en = torch.div(avg_obj_greedy_loss_nodup, torch.cat(obj_greedy_losses_nodup_en, 0)+0.00001).mean()
+            avg_obj_greedy_loss_nodup_hn = torch.div(avg_obj_greedy_loss_nodup, torch.cat(obj_greedy_losses_nodup_hn, 0)+0.00001).mean()
+            avg_obj_greedy_loss_norm = torch.div(avg_obj_greedy_loss_nodup, torch.cat(slot_norm, 0)+0.00001).mean()
             std_obj_greedy_loss_nodup = avg_obj_greedy_loss_nodup.std()/math.sqrt(avg_obj_greedy_loss_nodup.shape[0])
             avg_obj_greedy_loss_nodup = avg_obj_greedy_loss_nodup.mean()
+            avg_obj_greedy_loss_norm_en = avg_obj_greedy_loss_nodup/torch.cat(obj_greedy_losses_nodup_en, 0).mean()
+            avg_obj_greedy_loss_norm_hn = avg_obj_greedy_loss_nodup/torch.cat(obj_greedy_losses_nodup_hn, 0).mean()
 
             avg_attr_greedy_loss_nodup = torch.cat(attr_greedy_losses_nodup, 0)
             avg_attr_greedy_loss_nodup_en = (torch.cat(attr_greedy_losses_nodup_en, 0)-avg_attr_greedy_loss_nodup).mean()
@@ -274,6 +283,8 @@ class SlotAttentionMethod(pl.LightningModule):
             std_attr_pd_greedy_cos_loss = avg_attr_pd_greedy_cos_loss.std()/(math.sqrt(avg_attr_pd_greedy_cos_loss.shape[0]))
             avg_attr_pd_greedy_cos_loss = avg_attr_pd_greedy_cos_loss.mean()
 
+            avg_slot_norm = torch.cat(slot_norm, 0).mean()
+
             logs = {
                 # "avg_val_loss": avg_loss,
                 "avg_ari_mask": avg_ari_mask,
@@ -291,6 +302,10 @@ class SlotAttentionMethod(pl.LightningModule):
                 "corr_rank_shape": corr_rank_shape,
                 "corr_rank_color": corr_rank_color,
                 "corr_rank": corr_rank,
+                "avg_slot_norm": avg_slot_norm,
+                "avg_obj_greedy_loss_norm": avg_obj_greedy_loss_norm,
+                "avg_obj_greedy_loss_norm_en": avg_obj_greedy_loss_norm_en,
+                "avg_obj_greedy_loss_norm_hn": avg_obj_greedy_loss_norm_hn,
                 "avg_obj_greedy_loss_nodup": avg_obj_greedy_loss_nodup,
                 "avg_attr_greedy_loss_nodup": avg_attr_greedy_loss_nodup,
                 "avg_obj_pseudo_greedy_loss": avg_obj_pd_greedy_loss,

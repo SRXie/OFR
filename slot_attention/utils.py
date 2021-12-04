@@ -198,7 +198,7 @@ def compute_greedy_loss(cat_slots, losses, easy_neg=False, cos_sim=False):
             greedy_criterion = torch.norm(ext_A-ext_B+ext_C-ext_D, 2, -1)
             norm_term = torch.stack([torch.norm(ext_A-ext_B, 2, -1), torch.norm(ext_A-ext_D, 2, -1), torch.norm(ext_C-ext_B, 2, -1), torch.norm(ext_C-ext_D, 2, -1)], dim=-1)
             norm_term = torch.max(norm_term, dim=-1)[0]
-            greedy_criterion = greedy_criterion.div(norm_term+0.0001)
+            # greedy_criterion = greedy_criterion.div(norm_term+0.0001)
         else:
             vector_a = (ext_A-ext_B).div(torch.norm(ext_A-ext_B, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size)+0.0001)
             vector_b = (ext_D-ext_C).div(torch.norm(ext_D-ext_C, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size)+0.0001)
