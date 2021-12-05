@@ -194,8 +194,8 @@ def compute_greedy_loss(cat_slots, losses, cos_sim=False):
         ext_D = slots_D.view(batch_size, 1, 1, 1, num_slots-i, slot_size).expand(-1, num_slots-i, num_slots-i, num_slots-i, -1, -1)
         if not cos_sim:
             greedy_criterion = torch.norm(ext_A-ext_B+ext_C-ext_D, 2, -1)
-            norm_term = torch.stack([torch.norm(ext_A-ext_B, 2, -1), torch.norm(ext_A-ext_D, 2, -1), torch.norm(ext_C-ext_B, 2, -1), torch.norm(ext_C-ext_D, 2, -1)], dim=-1)
-            norm_term = torch.max(norm_term, dim=-1)[0]
+            # norm_term = torch.stack([torch.norm(ext_A-ext_B, 2, -1), torch.norm(ext_A-ext_D, 2, -1), torch.norm(ext_C-ext_B, 2, -1), torch.norm(ext_C-ext_D, 2, -1)], dim=-1)
+            # norm_term = torch.max(norm_term, dim=-1)[0]
             # greedy_criterion = greedy_criterion.div(norm_term+0.0001)
         else:
             vector_a = (ext_A-ext_B+ext_C).div(torch.norm(ext_A-ext_B+ext_C, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size)+0.0001)
@@ -251,19 +251,19 @@ def compute_partition_loss(cat_slots, cat_indices, A_losses, D_losses, cos_sim=F
     batch_size, num_slots, slot_size = slots_A.shape
     if not cos_sim:
         slots_A_delta = slots_A.view(batch_size, 1, num_slots, slot_size) - slots_D.view(1, batch_size, num_slots, slot_size)
-        A_loss = torch.exp(-(torch.norm(slots_A_delta), 2, -1).sum(2)).sum(1)
+        A_loss = torch.exp(-(torch.norm(slots_A_delta, 2, -1).sum(2))).sum(1)
     else:
-        unit_slots_A = slots_A.div(torch.norm(slots_A, 2, -1)+0.0001)
-        unit_slots_D = slots_D.div(torch.norm(slots_D, 2, -1)+0.0001)
-        A_loss = torch.norm(unit_slots_A-unit_slots_D, 2, -1)/2
+        unit_slots_A = slots_A.div(torch.norm(slots_A, 2, -1).unsqueeze(-1).repeat(1,1,slot_size)+0.0001).view(batch_size, 1, num_slots, slot_size)
+        unit_slots_D = slots_D.div(torch.norm(slots_D, 2, -1).unsqueeze(-1).repeat(1,1,slot_size)+0.0001).view(1, batch_size, num_slots, slot_size)
+        A_loss = torch.exp(-torch.norm(unit_slots_A-unit_slots_D, 2, -1).sum(2)/2).sum(1)
     A_losses.append(A_loss)
     slots_D_prime = slots_A-slots_B+slots_C
     if not cos_sim:
         slots_D_delta = slots_D_prime.view(batch_size, 1, num_slots, slot_size) - slots_D.view(1, batch_size, num_slots, slot_size)
-        D_loss = torch.exp(-(torch.norm(slots_D_delta), 2, -1).sum(2)).sum(1)
+        D_loss = torch.exp(-(torch.norm(slots_D_delta, 2, -1).sum(2))).sum(1)
     else:
-        unit_slots_D_prime = slots_D_prime.div(torch.norm(slots_D_prime, 2, -1)+0.0001)
-        D_loss = torch.norm(unit_slots_D_prime.view(batch_size, 1, num_slots, slot_size) - unit_slots_D.view(1, batch_size, num_slots, slot_size), 2, -1)/2
+        unit_slots_D_prime = slots_D_prime.div(torch.norm(slots_D_prime, 2, -1).unsqueeze(-1).repeat(1,1,slot_size)+0.0001)
+        D_loss = torch.exp(-torch.norm(unit_slots_D_prime.view(batch_size, 1, num_slots, slot_size) - unit_slots_D.view(1, batch_size, num_slots, slot_size), 2, -1).sum(1)/2).sum(1)
     D_losses.append(D_loss)
 
 

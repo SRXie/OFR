@@ -131,21 +131,21 @@ class SlotAttentionMethod(pl.LightningModule):
         schema_distance_color = torch.cat([x["schema_distance_color"] for x in outputs])
         schema_distance = schema_distance_disc + schema_distance_pos
         slots_distance = torch.cat([x["slots_distance"] for x in outputs])
-        corr_coef_disc = compute_corr_coef(schema_distance_disc, slots_distance)
-        corr_coef_size = compute_corr_coef(schema_distance_size, slots_distance)
-        corr_coef_material = compute_corr_coef(schema_distance_material, slots_distance)
-        corr_coef_shape = compute_corr_coef(schema_distance_shape, slots_distance)
-        corr_coef_color = compute_corr_coef(schema_distance_color, slots_distance)
-        corr_coef_pos = compute_corr_coef(schema_distance_pos, slots_distance)
-        corr_coef = compute_corr_coef(schema_distance, slots_distance)
+        # corr_coef_disc = compute_corr_coef(schema_distance_disc, slots_distance)
+        # corr_coef_size = compute_corr_coef(schema_distance_size, slots_distance)
+        # corr_coef_material = compute_corr_coef(schema_distance_material, slots_distance)
+        # corr_coef_shape = compute_corr_coef(schema_distance_shape, slots_distance)
+        # corr_coef_color = compute_corr_coef(schema_distance_color, slots_distance)
+        # corr_coef_pos = compute_corr_coef(schema_distance_pos, slots_distance)
+        # corr_coef = compute_corr_coef(schema_distance, slots_distance)
 
-        corr_rank_disc = compute_rank_correlation(schema_distance_disc.unsqueeze(0), slots_distance.unsqueeze(0))
-        corr_rank_size = compute_rank_correlation(schema_distance_size.unsqueeze(0), slots_distance.unsqueeze(0))
-        corr_rank_material = compute_rank_correlation(schema_distance_material.unsqueeze(0), slots_distance.unsqueeze(0))
-        corr_rank_shape = compute_rank_correlation(schema_distance_shape.unsqueeze(0), slots_distance.unsqueeze(0))
-        corr_rank_color = compute_rank_correlation(schema_distance_color.unsqueeze(0), slots_distance.unsqueeze(0))
-        corr_rank_pos = compute_rank_correlation(schema_distance_pos.unsqueeze(0), slots_distance.unsqueeze(0))
-        corr_rank = compute_rank_correlation(schema_distance.unsqueeze(0), slots_distance.unsqueeze(0))
+        # corr_rank_disc = compute_rank_correlation(schema_distance_disc.unsqueeze(0), slots_distance.unsqueeze(0))
+        # corr_rank_size = compute_rank_correlation(schema_distance_size.unsqueeze(0), slots_distance.unsqueeze(0))
+        # corr_rank_material = compute_rank_correlation(schema_distance_material.unsqueeze(0), slots_distance.unsqueeze(0))
+        # corr_rank_shape = compute_rank_correlation(schema_distance_shape.unsqueeze(0), slots_distance.unsqueeze(0))
+        # corr_rank_color = compute_rank_correlation(schema_distance_color.unsqueeze(0), slots_distance.unsqueeze(0))
+        # corr_rank_pos = compute_rank_correlation(schema_distance_pos.unsqueeze(0), slots_distance.unsqueeze(0))
+        # corr_rank = compute_rank_correlation(schema_distance.unsqueeze(0), slots_distance.unsqueeze(0))
         # Algebra Test starts here
         odl = self.datamodule.obj_test_dataloader()
         adl = self.datamodule.attr_test_dataloader()
@@ -158,7 +158,7 @@ class SlotAttentionMethod(pl.LightningModule):
         obj_pd_greedy_losses_hn, attr_pd_greedy_losses_hn = [], []
 
         obj_greedy_cos_losses_nodup, attr_greedy_cos_losses_nodup = [], []
-        obj_greedy_cos_losses_nodup_en_A, obj_greedy_cos_losses_nodup_en_D, attr_greedy_cos_losses_nodup_en = [], []
+        obj_greedy_cos_losses_nodup_en_A, obj_greedy_cos_losses_nodup_en_D, attr_greedy_cos_losses_nodup_en = [], [], []
         obj_greedy_cos_losses_nodup_hn, attr_greedy_cos_losses_nodup_hn = [], []
         obj_pd_greedy_cos_losses, attr_pd_greedy_cos_losses = [], []
         obj_pd_greedy_cos_losses_en, attr_pd_greedy_cos_losses_en = [], []
@@ -231,115 +231,115 @@ class SlotAttentionMethod(pl.LightningModule):
         with torch.no_grad():
             compute_test_losses(odl, obj_pd_greedy_losses, obj_pd_greedy_losses_en, obj_pd_greedy_losses_hn, obj_greedy_losses_nodup, obj_greedy_losses_nodup_en_A, obj_greedy_losses_nodup_en_D, obj_greedy_losses_nodup_hn,
                 obj_pd_greedy_cos_losses, obj_pd_greedy_cos_losses_en, obj_pd_greedy_cos_losses_hn, obj_greedy_cos_losses_nodup, obj_greedy_cos_losses_nodup_en_A, obj_greedy_cos_losses_nodup_en_D, obj_greedy_cos_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
-            compute_test_losses(adl, attr_pd_greedy_losses, attr_pd_greedy_losses_en, attr_pd_greedy_losses_hn, attr_greedy_losses_nodup, attr_greedy_losses_nodup_en, attr_greedy_losses_nodup_hn,
-                attr_pd_greedy_cos_losses, attr_pd_greedy_cos_losses_en, attr_pd_greedy_cos_losses_hn, attr_greedy_cos_losses_nodup, attr_greedy_cos_losses_nodup_en, attr_greedy_cos_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
+            # compute_test_losses(adl, attr_pd_greedy_losses, attr_pd_greedy_losses_en, attr_pd_greedy_losses_hn, attr_greedy_losses_nodup, attr_greedy_losses_nodup_en, attr_greedy_losses_nodup_hn,
+            #     attr_pd_greedy_cos_losses, attr_pd_greedy_cos_losses_en, attr_pd_greedy_cos_losses_hn, attr_greedy_cos_losses_nodup, attr_greedy_cos_losses_nodup_en, attr_greedy_cos_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
 
             avg_obj_greedy_loss_nodup = torch.cat(obj_greedy_losses_nodup, 0)
-            avg_obj_greedy_loss_nodup_en = (avg_obj_greedy_loss_nodup+torch.log(torch.cat(obj_greedy_losses_nodup_en_D, 0))-torch.log(torch.cat(obj_greedy_losses_nodup_en_A, 0))).mean()
-            avg_obj_greedy_loss_nodup_hn = (avg_obj_greedy_loss_nodup+torch.log(torch.cat(torch.exp(obj_greedy_losses_nodup_hn), 0))-torch.log(torch.cat(obj_greedy_losses_nodup_en_A, 0))).mean()
-            avg_obj_greedy_loss_nodup_norm = (avg_obj_greedy_loss_nodup+torch.log(torch.cat(obj_greedy_losses_nodup_en_D, 0)+torch.cat(torch.exp(obj_greedy_losses_nodup_hn), 0))-torch.log(torch.cat(obj_greedy_losses_nodup_en_A, 0))).mean()
+            avg_obj_greedy_loss_nodup_en = torch.abs(avg_obj_greedy_loss_nodup+torch.log(torch.cat(obj_greedy_losses_nodup_en_D, 0))-torch.log(torch.cat(obj_greedy_losses_nodup_en_A, 0))).mean()
+            avg_obj_greedy_loss_nodup_hn = torch.abs(avg_obj_greedy_loss_nodup+torch.log(torch.exp(-torch.cat(obj_greedy_losses_nodup_hn, 0))-torch.log(torch.cat(obj_greedy_losses_nodup_en_A, 0)))).mean()
+            avg_obj_greedy_loss_nodup_norm = torch.abs(avg_obj_greedy_loss_nodup+torch.log(torch.cat(obj_greedy_losses_nodup_en_D, 0)+torch.exp(-torch.cat(obj_greedy_losses_nodup_hn, 0))-torch.log(torch.cat(obj_greedy_losses_nodup_en_A, 0)))).mean()
             std_obj_greedy_loss_nodup = avg_obj_greedy_loss_nodup.std()/math.sqrt(avg_obj_greedy_loss_nodup.shape[0])
             avg_obj_greedy_loss_nodup = avg_obj_greedy_loss_nodup.mean()
             avg_obj_greedy_loss_norm_hn = avg_obj_greedy_loss_nodup/torch.cat(obj_greedy_losses_nodup_hn, 0).mean()
 
-            avg_attr_greedy_loss_nodup = torch.cat(attr_greedy_losses_nodup, 0)
-            avg_attr_greedy_loss_nodup_en = (torch.cat(attr_greedy_losses_nodup_en, 0)-avg_attr_greedy_loss_nodup).mean()
-            avg_attr_greedy_loss_nodup_hn = (torch.cat(attr_greedy_losses_nodup_hn, 0)-avg_attr_greedy_loss_nodup).mean()
-            std_attr_greedy_loss_nodup = avg_attr_greedy_loss_nodup.std()/math.sqrt(avg_attr_greedy_loss_nodup.shape[0])
-            avg_attr_greedy_loss_nodup = avg_attr_greedy_loss_nodup.mean()
+            # avg_attr_greedy_loss_nodup = torch.cat(attr_greedy_losses_nodup, 0)
+            # avg_attr_greedy_loss_nodup_en = (torch.cat(attr_greedy_losses_nodup_en, 0)-avg_attr_greedy_loss_nodup).mean()
+            # avg_attr_greedy_loss_nodup_hn = (torch.cat(attr_greedy_losses_nodup_hn, 0)-avg_attr_greedy_loss_nodup).mean()
+            # std_attr_greedy_loss_nodup = avg_attr_greedy_loss_nodup.std()/math.sqrt(avg_attr_greedy_loss_nodup.shape[0])
+            # avg_attr_greedy_loss_nodup = avg_attr_greedy_loss_nodup.mean()
 
             avg_obj_pd_greedy_loss = torch.cat(obj_pd_greedy_losses, 0)
             avg_obj_pd_greedy_loss_en = (torch.cat(obj_pd_greedy_losses_en, 0)-avg_obj_pd_greedy_loss).mean()
             avg_obj_pd_greedy_loss_hn = (torch.cat(obj_pd_greedy_losses_hn, 0)-avg_obj_pd_greedy_loss).mean()
             std_obj_pd_greedy_loss = avg_obj_pd_greedy_loss.std()/math.sqrt(avg_obj_pd_greedy_loss.shape[0])
             avg_obj_pd_greedy_loss = avg_obj_pd_greedy_loss.mean()
-            avg_attr_pd_greedy_loss = torch.cat(attr_pd_greedy_losses, 0)
-            avg_attr_pd_greedy_loss_en = (torch.cat(attr_pd_greedy_losses_en, 0)-avg_attr_pd_greedy_loss).mean()
-            avg_attr_pd_greedy_loss_hn = (torch.cat(attr_pd_greedy_losses_hn, 0)-avg_attr_pd_greedy_loss).mean()
-            std_attr_pd_greedy_loss = avg_attr_pd_greedy_loss.std()/math.sqrt(avg_attr_pd_greedy_loss.shape[0])
-            avg_attr_pd_greedy_loss = avg_attr_pd_greedy_loss.mean()
+            # avg_attr_pd_greedy_loss = torch.cat(attr_pd_greedy_losses, 0)
+            # avg_attr_pd_greedy_loss_en = (torch.cat(attr_pd_greedy_losses_en, 0)-avg_attr_pd_greedy_loss).mean()
+            # avg_attr_pd_greedy_loss_hn = (torch.cat(attr_pd_greedy_losses_hn, 0)-avg_attr_pd_greedy_loss).mean()
+            # std_attr_pd_greedy_loss = avg_attr_pd_greedy_loss.std()/math.sqrt(avg_attr_pd_greedy_loss.shape[0])
+            # avg_attr_pd_greedy_loss = avg_attr_pd_greedy_loss.mean()
 
             avg_obj_greedy_cos_loss_nodup = torch.cat(obj_greedy_cos_losses_nodup, 0)
-            avg_obj_greedy_cos_loss_nodup_en = (avg_obj_greedy_cos_loss_nodup+torch.log(torch.cat(obj_greedy_cos_losses_nodup_en_D, 0))-torch.log(torch.cat(obj_greedy_cos_losses_nodup_en_A, 0))).mean()
-            avg_obj_greedy_cos_loss_nodup_hn = (avg_obj_greedy_cos_loss_nodup+torch.log(torch.cat(torch.exp(obj_greedy_cos_losses_nodup_hn), 0))-torch.log(torch.cat(obj_greedy_cos_losses_nodup_en_A, 0))).mean()
-            avg_obj_greedy_cos_loss_nodup_norm = (avg_obj_greedy_cos_loss_nodup+torch.log(torch.cat(obj_greedy_cos_losses_nodup_en_D, 0)+torch.cat(torch.exp(obj_greedy_cos_losses_nodup_hn), 0))-torch.log(torch.cat(obj_greedy_cos_losses_nodup_en_A, 0))).mean()
+            avg_obj_greedy_cos_loss_nodup_en = torch.abs(avg_obj_greedy_cos_loss_nodup+torch.log(torch.cat(obj_greedy_cos_losses_nodup_en_D, 0))-torch.log(torch.cat(obj_greedy_cos_losses_nodup_en_A, 0))).mean()
+            avg_obj_greedy_cos_loss_nodup_hn = torch.abs(avg_obj_greedy_cos_loss_nodup+torch.log(torch.exp(-torch.cat(obj_greedy_cos_losses_nodup_hn, 0))-torch.log(torch.cat(obj_greedy_cos_losses_nodup_en_A, 0)))).mean()
+            avg_obj_greedy_cos_loss_nodup_norm = torch.abs(avg_obj_greedy_cos_loss_nodup+torch.log(torch.cat(obj_greedy_cos_losses_nodup_en_D, 0)+torch.exp(-torch.cat(obj_greedy_cos_losses_nodup_hn, 0))-torch.log(torch.cat(obj_greedy_cos_losses_nodup_en_A, 0)))).mean()
             std_obj_greedy_cos_loss_nodup = avg_obj_greedy_cos_loss_nodup.std()/(math.sqrt(avg_obj_greedy_cos_loss_nodup.shape[0]))
             avg_obj_greedy_cos_loss_nodup = avg_obj_greedy_cos_loss_nodup.mean()
             avg_obj_greedy_cos_loss_norm_hn = avg_obj_greedy_cos_loss_nodup/torch.cat(obj_greedy_cos_losses_nodup_hn, 0).mean()
 
-            avg_attr_greedy_cos_loss_nodup = torch.cat(attr_greedy_cos_losses_nodup, 0)
-            avg_attr_greedy_cos_loss_nodup_en = (torch.cat(attr_greedy_cos_losses_nodup_en, 0)-avg_attr_greedy_cos_loss_nodup).mean()
-            avg_attr_greedy_cos_loss_nodup_hn = (torch.cat(attr_greedy_cos_losses_nodup_hn, 0)-avg_attr_greedy_cos_loss_nodup).mean()
-            std_attr_greedy_cos_loss_nodup = avg_attr_greedy_cos_loss_nodup.std()/(math.sqrt(avg_attr_greedy_cos_loss_nodup.shape[0]))
-            avg_attr_greedy_cos_loss_nodup = avg_attr_greedy_cos_loss_nodup.mean()
+            # avg_attr_greedy_cos_loss_nodup = torch.cat(attr_greedy_cos_losses_nodup, 0)
+            # avg_attr_greedy_cos_loss_nodup_en = (torch.cat(attr_greedy_cos_losses_nodup_en, 0)-avg_attr_greedy_cos_loss_nodup).mean()
+            # avg_attr_greedy_cos_loss_nodup_hn = (torch.cat(attr_greedy_cos_losses_nodup_hn, 0)-avg_attr_greedy_cos_loss_nodup).mean()
+            # std_attr_greedy_cos_loss_nodup = avg_attr_greedy_cos_loss_nodup.std()/(math.sqrt(avg_attr_greedy_cos_loss_nodup.shape[0]))
+            # avg_attr_greedy_cos_loss_nodup = avg_attr_greedy_cos_loss_nodup.mean()
 
             avg_obj_pd_greedy_cos_loss = torch.cat(obj_pd_greedy_cos_losses, 0)
             avg_obj_pd_greedy_cos_loss_en = (torch.cat(obj_pd_greedy_cos_losses_en, 0)-avg_obj_pd_greedy_cos_loss).mean()
             avg_obj_pd_greedy_cos_loss_hn = (torch.cat(obj_pd_greedy_cos_losses_hn, 0)-avg_obj_pd_greedy_cos_loss).mean()
             std_obj_pd_greedy_cos_loss = avg_obj_pd_greedy_cos_loss.std()/(math.sqrt(avg_obj_pd_greedy_cos_loss.shape[0]))
             avg_obj_pd_greedy_cos_loss = avg_obj_pd_greedy_cos_loss.mean()
-            avg_attr_pd_greedy_cos_loss = torch.cat(attr_pd_greedy_cos_losses, 0)
-            avg_attr_pd_greedy_cos_loss_en = (torch.cat(attr_pd_greedy_cos_losses_en, 0)-avg_attr_pd_greedy_cos_loss).mean()
-            avg_attr_pd_greedy_cos_loss_hn = (torch.cat(attr_pd_greedy_cos_losses_hn, 0)-avg_attr_pd_greedy_cos_loss).mean()
-            std_attr_pd_greedy_cos_loss = avg_attr_pd_greedy_cos_loss.std()/(math.sqrt(avg_attr_pd_greedy_cos_loss.shape[0]))
-            avg_attr_pd_greedy_cos_loss = avg_attr_pd_greedy_cos_loss.mean()
+            # avg_attr_pd_greedy_cos_loss = torch.cat(attr_pd_greedy_cos_losses, 0)
+            # avg_attr_pd_greedy_cos_loss_en = (torch.cat(attr_pd_greedy_cos_losses_en, 0)-avg_attr_pd_greedy_cos_loss).mean()
+            # avg_attr_pd_greedy_cos_loss_hn = (torch.cat(attr_pd_greedy_cos_losses_hn, 0)-avg_attr_pd_greedy_cos_loss).mean()
+            # std_attr_pd_greedy_cos_loss = avg_attr_pd_greedy_cos_loss.std()/(math.sqrt(avg_attr_pd_greedy_cos_loss.shape[0]))
+            # avg_attr_pd_greedy_cos_loss = avg_attr_pd_greedy_cos_loss.mean()
 
             avg_slot_norm = torch.cat(slot_norm, 0).mean()
 
             logs = {
                 # "avg_val_loss": avg_loss,
-                "avg_ari_mask": avg_ari_mask,
-                "corr_coef_disc": corr_coef_disc,
-                "corr_coef_pos": corr_coef_pos,
-                "corr_coef_size": corr_coef_size,
-                "corr_coef_material": corr_coef_material,
-                "corr_coef_shape": corr_coef_shape,
-                "corr_coef_color": corr_coef_color,
-                "corr_coef": corr_coef,
-                "corr_rank_disc": corr_rank_disc,
-                "corr_rank_pos": corr_rank_pos,
-                "corr_rank_size": corr_rank_size,
-                "corr_rank_material": corr_rank_material,
-                "corr_rank_shape": corr_rank_shape,
-                "corr_rank_color": corr_rank_color,
-                "corr_rank": corr_rank,
+                # "avg_ari_mask": avg_ari_mask,
+                # "corr_coef_disc": corr_coef_disc,
+                # "corr_coef_pos": corr_coef_pos,
+                # "corr_coef_size": corr_coef_size,
+                # "corr_coef_material": corr_coef_material,
+                # "corr_coef_shape": corr_coef_shape,
+                # "corr_coef_color": corr_coef_color,
+                # "corr_coef": corr_coef,
+                # "corr_rank_disc": corr_rank_disc,
+                # "corr_rank_pos": corr_rank_pos,
+                # "corr_rank_size": corr_rank_size,
+                # "corr_rank_material": corr_rank_material,
+                # "corr_rank_shape": corr_rank_shape,
+                # "corr_rank_color": corr_rank_color,
+                # "corr_rank": corr_rank,
                 "avg_slot_norm": avg_slot_norm,
-                "avg_obj_greedy_loss_norm": avg_obj_greedy_loss_norm,
                 "avg_obj_greedy_loss_norm_hn": avg_obj_greedy_loss_norm_hn,
                 "avg_obj_greedy_loss_nodup": avg_obj_greedy_loss_nodup,
-                "avg_attr_greedy_loss_nodup": avg_attr_greedy_loss_nodup,
+                # "avg_attr_greedy_loss_nodup": avg_attr_greedy_loss_nodup,
                 "avg_obj_pseudo_greedy_loss": avg_obj_pd_greedy_loss,
-                "avg_attr_pseudo_greedy_loss": avg_attr_pd_greedy_loss,
+                # "avg_attr_pseudo_greedy_loss": avg_attr_pd_greedy_loss,
                 "avg_obj_greedy_loss_nodup_en": avg_obj_greedy_loss_nodup_en,
-                "avg_attr_greedy_loss_nodup_en": avg_attr_greedy_loss_nodup_en,
+                # "avg_attr_greedy_loss_nodup_en": avg_attr_greedy_loss_nodup_en,
                 "avg_obj_pseudo_greedy_loss_en": avg_obj_pd_greedy_loss_en,
-                "avg_attr_pseudo_greedy_loss_en": avg_attr_pd_greedy_loss_en,
+                # "avg_attr_pseudo_greedy_loss_en": avg_attr_pd_greedy_loss_en,
                 "avg_obj_greedy_loss_nodup_hn": avg_obj_greedy_loss_nodup_hn,
-                "avg_attr_greedy_loss_nodup_hn": avg_attr_greedy_loss_nodup_hn,
+                # "avg_attr_greedy_loss_nodup_hn": avg_attr_greedy_loss_nodup_hn,
                 "avg_obj_pseudo_greedy_loss_hn": avg_obj_pd_greedy_loss_hn,
-                "avg_attr_pseudo_greedy_loss_hn": avg_attr_pd_greedy_loss_hn,
+                # "avg_attr_pseudo_greedy_loss_hn": avg_attr_pd_greedy_loss_hn,
                 "std_obj_greedy_loss_nodup": std_obj_greedy_loss_nodup,
-                "std_attr_greedy_loss_nodup": std_attr_greedy_loss_nodup,
+                "avg_obj_greedy_loss_nodup_norm": avg_obj_greedy_loss_nodup_norm,
+                # "std_attr_greedy_loss_nodup": std_attr_greedy_loss_nodup,
                 "std_obj_pseudo_greedy_loss": std_obj_pd_greedy_loss,
-                "std_attr_pseudo_greedy_loss": std_attr_pd_greedy_loss,
-                "avg_obj_greedy_cos_loss_norm": avg_obj_greedy_cos_loss_norm,
+                # "std_attr_pseudo_greedy_loss": std_attr_pd_greedy_loss,
                 "avg_obj_greedy_cos_loss_norm_hn": avg_obj_greedy_cos_loss_norm_hn,
                 "avg_obj_greedy_cos_loss_nodup": avg_obj_greedy_cos_loss_nodup,
-                "avg_attr_greedy_cos_loss_nodup": avg_attr_greedy_cos_loss_nodup,
+                # "avg_attr_greedy_cos_loss_nodup": avg_attr_greedy_cos_loss_nodup,
                 "avg_obj_pseudo_greedy_cos_loss": avg_obj_pd_greedy_cos_loss,
-                "avg_attr_pseudo_greedy_cos_loss": avg_attr_pd_greedy_cos_loss,
+                # "avg_attr_pseudo_greedy_cos_loss": avg_attr_pd_greedy_cos_loss,
                 "avg_obj_greedy_cos_loss_nodup_en": avg_obj_greedy_cos_loss_nodup_en,
-                "avg_attr_greedy_cos_loss_nodup_en": avg_attr_greedy_cos_loss_nodup_en,
+                # "avg_attr_greedy_cos_loss_nodup_en": avg_attr_greedy_cos_loss_nodup_en,
                 "avg_obj_pseudo_greedy_cos_loss_en": avg_obj_pd_greedy_cos_loss_en,
-                "avg_attr_pseudo_greedy_cos_loss_en": avg_attr_pd_greedy_cos_loss_en,
+                # "avg_attr_pseudo_greedy_cos_loss_en": avg_attr_pd_greedy_cos_loss_en,
                 "avg_obj_greedy_cos_loss_nodup_hn": avg_obj_greedy_cos_loss_nodup_hn,
-                "avg_attr_greedy_cos_loss_nodup_hn": avg_attr_greedy_cos_loss_nodup_hn,
+                # "avg_attr_greedy_cos_loss_nodup_hn": avg_attr_greedy_cos_loss_nodup_hn,
                 "avg_obj_pseudo_greedy_cos_loss_hn": avg_obj_pd_greedy_cos_loss_hn,
-                "avg_attr_pseudo_greedy_cos_loss_hn": avg_attr_pd_greedy_cos_loss_hn,
+                # "avg_attr_pseudo_greedy_cos_loss_hn": avg_attr_pd_greedy_cos_loss_hn,
                 "std_obj_greedy_cos_loss_nodup": std_obj_greedy_cos_loss_nodup,
-                "std_attr_greedy_cos_loss_nodup": std_attr_greedy_cos_loss_nodup,
+                "avg_obj_greedy_cos_loss_nodup_norm": avg_obj_greedy_cos_loss_nodup_norm,
+                # "std_attr_greedy_cos_loss_nodup": std_attr_greedy_cos_loss_nodup,
                 "std_obj_pseudo_greedy_cos_loss": std_obj_pd_greedy_cos_loss,
-                "std_attr_pseudo_greedy_cos_loss": std_attr_pd_greedy_cos_loss,
+                # "std_attr_pseudo_greedy_cos_loss": std_attr_pd_greedy_cos_loss,
             }
             if self.trainer.running_sanity_check:
                 self.trainer.running_sanity_check = False  # so that loggers don't skip logging
