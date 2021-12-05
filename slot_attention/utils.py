@@ -251,11 +251,12 @@ def compute_partition_loss(cat_slots, cat_indices, A_losses, D_losses, cos_sim=F
     batch_size, num_slots, slot_size = slots_A.shape
     if not cos_sim:
         slots_A_delta = slots_A.view(batch_size, 1, num_slots, slot_size) - slots_D.view(1, batch_size, num_slots, slot_size)
-        A_loss = torch.exp(-(torch.norm(slots_A_delta, 2, -1).sum(2))).sum(1)
+        A_loss = torch.exp(-(torch.norm(slots_A_delta, 2, -1).sum(2))).sum(1)+torch.exp(-torch.norm(slots_A-slots_B, 2, -1))
     else:
         unit_slots_A = slots_A.div(torch.norm(slots_A, 2, -1).unsqueeze(-1).repeat(1,1,slot_size)+0.0001).view(batch_size, 1, num_slots, slot_size)
+        unit_slots_B = slots_B.div(torch.norm(slots_B, 2, -1).unsqueeze(-1).repeat(1,1,slot_size)+0.0001).view(batch_size, 1, num_slots, slot_size)
         unit_slots_D = slots_D.div(torch.norm(slots_D, 2, -1).unsqueeze(-1).repeat(1,1,slot_size)+0.0001).view(1, batch_size, num_slots, slot_size)
-        A_loss = torch.exp(-torch.norm(unit_slots_A-unit_slots_D, 2, -1).sum(2)/2).sum(1)
+        A_loss = torch.exp(-torch.norm(unit_slots_A-unit_slots_D, 2, -1).sum(2)/2).sum(1)+torch.exp(-torch.norm(unit_slots_A-unit_slots_B, 2, -1))
     A_losses.append(A_loss)
     slots_D_prime = slots_A-slots_B+slots_C
     if not cos_sim:
