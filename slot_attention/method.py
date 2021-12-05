@@ -14,7 +14,7 @@ from slot_attention.utils import Tensor
 from slot_attention.utils import to_rgb_from_tensor, to_tensor_from_rgb
 from slot_attention.utils import compute_cos_distance, compute_rank_correlation
 from slot_attention.utils import batched_index_select
-from slot_attention.utils import compute_greedy_loss, compute_pseudo_greedy_loss, compute_aggregated_loss
+from slot_attention.utils import compute_greedy_loss, compute_partition_loss, compute_pseudo_greedy_loss, compute_aggregated_loss
 from slot_attention.utils import swap_bg_slot_back
 from slot_attention.utils import captioned_masked_recons
 from slot_attention.utils import split_and_interleave_stack
@@ -151,14 +151,14 @@ class SlotAttentionMethod(pl.LightningModule):
         adl = self.datamodule.attr_test_dataloader()
 
         obj_greedy_losses_nodup, attr_greedy_losses_nodup = [], []
-        obj_greedy_losses_nodup_en, attr_greedy_losses_nodup_en = [], []
+        obj_greedy_losses_nodup_en_A, obj_greedy_losses_nodup_en_D, attr_greedy_losses_nodup_en = [], [], []
         obj_greedy_losses_nodup_hn, attr_greedy_losses_nodup_hn = [], []
         obj_pd_greedy_losses, attr_pd_greedy_losses = [], []
         obj_pd_greedy_losses_en, attr_pd_greedy_losses_en = [], []
         obj_pd_greedy_losses_hn, attr_pd_greedy_losses_hn = [], []
 
         obj_greedy_cos_losses_nodup, attr_greedy_cos_losses_nodup = [], []
-        obj_greedy_cos_losses_nodup_en, attr_greedy_cos_losses_nodup_en = [], []
+        obj_greedy_cos_losses_nodup_en_A, obj_greedy_cos_losses_nodup_en_D, attr_greedy_cos_losses_nodup_en = [], []
         obj_greedy_cos_losses_nodup_hn, attr_greedy_cos_losses_nodup_hn = [], []
         obj_pd_greedy_cos_losses, attr_pd_greedy_cos_losses = [], []
         obj_pd_greedy_cos_losses_en, attr_pd_greedy_cos_losses_en = [], []
@@ -171,8 +171,8 @@ class SlotAttentionMethod(pl.LightningModule):
         # if self.params.gpus > 0:
             # batch_rand_perm = batch_rand_perm.to(self.device)
 
-        def compute_test_losses(dataloader, pseudo_losses, pseudo_losses_en, pseudo_losses_hn, losses_nodup, losses_nodup_en, losses_nodup_hn,
-                pseudo_cos_losses, pseudo_cos_losses_en, pseudo_cos_losses_hn, cos_losses_nodup, cos_losses_nodup_en, cos_losses_nodup_hn, dup_threshold=None):
+        def compute_test_losses(dataloader, pseudo_losses, pseudo_losses_en, pseudo_losses_hn, losses_nodup, losses_nodup_en_A, losses_nodup_en_D,  losses_nodup_hn,
+                pseudo_cos_losses, pseudo_cos_losses_en, pseudo_cos_losses_hn, cos_losses_nodup, cos_losses_nodup_en_A, cos_losses_nodup_en_D, cos_losses_nodup_hn, dup_threshold=None):
             b_prev = datetime.now()
             for batch in dataloader:
                 print("load data:", datetime.now()-b_prev)
@@ -194,16 +194,16 @@ class SlotAttentionMethod(pl.LightningModule):
                     cat_batch_hn = cat_batch_hn.to(self.device)
                 cat_slots_hn, cat_attns_hn, cat_slots_nodup_hn = self.model.forward(cat_batch_hn, slots_only=True, dup_threshold=dup_threshold)
 
-                compute_greedy_loss(cat_slots_nodup, losses_nodup)
-                compute_greedy_loss(cat_slots_nodup, losses_nodup_en, easy_neg=True)
+                cat_indices = compute_greedy_loss(cat_slots_nodup, losses_nodup)
+                compute_partition_loss(cat_slots_nodup, cat_indices, losses_nodup_en_A, losses_nodup_en_D)
                 compute_greedy_loss(cat_slots_nodup_hn, losses_nodup_hn)
 
                 compute_pseudo_greedy_loss(cat_slots, pseudo_losses)
                 compute_pseudo_greedy_loss(cat_slots, pseudo_losses_en, easy_neg=True)
                 compute_pseudo_greedy_loss(cat_slots_hn, pseudo_losses_hn)
 
-                compute_greedy_loss(cat_slots_nodup, cos_losses_nodup, cos_sim=True)
-                compute_greedy_loss(cat_slots_nodup, cos_losses_nodup_en, easy_neg=True, cos_sim=True)
+                cat_indices = compute_greedy_loss(cat_slots_nodup, cos_losses_nodup, cos_sim=True)
+                compute_partition_loss(cat_slots_nodup, cat_indices, cos_losses_nodup_en_A, cos_losses_nodup_en_D, cos_sim=True)
                 compute_greedy_loss(cat_slots_nodup_hn, cos_losses_nodup_hn, cos_sim=True)
 
                 compute_pseudo_greedy_loss(cat_slots, pseudo_cos_losses, cos_sim=True)
@@ -229,18 +229,17 @@ class SlotAttentionMethod(pl.LightningModule):
                 b_prev = datetime.now()
 
         with torch.no_grad():
-            compute_test_losses(odl, obj_pd_greedy_losses, obj_pd_greedy_losses_en, obj_pd_greedy_losses_hn, obj_greedy_losses_nodup, obj_greedy_losses_nodup_en, obj_greedy_losses_nodup_hn,
-                obj_pd_greedy_cos_losses, obj_pd_greedy_cos_losses_en, obj_pd_greedy_cos_losses_hn, obj_greedy_cos_losses_nodup, obj_greedy_cos_losses_nodup_en, obj_greedy_cos_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
+            compute_test_losses(odl, obj_pd_greedy_losses, obj_pd_greedy_losses_en, obj_pd_greedy_losses_hn, obj_greedy_losses_nodup, obj_greedy_losses_nodup_en_A, obj_greedy_losses_nodup_en_D, obj_greedy_losses_nodup_hn,
+                obj_pd_greedy_cos_losses, obj_pd_greedy_cos_losses_en, obj_pd_greedy_cos_losses_hn, obj_greedy_cos_losses_nodup, obj_greedy_cos_losses_nodup_en_A, obj_greedy_cos_losses_nodup_en_D, obj_greedy_cos_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
             compute_test_losses(adl, attr_pd_greedy_losses, attr_pd_greedy_losses_en, attr_pd_greedy_losses_hn, attr_greedy_losses_nodup, attr_greedy_losses_nodup_en, attr_greedy_losses_nodup_hn,
                 attr_pd_greedy_cos_losses, attr_pd_greedy_cos_losses_en, attr_pd_greedy_cos_losses_hn, attr_greedy_cos_losses_nodup, attr_greedy_cos_losses_nodup_en, attr_greedy_cos_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
 
             avg_obj_greedy_loss_nodup = torch.cat(obj_greedy_losses_nodup, 0)
-            avg_obj_greedy_loss_nodup_en = torch.div(avg_obj_greedy_loss_nodup, torch.cat(obj_greedy_losses_nodup_en, 0)+0.00001).mean()
-            avg_obj_greedy_loss_nodup_hn = torch.div(avg_obj_greedy_loss_nodup, torch.cat(obj_greedy_losses_nodup_hn, 0)+0.00001).mean()
-            avg_obj_greedy_loss_norm = torch.div(avg_obj_greedy_loss_nodup, torch.cat(slot_norm, 0)+0.00001).mean()
+            avg_obj_greedy_loss_nodup_en = (avg_obj_greedy_loss_nodup+torch.log(torch.cat(obj_greedy_losses_nodup_en_D, 0))-torch.log(torch.cat(obj_greedy_losses_nodup_en_A, 0))).mean()
+            avg_obj_greedy_loss_nodup_hn = (avg_obj_greedy_loss_nodup+torch.log(torch.cat(torch.exp(obj_greedy_losses_nodup_hn), 0))-torch.log(torch.cat(obj_greedy_losses_nodup_en_A, 0))).mean()
+            avg_obj_greedy_loss_nodup_norm = (avg_obj_greedy_loss_nodup+torch.log(torch.cat(obj_greedy_losses_nodup_en_D, 0)+torch.cat(torch.exp(obj_greedy_losses_nodup_hn), 0))-torch.log(torch.cat(obj_greedy_losses_nodup_en_A, 0))).mean()
             std_obj_greedy_loss_nodup = avg_obj_greedy_loss_nodup.std()/math.sqrt(avg_obj_greedy_loss_nodup.shape[0])
             avg_obj_greedy_loss_nodup = avg_obj_greedy_loss_nodup.mean()
-            avg_obj_greedy_loss_norm_en = avg_obj_greedy_loss_nodup/torch.cat(obj_greedy_losses_nodup_en, 0).mean()
             avg_obj_greedy_loss_norm_hn = avg_obj_greedy_loss_nodup/torch.cat(obj_greedy_losses_nodup_hn, 0).mean()
 
             avg_attr_greedy_loss_nodup = torch.cat(attr_greedy_losses_nodup, 0)
@@ -261,11 +260,13 @@ class SlotAttentionMethod(pl.LightningModule):
             avg_attr_pd_greedy_loss = avg_attr_pd_greedy_loss.mean()
 
             avg_obj_greedy_cos_loss_nodup = torch.cat(obj_greedy_cos_losses_nodup, 0)
-            avg_obj_greedy_cos_loss_nodup_en = (torch.cat(obj_greedy_cos_losses_nodup_en, 0)-avg_obj_greedy_cos_loss_nodup).mean()
-            avg_obj_greedy_cos_loss_nodup_hn = (torch.cat(obj_greedy_cos_losses_nodup_hn, 0)-avg_obj_greedy_cos_loss_nodup).mean()
+            avg_obj_greedy_cos_loss_nodup_en = (avg_obj_greedy_cos_loss_nodup+torch.log(torch.cat(obj_greedy_cos_losses_nodup_en_D, 0))-torch.log(torch.cat(obj_greedy_cos_losses_nodup_en_A, 0))).mean()
+            avg_obj_greedy_cos_loss_nodup_hn = (avg_obj_greedy_cos_loss_nodup+torch.log(torch.cat(torch.exp(obj_greedy_cos_losses_nodup_hn), 0))-torch.log(torch.cat(obj_greedy_cos_losses_nodup_en_A, 0))).mean()
+            avg_obj_greedy_cos_loss_nodup_norm = (avg_obj_greedy_cos_loss_nodup+torch.log(torch.cat(obj_greedy_cos_losses_nodup_en_D, 0)+torch.cat(torch.exp(obj_greedy_cos_losses_nodup_hn), 0))-torch.log(torch.cat(obj_greedy_cos_losses_nodup_en_A, 0))).mean()
             std_obj_greedy_cos_loss_nodup = avg_obj_greedy_cos_loss_nodup.std()/(math.sqrt(avg_obj_greedy_cos_loss_nodup.shape[0]))
             avg_obj_greedy_cos_loss_nodup = avg_obj_greedy_cos_loss_nodup.mean()
-            # avg_attr_aggr_loss_nodup = torch.cat(attr_aggr_losses_nodup, 0).mean()
+            avg_obj_greedy_cos_loss_norm_hn = avg_obj_greedy_cos_loss_nodup/torch.cat(obj_greedy_cos_losses_nodup_hn, 0).mean()
+
             avg_attr_greedy_cos_loss_nodup = torch.cat(attr_greedy_cos_losses_nodup, 0)
             avg_attr_greedy_cos_loss_nodup_en = (torch.cat(attr_greedy_cos_losses_nodup_en, 0)-avg_attr_greedy_cos_loss_nodup).mean()
             avg_attr_greedy_cos_loss_nodup_hn = (torch.cat(attr_greedy_cos_losses_nodup_hn, 0)-avg_attr_greedy_cos_loss_nodup).mean()
@@ -304,7 +305,6 @@ class SlotAttentionMethod(pl.LightningModule):
                 "corr_rank": corr_rank,
                 "avg_slot_norm": avg_slot_norm,
                 "avg_obj_greedy_loss_norm": avg_obj_greedy_loss_norm,
-                "avg_obj_greedy_loss_norm_en": avg_obj_greedy_loss_norm_en,
                 "avg_obj_greedy_loss_norm_hn": avg_obj_greedy_loss_norm_hn,
                 "avg_obj_greedy_loss_nodup": avg_obj_greedy_loss_nodup,
                 "avg_attr_greedy_loss_nodup": avg_attr_greedy_loss_nodup,
@@ -322,6 +322,8 @@ class SlotAttentionMethod(pl.LightningModule):
                 "std_attr_greedy_loss_nodup": std_attr_greedy_loss_nodup,
                 "std_obj_pseudo_greedy_loss": std_obj_pd_greedy_loss,
                 "std_attr_pseudo_greedy_loss": std_attr_pd_greedy_loss,
+                "avg_obj_greedy_cos_loss_norm": avg_obj_greedy_cos_loss_norm,
+                "avg_obj_greedy_cos_loss_norm_hn": avg_obj_greedy_cos_loss_norm_hn,
                 "avg_obj_greedy_cos_loss_nodup": avg_obj_greedy_cos_loss_nodup,
                 "avg_attr_greedy_cos_loss_nodup": avg_attr_greedy_cos_loss_nodup,
                 "avg_obj_pseudo_greedy_cos_loss": avg_obj_pd_greedy_cos_loss,
