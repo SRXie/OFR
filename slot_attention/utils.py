@@ -270,6 +270,7 @@ def compute_partition_loss(cat_slots, cat_indices, A_losses, D_losses, cos_sim=F
 def bipartite_greedy_loss(cat_slots, cat_indices, slots_E, slots_F, losses_AE, losses_DF, cos_sim=False):
     cat_slots_sorted = batched_index_select(cat_slots, 1, cat_indices)
     slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
+    slots_D_prime = slots_A-slots_B+slots_C
     batch_size, num_slots, slot_size = slots_A.shape
     # greedy assignment without multi-assignment
     greedy_loss_AE = torch.zeros(batch_size).to(cat_slots.device)
@@ -277,8 +278,10 @@ def bipartite_greedy_loss(cat_slots, cat_indices, slots_E, slots_F, losses_AE, l
     cat_indices_holder = torch.arange(0, num_slots, dtype=int).unsqueeze(0).repeat(4*batch_size, 1).to(cat_slots.device)
 
     for i in range(num_slots):
-        ext_AD = torch.cat([slots_A, slots_D], 0).view(2*batch_size, num_slots-i, 1, slot_size).expand(-1, -1, num_slots-i, -1)
-        ext_EF = torch.cat([slots_E, slots_F], 0).view(2*batch_size, 1, num_slots-i, slot_size).expand(-1, num_slots-i, -1, -1)
+        slots_AD = torch.cat([slots_A, slots_D_prime], 0)
+        slots_EF = torch.cat([slots_E, slots_F], 0)
+        ext_AD = slots_AD.view(2*batch_size, num_slots-i, 1, slot_size).expand(-1, -1, num_slots-i, -1)
+        ext_EF = slots_EF.view(2*batch_size, 1, num_slots-i, slot_size).expand(-1, num_slots-i, -1, -1)
 
         if not cos_sim:
             greedy_criterion = torch.norm(ext_AD-ext_EF, 2, -1)
@@ -313,7 +316,7 @@ def bipartite_greedy_loss(cat_slots, cat_indices, slots_E, slots_F, losses_AE, l
         cat_indices_holder[:, num_slots-i-1] = tmp
         replace = replace.unsqueeze(-1).repeat(1, 1, slot_size)
         slots_cat = torch.where(replace, slots_cat[:,-1,:].unsqueeze(1).repeat(1, num_slots-i, 1), slots_cat)[:,:-1,:]
-        slots_A, slots_D, slots_E, slots_F = torch.split(slots_cat, batch_size, 0)
+        slots_A, slots_D_prime, slots_E, slots_F = torch.split(slots_cat, batch_size, 0)
 
     losses_AE.append(greedy_loss_AE)
     losses_DF.append(greedy_loss_DF)
