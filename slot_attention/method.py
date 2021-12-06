@@ -257,7 +257,7 @@ class SlotAttentionMethod(pl.LightningModule):
                                                 -torch.log(obj_greedy_losses_nodup_hn_A+obj_greedy_losses_nodup_en_A)).mean()
             std_obj_greedy_loss_nodup = avg_obj_greedy_loss_nodup.std()/math.sqrt(avg_obj_greedy_loss_nodup.shape[0])
             avg_obj_greedy_loss_nodup = avg_obj_greedy_loss_nodup.mean()
-            avg_obj_greedy_loss_norm_hn = avg_obj_greedy_loss_nodup-obj_greedy_losses_nodup_hn_D.mean()
+            avg_obj_greedy_loss_norm_hn = avg_obj_greedy_loss_nodup+torch.log(obj_greedy_losses_nodup_hn_D).mean()
 
             # avg_attr_greedy_loss_nodup = torch.cat(attr_greedy_losses_nodup, 0)
             # avg_attr_greedy_loss_nodup_en = (torch.cat(attr_greedy_losses_nodup_en, 0)-avg_attr_greedy_loss_nodup).mean()
@@ -287,7 +287,7 @@ class SlotAttentionMethod(pl.LightningModule):
                                                 -torch.log(obj_greedy_cos_losses_nodup_hn_A+obj_greedy_cos_losses_nodup_en_A)).mean()
             std_obj_greedy_cos_loss_nodup = avg_obj_greedy_cos_loss_nodup.std()/(math.sqrt(avg_obj_greedy_cos_loss_nodup.shape[0]))
             avg_obj_greedy_cos_loss_nodup = avg_obj_greedy_cos_loss_nodup.mean()
-            avg_obj_greedy_cos_loss_norm_hn = avg_obj_greedy_cos_loss_nodup-obj_greedy_cos_losses_nodup_hn_D.mean()
+            avg_obj_greedy_cos_loss_norm_hn = avg_obj_greedy_cos_loss_nodup+torch.log(obj_greedy_cos_losses_nodup_hn_D).mean()
 
             # avg_attr_greedy_cos_loss_nodup = torch.cat(attr_greedy_cos_losses_nodup, 0)
             # avg_attr_greedy_cos_loss_nodup_en = (torch.cat(attr_greedy_cos_losses_nodup_en, 0)-avg_attr_greedy_cos_loss_nodup).mean()
