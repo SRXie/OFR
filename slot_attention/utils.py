@@ -267,6 +267,56 @@ def compute_partition_loss(cat_slots, cat_indices, A_losses, D_losses, cos_sim=F
         D_loss = (torch.norm(unit_slots_D_prime.view(batch_size, 1, num_slots, slot_size) - unit_slots_D.view(1, batch_size, num_slots, slot_size), 2, -1).sum(1)/2).mean(1)
     D_losses.append(D_loss)
 
+def bipartite_greedy_loss(cat_slots, cat_indices, slots_E, slots_F, losses_AE, losses_DF, cos_sim=False):
+    cat_slots_sorted = batched_index_select(cat_slots, 1, cat_indices)
+    slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
+    batch_size, num_slots, slot_size = slots_A.shape
+    # greedy assignment without multi-assignment
+    greedy_loss_AE = torch.zeros(batch_size).to(cat_slots.device)
+    greedy_loss_DF = torch.zeros(batch_size).to(cat_slots.device)
+    cat_indices_holder = torch.arange(0, num_slots, dtype=int).unsqueeze(0).repeat(4*batch_size, 1).to(cat_slots.device)
+
+    for i in range(num_slots):
+        ext_AD = torch.cat([slots_A, slots_D], 0).view(2*batch_size, num_slots-i, 1, slot_size).expand(-1, -1, num_slots-i, -1)
+        ext_EF = torch.cat([slots_E, slots_F], 0).view(2*batch_size, 1, num_slots-i, slot_size).expand(-1, num_slots-i, -1, -1)
+
+        if not cos_sim:
+            greedy_criterion = torch.norm(ext_AD-ext_EF, 2, -1)
+            # norm_term = torch.stack([torch.norm(ext_A-ext_B, 2, -1), torch.norm(ext_A-ext_D, 2, -1), torch.norm(ext_C-ext_B, 2, -1), torch.norm(ext_C-ext_D, 2, -1)], dim=-1)
+            # norm_term = torch.max(norm_term, dim=-1)[0]
+            # greedy_criterion = greedy_criterion.div(norm_term+0.0001)
+        else:
+            unit_vector_a = (ext_AD).div(torch.norm(ext_AD, 2, -1).unsqueeze(-1).repeat(1,1,1,slot_size)+0.0001)
+            unit_vector_b = (ext_EF).div(torch.norm(ext_EF, 2, -1).unsqueeze(-1).repeat(1,1,1,slot_size)+0.0001)
+            greedy_criterion = torch.norm(unit_vector_a-unit_vector_b, 2, -1)/2
+
+        # backtrace for greedy matching (3 times)
+        greedy_criterion, indices_EF = greedy_criterion.min(-1)
+        greedy_criterion, indices_AD = greedy_criterion.min(-1)
+        greedy_criterion_AE, greedy_criterion_DF = torch.split(greedy_criterion, batch_size, 0)
+        greedy_loss_AE += greedy_criterion_AE
+        greedy_loss_DF += greedy_criterion_DF
+
+        index_AD = indices_AD.view(indices_AD.shape[0],1)
+        index_EF = batched_index_select(indices_EF, 1, index_AD)
+        index_EF = index_EF.view(index_EF.shape[0],1)
+
+        replace = torch.zeros(batch_size*4, num_slots-i, dtype=torch.bool)
+        replace = replace.to(cat_slots.device)
+        index_cat = torch.cat([index_AD, index_EF], dim=0)
+        slots_cat = torch.cat([slots_AD, slots_EF], dim=0)
+
+        replace = replace.scatter(1, index_cat, True)
+        # batched element swap
+        tmp = batched_index_select(cat_indices_holder, 1, index_cat.squeeze(1)).squeeze(1).clone()
+        cat_indices_holder[:, 0:num_slots-i-1] = torch.where(replace[:, 0:num_slots-i-1], cat_indices_holder[:, num_slots-i-1].unsqueeze(1).repeat(1, num_slots-i-1), cat_indices_holder[:, 0:num_slots-i-1])
+        cat_indices_holder[:, num_slots-i-1] = tmp
+        replace = replace.unsqueeze(-1).repeat(1, 1, slot_size)
+        slots_cat = torch.where(replace, slots_cat[:,-1,:].unsqueeze(1).repeat(1, num_slots-i, 1), slots_cat)[:,:-1,:]
+        slots_A, slots_D, slots_E, slots_F = torch.split(slots_cat, batch_size, 0)
+
+    losses_AE.append(greedy_loss_AE)
+    losses_DF.append(greedy_loss_DF)
 
 def compute_ari(table):
     """
