@@ -53,7 +53,7 @@ class _Workplace(object):
         )
 
         if os.path.exists(os.path.join(cfg.test_root, "obj_test", "CLEVR_test_cases.csv")):
-            with open(os.path.join(cfg.test_root, "obj_test", "CLEVR_test_cases.csv"), "r") as f:
+            with open(os.path.join(cfg.test_root, "obj_test", "CLEVR_test_cases_tmp.csv"), "r") as f:
                 csv_reader = reader(f)
                 self.obj_algebra_test_cases = list(csv_reader)
         else:
@@ -94,6 +94,8 @@ class _Workplace(object):
             attr_algebra_test_cases = self.attr_algebra_test_cases,
         )
 
+        if cfg.beta == 0.:
+            cfg.gamma =0.
         model = BetaTCVAE(
             latent_dim=cfg.latent_dim,
             decoder_type=cfg.decoder_type,
@@ -117,7 +119,7 @@ class _Workplace(object):
 
         self.method = BetaVAEMethod(model=model, datamodule=clevr_datamodule, params=cfg)
 
-        logger_name = "btc-vae/nll-"+cfg.decoder_type+"-beta-"+str(cfg.beta)+"-ldim-"+str(cfg.latent_dim)+ "-s-" + str(seed)#"-dup-"+str(cfg.dup_threshold)
+        logger_name = "btc-vae/nll2-"+cfg.decoder_type+"-beta-"+str(cfg.beta)+"-ldim-"+str(cfg.latent_dim)+ "-s-" + str(seed)#"-dup-"+str(cfg.dup_threshold)
         logger = pl_loggers.WandbLogger(project="objectness-test-clevr6", name=logger_name)
         # Use this line for Tensorboard logger
         # logger = pl_loggers.TensorBoardLogger("./logs/"+logger_name+strftime("-%Y%m%d%H%M%S", localtime()))

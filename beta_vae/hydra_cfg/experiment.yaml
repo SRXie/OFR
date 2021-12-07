@@ -9,9 +9,9 @@ test_batch_size: 128
 resolution: [64, 64] # Tuple[int, int]
 num_slots: 7
 latent_dim: 64
-decoder_type: sbd
+decoder_type: deconv
 alpha: 1.
-beta: 6.
+beta: 0.
 gamma: 1.
 anneal_steps: 10000
 data_mix_idx: 1
