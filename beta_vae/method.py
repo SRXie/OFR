@@ -13,7 +13,7 @@ from beta_vae.params import BetaVAEParams
 from beta_vae.utils import Tensor
 from beta_vae.utils import split_and_interleave_stack
 from beta_vae.utils import to_rgb_from_tensor, to_tensor_from_rgb
-from beta_vae.utils import compute_loss
+from beta_vae.utils import compute_loss, compute_partition_loss, compute_partition_loss_hard
 
 
 class BetaVAEMethod(pl.LightningModule):
@@ -91,10 +91,10 @@ class BetaVAEMethod(pl.LightningModule):
 
         z_norms = []
         obj_losses, attr_losses = [], []
-        obj_losses_en, attr_losses_en = [], []
-        obj_losses_hn, attr_losses_hn = [], []
+        obj_losses_en_A, obj_losses_en_D, attr_losses_en = [], []
+        obj_losses_hn_A, obj_losses_hn_D, attr_losses_hn = [], []
 
-        def compute_test_losses(dataloader, losses, losses_en, losses_hn):
+        def compute_test_losses(dataloader, losses, losses_en_A, losses_en_D, losses_hn_A, losses_hn_D):
             b_prev = datetime.now()
             for batch in dataloader:
                 print("load data:", datetime.now()-b_prev)
@@ -111,53 +111,58 @@ class BetaVAEMethod(pl.LightningModule):
                     znorm = torch.stack(torch.split(znorm, znorm.shape[0]//4, 0), 1).mean(1)
                     z_norms.append(znorm)
 
-                cat_batch_hn = torch.cat(batch[:3]+[batch[-1]], 0)
+                cat_batch_EF = torch.cat(batch[4:], 0)
                 if self.params.gpus > 0:
-                    cat_batch_hn = cat_batch_hn.to(self.device)
-                cat_zs_hn = self.model.encode(cat_batch_hn)[0]
+                    cat_batch_EF = cat_batch_EF.to(self.device)
+                cat_zs_EF = self.model.encode(cat_batch_EF)[0]
+                zs_E, zs_F = torch.split(cat_zs_EF, batch_size, 0)
 
                 compute_loss(cat_zs, losses)
-                compute_loss(cat_zs, losses_en, easy_neg=True)
-                compute_loss(cat_zs_hn, losses_hn)
+                compute_partition_loss(cat_zs, losses_en_A, losses_en_D)
+                compute_partition_loss_hard(cat_zs_hn, zs_E, zs_F, losses_hn_A, losses_hn_D)
 
                 print("batch time:", datetime.now()-b_prev)
                 b_prev = datetime.now()
 
         with torch.no_grad():
-            compute_test_losses(odl, obj_losses, obj_losses_en, obj_losses_hn)
-            compute_test_losses(adl, attr_losses, attr_losses_en, attr_losses_hn)
+            compute_test_losses(odl, obj_losses, obj_losses_en_A, obj_losses_en_D, obj_losses_hn_A, obj_losses_hn_D)
+            # compute_test_losses(adl, attr_losses, attr_losses_en, attr_losses_hn)
 
             avg_obj_loss = torch.cat(obj_losses, 0)
-            avg_obj_loss_en = torch.div(avg_obj_loss, torch.cat(obj_losses_en, 0)+0.00001).mean()
-            avg_obj_loss_hn = torch.div(avg_obj_loss, torch.cat(obj_losses_hn, 0)+0.00001).mean()
-            avg_obj_loss_z_norm = torch.div(avg_obj_loss, torch.cat(z_norms, 0)+0.00001).mean()
+            avg_obj_loss_en_A = torch.cat(obj_losses_en_A, 0)
+            avg_obj_loss_en_D = torch.cat(obj_losses_en_D, 0)
+            avg_obj_loss_hn_A = torch.cat(obj_losses_hn_A, 0)
+            avg_obj_loss_hn_D = torch.cat(obj_losses_hn_D, 0)
+            avg_obj_loss_en = (avg_obj_loss+torch.log(avg_obj_loss_en_D)-torch.log(avg_obj_loss_en_A)).mean()
+            avg_obj_loss_hn = (avg_obj_loss+torch.log(avg_obj_loss_hn_D)-torch.log(avg_obj_loss_hn_A)).mean()
+            avg_obj_loss_norm = (avg_obj_loss+torch.log(avg_obj_loss_en_D)+torch.log(avg_obj_loss_hn_D)-torch.log(avg_obj_loss_en_A)-torch.log(avg_obj_loss_hn_A)).mean()
             std_obj_loss = avg_obj_loss.std()/math.sqrt(avg_obj_loss.shape[0])
             avg_obj_loss = avg_obj_loss.mean()
-            avg_obj_loss_norm_en = avg_obj_loss/torch.cat(obj_losses_en, 0).mean()
-            avg_obj_loss_norm_hn = avg_obj_loss/torch.cat(obj_losses_hn, 0).mean()
+            avg_obj_loss_nll_en = avg_obj_loss/torch.cat(obj_losses_en, 0).mean()
+            avg_obj_loss_nll_hn = avg_obj_loss/torch.cat(obj_losses_hn, 0).mean()
 
-            avg_attr_loss = torch.cat(attr_losses, 0)
-            avg_attr_loss_en = (torch.cat(attr_losses_en, 0)-avg_attr_loss).mean()
-            avg_attr_loss_hn = (torch.cat(attr_losses_hn, 0)-avg_attr_loss).mean()
-            std_attr_loss = avg_attr_loss.std()/math.sqrt(avg_attr_loss.shape[0])
-            avg_attr_loss = avg_attr_loss.mean()
+            # avg_attr_loss = torch.cat(attr_losses, 0)
+            # avg_attr_loss_en = (torch.cat(attr_losses_en, 0)-avg_attr_loss).mean()
+            # avg_attr_loss_hn = (torch.cat(attr_losses_hn, 0)-avg_attr_loss).mean()
+            # std_attr_loss = avg_attr_loss.std()/math.sqrt(avg_attr_loss.shape[0])
+            # avg_attr_loss = avg_attr_loss.mean()
 
             avg_z_norm = torch.cat(z_norms).mean()
-            
+
             logs = {
                 "avg_z_norms": avg_z_norm,
                 "avg_val_loss": avg_loss,
                 "avg_obj_loss": avg_obj_loss,
-                "avg_attr_loss": avg_attr_loss,
-                "avg_obj_loss_z_norm": avg_obj_loss_z_norm,
-                "avg_obj_loss_norm_en": avg_obj_loss_norm_en,
-                "avg_obj_loss_norm_hn":avg_obj_loss_norm_hn,
+                # "avg_attr_loss": avg_attr_loss,
+                "avg_obj_loss_norm": avg_obj_loss_norm,
+                "avg_obj_loss_nll_en": avg_obj_loss_norm_en,
+                "avg_obj_loss_nll_hn":avg_obj_loss_norm_hn,
                 "avg_obj_loss_en": avg_obj_loss_en,
-                "avg_attr_loss_en": avg_attr_loss_en,
+                # "avg_attr_loss_en": avg_attr_loss_en,
                 "avg_obj_loss_hn": avg_obj_loss_hn,
-                "avg_attr_loss_hn": avg_attr_loss_hn,
+                # "avg_attr_loss_hn": avg_attr_loss_hn,
                 "std_obj_loss": std_obj_loss,
-                "std_attr_loss": std_attr_loss,
+                # "std_attr_loss": std_attr_loss,
             }
             if self.trainer.running_sanity_check:
                 self.trainer.running_sanity_check = False  # so that loggers don't skip logging

@@ -95,18 +95,40 @@ def split_and_interleave_stack(input, split_size):
     view_shape[0]*=4
     return torch.stack((x, y, z, w), dim=1).view(view_shape)
 
-def compute_loss(cat_zs, losses, easy_neg=False):
+def compute_loss(cat_zs, losses):
     zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
     batch_size, z_dim = zs_A.shape
-    if easy_neg:
-        zs_D = zs_D[torch.randperm(batch_size)]
 
-    # vector_a = (zs_A-zs_B).div(torch.norm(zs_A-zs_B, 2, -1).unsqueeze(-1)+0.0001)
-    # vector_b = (zs_D-zs_C).div(torch.norm(zs_D-zs_C, 2, -1).unsqueeze(-1)+0.0001)
-    # loss = torch.norm(vector_a-vector_b, 2, -1)/2
     loss = torch.norm(zs_A-zs_B+zs_C-zs_D, 2, -1)
-    norm_term = torch.stack([torch.norm(zs_A-zs_B, 2, -1), torch.norm(zs_C-zs_D, 2, -1)], dim=-1)
-    norm_term = torch.max(norm_term, dim=-1)[0]
-    # loss = loss.div(norm_term+0.0001)
 
     losses.append(loss)
+
+def compute_partition_loss(cat_zs, A_losses, D_losses):
+    zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
+    batch_size, z_dim = zs_A.shape
+
+    zs_A_delta = zs_A.view(batch_size, 1, z_dim) - zs_D.view(1, batch_size, z_dim)
+    A_loss = torch.exp(-torch.norm(zs_A_delta, 2, -1)).sum(1)
+
+    zs_D_prime = zs_A-zs_B+zs_C
+    zs_D_delta = zs_D_prime.view(batch_size, 1, z_dim) - zs_D.view(1, batch_size, z_dim)
+    D_loss = torch.exp(-torch.norm(zs_D_delta, 2, -1)).sum(1)
+
+    A_losses.append(A_loss)
+    D_losses.append(D_loss)
+
+def compute_partition_loss_hard(cat_zs, zs_E, zs_F, AE_losses, DF_losses):
+    zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
+    batch_size, z_dim = zs_A.shape
+    zs_D_prime = zs_A-zs_B+zs_C
+
+    zs_AD = torch.cat([zs_A, zs_D_prime], 0)
+    zs_EF = torch.cat([zs_E, zs_F_prime], 0)
+
+    zs_delta = zs_AD - zs_EF
+    loss = torch.exp(-torch.norm(zs_delta, 2, -1))
+
+    AE_loss, DF_loss = torch.split(loss, batch_size, 0)
+
+    AE_losses.append(AE_loss)
+    DF_losses.append(DF_loss)
