@@ -139,8 +139,8 @@ class BetaVAEMethod(pl.LightningModule):
             avg_obj_loss_norm = (obj_loss+obj_loss_en_D+obj_loss_hn_D-obj_loss_en_A-obj_loss_hn_A).mean()
             std_obj_loss = obj_loss.std()/math.sqrt(obj_loss.shape[0])
             avg_obj_loss = obj_loss.mean()
-            avg_obj_loss_nll_en = avg_obj_loss-obj_loss_en_D.mean()
-            avg_obj_loss_nll_hn = avg_obj_loss-obj_loss_hn_D.mean()
+            avg_obj_loss_nll_en = avg_obj_loss+obj_loss_en_D.mean()
+            avg_obj_loss_nll_hn = avg_obj_loss+obj_loss_hn_D.mean()
 
             # avg_attr_loss = torch.cat(attr_losses, 0)
             # avg_attr_loss_en = (torch.cat(attr_losses_en, 0)-avg_attr_loss).mean()
