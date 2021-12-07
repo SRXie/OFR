@@ -250,12 +250,12 @@ class SlotAttentionMethod(pl.LightningModule):
             obj_greedy_loss_nodup = torch.cat(obj_greedy_losses_nodup, 0)/(avg_slot_norm*self.model.num_slots)
             obj_greedy_losses_nodup_en_A = torch.cat([torch.log(torch.exp(x/(avg_slot_norm*self.model.num_slots)).sum(1)) for x in obj_greedy_losses_nodup_en_A], 0)
             obj_greedy_losses_nodup_en_D = torch.cat([torch.log(torch.exp(x/(avg_slot_norm*self.model.num_slots)).sum(1)) for x in obj_greedy_losses_nodup_en_D], 0)
-            obj_greedy_losses_nodup_hn_A = torch.cat(obj_greedy_losses_nodup_hn_A, 0) # this should be changed to log sum exp if there are more than one hard negatives
-            obj_greedy_losses_nodup_hn_D = torch.cat(obj_greedy_losses_nodup_hn_D, 0)
-            avg_obj_greedy_loss_nodup_en = (avg_obj_greedy_loss_nodup+obj_greedy_losses_nodup_en_D-obj_greedy_losses_nodup_en_A).mean()
-            avg_obj_greedy_loss_nodup_hn = (avg_obj_greedy_loss_nodup+obj_greedy_losses_nodup_hn_D-obj_greedy_losses_nodup_hn_A).mean()
-            avg_obj_greedy_loss_nodup_norm = (avg_obj_greedy_loss_nodup+obj_greedy_losses_nodup_hn_D+obj_greedy_losses_nodup_en_D \
-                                                -obj_greedy_losses_nodup_hn_A+obj_greedy_losses_nodup_en_A).mean()
+            obj_greedy_losses_nodup_hn_A = torch.cat([x/(avg_slot_norm*self.model.num_slots) for x in obj_greedy_losses_nodup_hn_A], 0) # this should be changed to log sum exp if there are more than one hard negatives
+            obj_greedy_losses_nodup_hn_D = torch.cat([x/(avg_slot_norm*self.model.num_slots) for x in obj_greedy_losses_nodup_hn_D], 0)
+            avg_obj_greedy_loss_nodup_en = (obj_greedy_loss_nodup+obj_greedy_losses_nodup_en_D-obj_greedy_losses_nodup_en_A).mean()
+            avg_obj_greedy_loss_nodup_hn = (obj_greedy_loss_nodup+obj_greedy_losses_nodup_hn_D-obj_greedy_losses_nodup_hn_A).mean()
+            avg_obj_greedy_loss_nodup_norm = (obj_greedy_loss_nodup+obj_greedy_losses_nodup_hn_D+obj_greedy_losses_nodup_en_D \
+                                                -obj_greedy_losses_nodup_hn_A-obj_greedy_losses_nodup_en_A).mean()
             std_obj_greedy_loss_nodup = obj_greedy_loss_nodup.std()/math.sqrt(obj_greedy_loss_nodup.shape[0])
             avg_obj_greedy_loss_nodup = obj_greedy_loss_nodup.mean()
             avg_obj_greedy_loss_norm_hn = avg_obj_greedy_loss_nodup+obj_greedy_losses_nodup_hn_D.mean()
