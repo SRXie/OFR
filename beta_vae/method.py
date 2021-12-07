@@ -134,11 +134,14 @@ class BetaVAEMethod(pl.LightningModule):
             obj_loss_en_D = torch.cat([torch.log(torch.exp(x/avg_z_norm).sum(1)) for x in obj_losses_en_D], 0)
             obj_loss_hn_A = torch.cat([torch.log(torch.exp(x/avg_z_norm)) for x in obj_losses_hn_A], 0)
             obj_loss_hn_D = torch.cat([torch.log(torch.exp(x/avg_z_norm)) for x in obj_losses_hn_D], 0)
+            obj_loss_A = torch.cat([torch.log(torch.exp(x/avg_z_norm).sum(1))+y for x, y in obj_losses_en_A, obj_losses_hn_A], 0)
+            obj_loss_D = torch.cat([torch.log(torch.exp(x/avg_z_norm).sum(1))+y for x, y in obj_losses_en_D, obj_losses_hn_D], 0)
             avg_obj_loss_en = (obj_loss+obj_loss_en_D-obj_loss_en_A).mean()
             avg_obj_loss_hn = (obj_loss+obj_loss_hn_D-obj_loss_hn_A).mean()
-            avg_obj_loss_norm = (obj_loss+obj_loss_en_D+obj_loss_hn_D-obj_loss_en_A-obj_loss_hn_A).mean()
+            avg_obj_loss_norm = (obj_loss+obj_loss_D-obj_loss_A).mean()
             std_obj_loss = obj_loss.std()/math.sqrt(obj_loss.shape[0])
             avg_obj_loss = obj_loss.mean()
+            avg_obj_loss_nll = avg_obj_loss+obj_loss_D.mean()
             avg_obj_loss_nll_en = avg_obj_loss+obj_loss_en_D.mean()
             avg_obj_loss_nll_hn = avg_obj_loss+obj_loss_hn_D.mean()
 
@@ -154,6 +157,7 @@ class BetaVAEMethod(pl.LightningModule):
                 "avg_obj_loss": avg_obj_loss,
                 # "avg_attr_loss": avg_attr_loss,
                 "avg_obj_loss_norm": avg_obj_loss_norm,
+                "avg_obj_loss_nll": avg_obj_loss_nll,
                 "avg_obj_loss_nll_en": avg_obj_loss_nll_en,
                 "avg_obj_loss_nll_hn":avg_obj_loss_nll_hn,
                 "avg_obj_loss_en": avg_obj_loss_en,
