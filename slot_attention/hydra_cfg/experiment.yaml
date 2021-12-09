@@ -15,7 +15,7 @@ data_root:  /checkpoint/siruixie/clevr_corr/ #/datasets01/CLEVR_v1.0/060817/imag
 val_root: /checkpoint/siruixie/clevr_with_masks/
 test_root: /checkpoint/siruixie/clevr_obj_test/output/
 gpus: 2
-max_epochs: 500
+max_epochs: 100 #500
 num_sanity_val_steps: 1
 scheduler_gamma: 0.5
 weight_decay: 0.0

@@ -108,11 +108,11 @@ def compute_partition_loss(cat_zs, A_losses, D_losses):
     batch_size, z_dim = zs_A.shape
 
     zs_A_delta = zs_A.view(batch_size, 1, z_dim) - zs_D.view(1, batch_size, z_dim)
-    A_loss = torch.norm(zs_A_delta, 2, -1)
+    A_loss = torch.norm(zs_A_delta, 2, -1).mean(1)
 
     zs_D_prime = zs_A-zs_B+zs_C
     zs_D_delta = zs_D_prime.view(batch_size, 1, z_dim) - zs_D.view(1, batch_size, z_dim)
-    D_loss = torch.norm(zs_D_delta, 2, -1)
+    D_loss = torch.norm(zs_D_delta, 2, -1).mean(1)
 
     A_losses.append(A_loss)
     D_losses.append(D_loss)

@@ -130,20 +130,20 @@ class BetaVAEMethod(pl.LightningModule):
 
             avg_z_norm = torch.cat(z_norms).mean()
             obj_loss = torch.cat(obj_losses, 0)/avg_z_norm
-            obj_loss_en_A = torch.cat(obj_losses_en_A, 0).mean(1)/avg_z_norm
-            obj_loss_en_D = torch.cat(obj_losses_en_D, 0).mean(1)/avg_z_norm
+            obj_loss_en_A = torch.cat(obj_losses_en_A, 0)/avg_z_norm
+            obj_loss_en_D = torch.cat(obj_losses_en_D, 0)/avg_z_norm
             obj_loss_hn_A = torch.cat(obj_losses_hn_A, 0)/avg_z_norm
             obj_loss_hn_D = torch.cat(obj_losses_hn_D, 0)/avg_z_norm
             obj_loss_A = 0.9*obj_loss_en_A+0.1*obj_loss_hn_A
             obj_loss_D = 0.9*obj_loss_en_D+0.1*obj_loss_hn_D
-            avg_obj_loss_en = (obj_loss-obj_loss_en_D+obj_loss_en_A).mean()
-            avg_obj_loss_hn = (obj_loss-obj_loss_hn_D+obj_loss_hn_A).mean()
-            avg_obj_loss_norm = (obj_loss-obj_loss_D+obj_loss_A).mean()
+            avg_obj_gap_en = (obj_loss-obj_loss_en_D+obj_loss_en_A).mean()
+            avg_obj_gap_hn = (obj_loss-obj_loss_hn_D+obj_loss_hn_A).mean()
+            avg_obj_gap = (obj_loss-obj_loss_D+obj_loss_A).mean()
             std_obj_loss = obj_loss.std()/math.sqrt(obj_loss.shape[0])
             avg_obj_loss = obj_loss.mean()
-            avg_obj_loss_nll = avg_obj_loss-obj_loss_D.mean()
-            avg_obj_loss_nll_en = avg_obj_loss-obj_loss_en_D.mean()
-            avg_obj_loss_nll_hn = avg_obj_loss-obj_loss_hn_D.mean()
+            avg_obj_ctrast = avg_obj_loss-obj_loss_D.mean()
+            avg_obj_ctrast_en = avg_obj_loss-obj_loss_en_D.mean()
+            avg_obj_ctrast_hn = avg_obj_loss-obj_loss_hn_D.mean()
 
             # avg_attr_loss = torch.cat(attr_losses, 0)
             # avg_attr_loss_en = (torch.cat(attr_losses_en, 0)-avg_attr_loss).mean()
@@ -156,13 +156,13 @@ class BetaVAEMethod(pl.LightningModule):
                 "avg_val_loss": avg_loss,
                 "avg_obj_loss": avg_obj_loss,
                 # "avg_attr_loss": avg_attr_loss,
-                "avg_obj_loss_norm": avg_obj_loss_norm,
-                "avg_obj_loss_nll": avg_obj_loss_nll,
-                "avg_obj_loss_nll_en": avg_obj_loss_nll_en,
-                "avg_obj_loss_nll_hn":avg_obj_loss_nll_hn,
-                "avg_obj_loss_en": avg_obj_loss_en,
+                "avg_obj_gap": avg_obj_gap,
+                "avg_obj_ctrast": avg_obj_ctrast,
+                "avg_obj_ctrast_en": avg_obj_ctrast_en,
+                "avg_obj_ctrast_hn":avg_obj_ctrast_hn,
+                "avg_obj_gap_en": avg_obj_gap_en,
                 # "avg_attr_loss_en": avg_attr_loss_en,
-                "avg_obj_loss_hn": avg_obj_loss_hn,
+                "avg_obj_gap_hn": avg_obj_gap_hn,
                 # "avg_attr_loss_hn": avg_attr_loss_hn,
                 "std_obj_loss": std_obj_loss,
                 # "std_attr_loss": std_attr_loss,
