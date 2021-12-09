@@ -246,16 +246,16 @@ def compute_greedy_loss(cat_slots, losses, cos_sim=False):
     return cat_indices_holder
 
 def compute_cosine_loss(cat_slots, cat_indices, losses):
-    cat_slots_sorted = batched_index_select(cat_slots, 1, cat_indices).view(cat_slots.shape[0], :)
-    slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
+    cat_slots_sorted = batched_index_select(cat_slots, 1, cat_indices).view(cat_slots.shape[0], -1)
+    slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots_sorted, cat_slots.shape[0]//4, 0)
     vector_AB = (slots_A - slots_B).div(torch.norm(slots_A - slots_B, 2, -1).unsqueeze(-1).repeat(1, cat_slots.shape[1]*cat_slots.shape[2]))
     vector_DC = (slots_D - slots_C).div(torch.norm(slots_D - slots_C, 2, -1).unsqueeze(-1).repeat(1, cat_slots.shape[1]*cat_slots.shape[2]))
-    cos_loss = torch.norm(vector_a-vector_b, 2, -1)/2
+    cos_loss = torch.norm(vector_AB-vector_DC, 2, -1)/2
     losses.append(cos_loss)
 
 def compute_partition_loss(cat_slots, cat_indices, A_losses, D_losses, cos_sim=False):
     cat_slots_sorted = batched_index_select(cat_slots, 1, cat_indices)
-    slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
+    slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots_sorted, cat_slots.shape[0]//4, 0)
     batch_size, num_slots, slot_size = slots_A.shape
     if not cos_sim:
         slots_A_delta = slots_A.view(batch_size, 1, num_slots, slot_size) - slots_A.view(1, batch_size, num_slots, slot_size)
@@ -277,7 +277,7 @@ def compute_partition_loss(cat_slots, cat_indices, A_losses, D_losses, cos_sim=F
 
 def bipartite_greedy_loss(cat_slots, cat_indices, slots_E, slots_F, losses_AE, losses_DF, cos_sim=False):
     cat_slots_sorted = batched_index_select(cat_slots, 1, cat_indices)
-    slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
+    slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots_sorted, cat_slots.shape[0]//4, 0)
     slots_D_prime = slots_A-slots_B+slots_C
     batch_size, num_slots, slot_size = slots_A.shape
     # greedy assignment without multi-assignment
