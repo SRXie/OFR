@@ -123,14 +123,14 @@ class SlotAttentionMethod(pl.LightningModule):
     def validation_epoch_end(self, outputs):
         avg_loss = torch.stack([x["loss"] for x in outputs]).mean()
         avg_ari_mask = np.stack([x["mask_ari"] for x in outputs]).mean()
-        schema_distance_disc = torch.cat([x["schema_distance_disc"] for x in outputs])
-        schema_distance_pos = torch.cat([x["schema_distance_pos"] for x in outputs])
-        schema_distance_size = torch.cat([x["schema_distance_size"] for x in outputs])
-        schema_distance_material = torch.cat([x["schema_distance_material"] for x in outputs])
-        schema_distance_shape = torch.cat([x["schema_distance_shape"] for x in outputs])
-        schema_distance_color = torch.cat([x["schema_distance_color"] for x in outputs])
-        schema_distance = schema_distance_disc + schema_distance_pos
-        slots_distance = torch.cat([x["slots_distance"] for x in outputs])
+        # schema_distance_disc = torch.cat([x["schema_distance_disc"] for x in outputs])
+        # schema_distance_pos = torch.cat([x["schema_distance_pos"] for x in outputs])
+        # schema_distance_size = torch.cat([x["schema_distance_size"] for x in outputs])
+        # schema_distance_material = torch.cat([x["schema_distance_material"] for x in outputs])
+        # schema_distance_shape = torch.cat([x["schema_distance_shape"] for x in outputs])
+        # schema_distance_color = torch.cat([x["schema_distance_color"] for x in outputs])
+        # schema_distance = schema_distance_disc + schema_distance_pos
+        # slots_distance = torch.cat([x["slots_distance"] for x in outputs])
         # corr_coef_disc = compute_corr_coef(schema_distance_disc, slots_distance)
         # corr_coef_size = compute_corr_coef(schema_distance_size, slots_distance)
         # corr_coef_material = compute_corr_coef(schema_distance_material, slots_distance)

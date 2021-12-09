@@ -341,75 +341,75 @@ class SlotAttentionModel(nn.Module):
                     mask_aris += mask_ari
             mask_ari = mask_aris/batch_size
 
-            # Here we start to calculate the correlation between the distance in the schema and the l2 distance in the slot features
+            # # Here we start to calculate the correlation between the distance in the schema and the l2 distance in the slot features
 
-            perm_num = math.factorial(num_slots)
-            perm_idx = list(itertools.permutations([a for a in range(num_slots)]))
-            perm_idx = torch.stack([torch.Tensor(idx) for idx in perm_idx], dim=0).long()
-            perm_idx = perm_idx.repeat(batch_size, 1)
+            # perm_num = math.factorial(num_slots)
+            # perm_idx = list(itertools.permutations([a for a in range(num_slots)]))
+            # perm_idx = torch.stack([torch.Tensor(idx) for idx in perm_idx], dim=0).long()
+            # perm_idx = perm_idx.repeat(batch_size, 1)
 
-            # First we get the best-matched distance for all schema pairs in this batch
-            schema_gt = schema_gt[:, :num_slots]
-            schema_a = torch.reshape(schema_gt, (batch_size, 1, 1, num_slots, -1))
-            schema_a = schema_a.repeat(1, batch_size, perm_num, 1, 1)
-            schema_b = schema_gt.unsqueeze(1).repeat(1, perm_num, 1, 1).view(batch_size*perm_num, num_slots, -1)
-            schema_b = schema_b[torch.arange(batch_size*perm_num).unsqueeze(-1), perm_idx]
-            schema_b = schema_b.view(1, batch_size, perm_num, num_slots, -1).repeat(batch_size, 1, 1, 1, 1)
-            schema_a_disc = torch.reshape(schema_a[:,:,:,:, :4], (batch_size, batch_size, perm_num, -1))
-            schema_b_disc = torch.reshape(schema_b[:,:,:,:, :4], (batch_size, batch_size, perm_num, -1))
-            schema_a_size = torch.reshape(schema_a[:,:,:,:, 0], (batch_size, batch_size, perm_num, -1))
-            schema_b_size = torch.reshape(schema_b[:,:,:,:, 0], (batch_size, batch_size, perm_num, -1))
-            schema_a_material = torch.reshape(schema_a[:,:,:,:, 1], (batch_size, batch_size, perm_num, -1))
-            schema_b_material = torch.reshape(schema_b[:,:,:,:, 1], (batch_size, batch_size, perm_num, -1))
-            schema_a_shape = torch.reshape(schema_a[:,:,:,:, 2], (batch_size, batch_size, perm_num, -1))
-            schema_b_shape = torch.reshape(schema_b[:,:,:,:, 2], (batch_size, batch_size, perm_num, -1))
-            schema_a_color = torch.reshape(schema_a[:,:,:,:, 3], (batch_size, batch_size, perm_num, -1))
-            schema_b_color = torch.reshape(schema_b[:,:,:,:, 3], (batch_size, batch_size, perm_num, -1))
-            schema_a_pos = torch.reshape(schema_a[:,:,:,:, 4:6], (batch_size, batch_size, perm_num, -1))/6.0
-            schema_b_pos = torch.reshape(schema_b[:,:,:,:, 4:6], (batch_size, batch_size, perm_num, -1))/6.0
-            schema_distance_disc = torch.where(schema_a_disc == schema_b_disc, 1.0, 0.0).sum(-1)/(num_slots)
-            schema_distance_disc, _ = schema_distance_disc.max(-1)
-            schema_distance_disc = 4.0 - schema_distance_disc
-            schema_distance_pos, idx_pos = torch.norm(schema_a_pos - schema_b_pos, p=2, dim=-1).min(-1)
-            schema_distance_size = torch.where(schema_a_size == schema_b_size, 1.0, 0.0).sum(-1)/(num_slots)
-            schema_distance_material = torch.where(schema_a_material == schema_b_material, 1.0, 0.0).sum(-1)/(num_slots)
-            schema_distance_shape = torch.where(schema_a_shape == schema_b_shape, 1.0, 0.0).sum(-1)/(num_slots)
-            schema_distance_color = torch.where(schema_a_color == schema_b_color, 1.0, 0.0).sum(-1)/(num_slots)
-            idx_pos = idx_pos.view(batch_size*batch_size, 1)
-            schema_distance_size = batched_index_select(schema_distance_size.view(batch_size*batch_size, perm_num), 1, idx_pos).view(batch_size, batch_size)
-            schema_distance_material = batched_index_select(schema_distance_material.view(batch_size*batch_size, perm_num), 1, idx_pos).view(batch_size, batch_size)
-            schema_distance_shape = batched_index_select(schema_distance_shape.view(batch_size*batch_size, perm_num), 1, idx_pos).view(batch_size, batch_size)
-            schema_distance_color = batched_index_select(schema_distance_color.view(batch_size*batch_size, perm_num), 1, idx_pos).view(batch_size, batch_size)
+            # # First we get the best-matched distance for all schema pairs in this batch
+            # schema_gt = schema_gt[:, :num_slots]
+            # schema_a = torch.reshape(schema_gt, (batch_size, 1, 1, num_slots, -1))
+            # schema_a = schema_a.repeat(1, batch_size, perm_num, 1, 1)
+            # schema_b = schema_gt.unsqueeze(1).repeat(1, perm_num, 1, 1).view(batch_size*perm_num, num_slots, -1)
+            # schema_b = schema_b[torch.arange(batch_size*perm_num).unsqueeze(-1), perm_idx]
+            # schema_b = schema_b.view(1, batch_size, perm_num, num_slots, -1).repeat(batch_size, 1, 1, 1, 1)
+            # schema_a_disc = torch.reshape(schema_a[:,:,:,:, :4], (batch_size, batch_size, perm_num, -1))
+            # schema_b_disc = torch.reshape(schema_b[:,:,:,:, :4], (batch_size, batch_size, perm_num, -1))
+            # schema_a_size = torch.reshape(schema_a[:,:,:,:, 0], (batch_size, batch_size, perm_num, -1))
+            # schema_b_size = torch.reshape(schema_b[:,:,:,:, 0], (batch_size, batch_size, perm_num, -1))
+            # schema_a_material = torch.reshape(schema_a[:,:,:,:, 1], (batch_size, batch_size, perm_num, -1))
+            # schema_b_material = torch.reshape(schema_b[:,:,:,:, 1], (batch_size, batch_size, perm_num, -1))
+            # schema_a_shape = torch.reshape(schema_a[:,:,:,:, 2], (batch_size, batch_size, perm_num, -1))
+            # schema_b_shape = torch.reshape(schema_b[:,:,:,:, 2], (batch_size, batch_size, perm_num, -1))
+            # schema_a_color = torch.reshape(schema_a[:,:,:,:, 3], (batch_size, batch_size, perm_num, -1))
+            # schema_b_color = torch.reshape(schema_b[:,:,:,:, 3], (batch_size, batch_size, perm_num, -1))
+            # schema_a_pos = torch.reshape(schema_a[:,:,:,:, 4:6], (batch_size, batch_size, perm_num, -1))/6.0
+            # schema_b_pos = torch.reshape(schema_b[:,:,:,:, 4:6], (batch_size, batch_size, perm_num, -1))/6.0
+            # schema_distance_disc = torch.where(schema_a_disc == schema_b_disc, 1.0, 0.0).sum(-1)/(num_slots)
+            # schema_distance_disc, _ = schema_distance_disc.max(-1)
+            # schema_distance_disc = 4.0 - schema_distance_disc
+            # schema_distance_pos, idx_pos = torch.norm(schema_a_pos - schema_b_pos, p=2, dim=-1).min(-1)
+            # schema_distance_size = torch.where(schema_a_size == schema_b_size, 1.0, 0.0).sum(-1)/(num_slots)
+            # schema_distance_material = torch.where(schema_a_material == schema_b_material, 1.0, 0.0).sum(-1)/(num_slots)
+            # schema_distance_shape = torch.where(schema_a_shape == schema_b_shape, 1.0, 0.0).sum(-1)/(num_slots)
+            # schema_distance_color = torch.where(schema_a_color == schema_b_color, 1.0, 0.0).sum(-1)/(num_slots)
+            # idx_pos = idx_pos.view(batch_size*batch_size, 1)
+            # schema_distance_size = batched_index_select(schema_distance_size.view(batch_size*batch_size, perm_num), 1, idx_pos).view(batch_size, batch_size)
+            # schema_distance_material = batched_index_select(schema_distance_material.view(batch_size*batch_size, perm_num), 1, idx_pos).view(batch_size, batch_size)
+            # schema_distance_shape = batched_index_select(schema_distance_shape.view(batch_size*batch_size, perm_num), 1, idx_pos).view(batch_size, batch_size)
+            # schema_distance_color = batched_index_select(schema_distance_color.view(batch_size*batch_size, perm_num), 1, idx_pos).view(batch_size, batch_size)
 
-            # get rid of the diagonal
-            schema_distance_disc = schema_distance_disc.flatten()[1:].view(batch_size-1, batch_size+1)[:,:-1].reshape(batch_size, batch_size-1).flatten()
-            schema_distance_pos = schema_distance_pos.flatten()[1:].view(batch_size-1, batch_size+1)[:,:-1].reshape(batch_size, batch_size-1).flatten()
-            schema_distance_size = schema_distance_size.flatten()[1:].view(batch_size-1, batch_size+1)[:,:-1].reshape(batch_size, batch_size-1).flatten()
-            schema_distance_material = schema_distance_material.flatten()[1:].view(batch_size-1, batch_size+1)[:,:-1].reshape(batch_size, batch_size-1).flatten()
-            schema_distance_shape = schema_distance_shape.flatten()[1:].view(batch_size-1, batch_size+1)[:,:-1].reshape(batch_size, batch_size-1).flatten()
-            schema_distance_color = schema_distance_color.flatten()[1:].view(batch_size-1, batch_size+1)[:,:-1].reshape(batch_size, batch_size-1).flatten()
+            # # get rid of the diagonal
+            # schema_distance_disc = schema_distance_disc.flatten()[1:].view(batch_size-1, batch_size+1)[:,:-1].reshape(batch_size, batch_size-1).flatten()
+            # schema_distance_pos = schema_distance_pos.flatten()[1:].view(batch_size-1, batch_size+1)[:,:-1].reshape(batch_size, batch_size-1).flatten()
+            # schema_distance_size = schema_distance_size.flatten()[1:].view(batch_size-1, batch_size+1)[:,:-1].reshape(batch_size, batch_size-1).flatten()
+            # schema_distance_material = schema_distance_material.flatten()[1:].view(batch_size-1, batch_size+1)[:,:-1].reshape(batch_size, batch_size-1).flatten()
+            # schema_distance_shape = schema_distance_shape.flatten()[1:].view(batch_size-1, batch_size+1)[:,:-1].reshape(batch_size, batch_size-1).flatten()
+            # schema_distance_color = schema_distance_color.flatten()[1:].view(batch_size-1, batch_size+1)[:,:-1].reshape(batch_size, batch_size-1).flatten()
 
-            # Then we get the best-matched l2 distance for all image pairs
-            slots_a = slots.view(batch_size, 1, 1, -1)
-            slots_a = slots_a.repeat(1, batch_size, perm_num, 1)
-            slots_b = slots.unsqueeze(1).repeat(1, perm_num, 1, 1).view(batch_size*perm_num, num_slots, -1)
-            slots_b = slots_b[torch.arange(batch_size*perm_num).unsqueeze(-1), perm_idx]
-            slots_b = slots_b.view(1, batch_size, perm_num, -1).repeat(batch_size, 1, 1, 1)
-            slots_distance, _ = torch.norm(slots_a - slots_b, p = 2, dim=-1).min(-1)
-            slots_distance = slots_distance/(num_slots*slots.shape[-1])
-            # get rid of the diagonal
-            slots_distance = slots_distance.flatten()[1:].view(batch_size-1, batch_size+1)[:,:-1].reshape(batch_size, batch_size-1).flatten()
+            # # Then we get the best-matched l2 distance for all image pairs
+            # slots_a = slots.view(batch_size, 1, 1, -1)
+            # slots_a = slots_a.repeat(1, batch_size, perm_num, 1)
+            # slots_b = slots.unsqueeze(1).repeat(1, perm_num, 1, 1).view(batch_size*perm_num, num_slots, -1)
+            # slots_b = slots_b[torch.arange(batch_size*perm_num).unsqueeze(-1), perm_idx]
+            # slots_b = slots_b.view(1, batch_size, perm_num, -1).repeat(batch_size, 1, 1, 1)
+            # slots_distance, _ = torch.norm(slots_a - slots_b, p = 2, dim=-1).min(-1)
+            # slots_distance = slots_distance/(num_slots*slots.shape[-1])
+            # # get rid of the diagonal
+            # slots_distance = slots_distance.flatten()[1:].view(batch_size-1, batch_size+1)[:,:-1].reshape(batch_size, batch_size-1).flatten()
 
             return {
                 "loss": loss,
                 "mask_ari": mask_ari,
-                "schema_distance_disc": schema_distance_disc,
-                "schema_distance_size": schema_distance_size,
-                "schema_distance_material": schema_distance_material,
-                "schema_distance_shape": schema_distance_shape,
-                "schema_distance_color": schema_distance_color,
-                "schema_distance_pos": schema_distance_pos,
-                "slots_distance": slots_distance,
+                # "schema_distance_disc": schema_distance_disc,
+                # "schema_distance_size": schema_distance_size,
+                # "schema_distance_material": schema_distance_material,
+                # "schema_distance_shape": schema_distance_shape,
+                # "schema_distance_color": schema_distance_color,
+                # "schema_distance_pos": schema_distance_pos,
+                # "slots_distance": slots_distance,
             }
 
 
