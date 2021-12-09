@@ -94,10 +94,10 @@ class BetaVAEMethod(pl.LightningModule):
         obj_losses_en_A, obj_losses_en_D, attr_losses_en = [], [], []
         obj_losses_hn_A, obj_losses_hn_D, attr_losses_hn = [], [], []
 
-        def compute_test_losses(dataloader, losses, losses_en_A, losses_en_D, losses_hn_A, losses_hn_D):
+        def compute_test_losses(dataloader, losses, cos_losses, losses_en_A, losses_en_D, losses_hn_A, losses_hn_D):
             b_prev = datetime.now()
             for batch in dataloader:
-                print("load data:", datetime.now()-b_prev)
+                # print("load data:", datetime.now()-b_prev)
                 # sample_losses = []
                 # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
                 batch_size = batch[0].shape[0]
@@ -118,14 +118,15 @@ class BetaVAEMethod(pl.LightningModule):
                 zs_E, zs_F = torch.split(cat_zs_EF, batch_size, 0)
 
                 compute_loss(cat_zs, losses)
+                compute_cosine_loss(cat_zs, cos_losses)
                 compute_partition_loss(cat_zs, losses_en_A, losses_en_D)
                 compute_partition_loss_hard(cat_zs, zs_E, zs_F, losses_hn_A, losses_hn_D)
 
-                print("batch time:", datetime.now()-b_prev)
+                # print("batch time:", datetime.now()-b_prev)
                 b_prev = datetime.now()
 
         with torch.no_grad():
-            compute_test_losses(odl, obj_losses, obj_losses_en_A, obj_losses_en_D, obj_losses_hn_A, obj_losses_hn_D)
+            compute_test_losses(odl, obj_losses, obj_cos_losses, obj_losses_en_A, obj_losses_en_D, obj_losses_hn_A, obj_losses_hn_D)
             # compute_test_losses(adl, attr_losses, attr_losses_en, attr_losses_hn)
 
             avg_z_norm = torch.cat(z_norms).mean()
@@ -141,6 +142,7 @@ class BetaVAEMethod(pl.LightningModule):
             avg_obj_gap = (obj_loss+obj_loss_D-obj_loss_A).mean()
             std_obj_loss = obj_loss.std()/math.sqrt(obj_loss.shape[0])
             avg_obj_loss = obj_loss.mean()
+            avg_obj_cos_loss = torch.cat(obj_cos_losses).mean()
             avg_obj_ctrast = avg_obj_loss+obj_loss_D.mean()
             avg_obj_ctrast_en = avg_obj_loss+obj_loss_en_D.mean()
             avg_obj_ctrast_hn = avg_obj_loss+obj_loss_hn_D.mean()
@@ -155,6 +157,7 @@ class BetaVAEMethod(pl.LightningModule):
                 "avg_z_norms": avg_z_norm,
                 "avg_val_loss": avg_loss,
                 "avg_obj_loss": avg_obj_loss,
+                "avg_obj_cos_loss": avg_obj_cos_loss,
                 # "avg_attr_loss": avg_attr_loss,
                 "avg_obj_gap": avg_obj_gap,
                 "avg_obj_ctrast": avg_obj_ctrast,
