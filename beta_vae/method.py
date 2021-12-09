@@ -134,8 +134,8 @@ class BetaVAEMethod(pl.LightningModule):
             obj_loss_en_D = torch.cat([torch.log(torch.exp(x/avg_z_norm).sum(1)) for x in obj_losses_en_D], 0)
             obj_loss_hn_A = torch.cat(obj_losses_hn_A, 0)/avg_z_norm
             obj_loss_hn_D = torch.cat(obj_losses_hn_D, 0)/avg_z_norm
-            obj_loss_A = torch.cat([torch.log(torch.exp(x/avg_z_norm).sum(1)+torch.exp(y/avg_z_norm)) for x, y in zip(obj_losses_en_A, obj_loss_hn_A)], 0)
-            obj_loss_D = torch.cat([torch.log(torch.exp(x/avg_z_norm).sum(1)+torch.exp(y/avg_z_norm)) for x, y in zip(obj_losses_en_D, obj_loss_hn_D)], 0)
+            obj_loss_A = torch.cat([torch.log(torch.exp(x/avg_z_norm).sum(1)+torch.exp(y/avg_z_norm)) for x, y in zip(obj_losses_en_A, obj_losses_hn_A)], 0)
+            obj_loss_D = torch.cat([torch.log(torch.exp(x/avg_z_norm).sum(1)+torch.exp(y/avg_z_norm)) for x, y in zip(obj_losses_en_D, obj_losses_hn_D)], 0)
             avg_obj_gap_en = (obj_loss+obj_loss_en_D-obj_loss_en_A).mean()
             avg_obj_gap_hn = (obj_loss+obj_loss_hn_D-obj_loss_hn_A).mean()
             avg_obj_gap = (obj_loss+obj_loss_D-obj_loss_A).mean()

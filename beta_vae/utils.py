@@ -123,7 +123,7 @@ def compute_partition_loss_hard(cat_zs, zs_E, zs_F, AE_losses, DF_losses):
     zs_D_prime = zs_A-zs_B+zs_C
 
     zs_AD = torch.cat([zs_A, zs_D_prime], 0)
-    zs_EF = -torch.cat([zs_E, zs_F], 0)
+    zs_EF = torch.cat([zs_E, zs_F], 0)
 
     zs_delta = zs_AD - zs_EF
     loss = -torch.norm(zs_delta, 2, -1)
