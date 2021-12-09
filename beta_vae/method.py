@@ -13,7 +13,7 @@ from beta_vae.params import BetaVAEParams
 from beta_vae.utils import Tensor
 from beta_vae.utils import split_and_interleave_stack
 from beta_vae.utils import to_rgb_from_tensor, to_tensor_from_rgb
-from beta_vae.utils import compute_loss, compute_partition_loss, compute_partition_loss_hard
+from beta_vae.utils import compute_loss, compute_cos_loss, compute_partition_loss, compute_partition_loss_hard
 
 
 class BetaVAEMethod(pl.LightningModule):
@@ -90,7 +90,7 @@ class BetaVAEMethod(pl.LightningModule):
         adl = self.datamodule.attr_test_dataloader()
 
         z_norms = []
-        obj_losses, attr_losses = [], []
+        obj_losses, obj_cos_losses, attr_losses = [], [], []
         obj_losses_en_A, obj_losses_en_D, attr_losses_en = [], [], []
         obj_losses_hn_A, obj_losses_hn_D, attr_losses_hn = [], [], []
 

@@ -103,6 +103,13 @@ def compute_loss(cat_zs, losses):
 
     losses.append(loss)
 
+def compute_cosine_loss(cat_zs, cat_indices, losses):
+    zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs cat_zs.shape[0]//4, 0)
+    vector_AB = (zs_A - zs_B).div(torch.norm(zs_A - zs_B, 2, -1).unsqueeze(-1).repeat(1, zs.shape[1]))
+    vector_DC = (zs_D - zs_C).div(torch.norm(zs_D - zs_C, 2, -1).unsqueeze(-1).repeat(1, zs.shape[1]))
+    cos_loss = torch.norm(vector_AB-vector_DC, 2, -1)/2
+    losses.append(cos_loss)
+
 def compute_partition_loss(cat_zs, A_losses, D_losses):
     zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
     batch_size, z_dim = zs_A.shape
