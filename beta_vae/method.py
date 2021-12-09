@@ -130,20 +130,20 @@ class BetaVAEMethod(pl.LightningModule):
 
             avg_z_norm = torch.cat(z_norms).mean()
             obj_loss = torch.cat(obj_losses, 0)/avg_z_norm
-            obj_loss_en_A = torch.cat(obj_losses_en_A, 0)/avg_z_norm
-            obj_loss_en_D = torch.cat(obj_losses_en_D, 0)/avg_z_norm
+            obj_loss_en_A = torch.cat([torch.log(torch.exp(x/avg_z_norm).sum(1)) for x in obj_losses_en_A], 0)
+            obj_loss_en_D = torch.cat([torch.log(torch.exp(x/avg_z_norm).sum(1)) for x in obj_losses_en_D], 0)
             obj_loss_hn_A = torch.cat(obj_losses_hn_A, 0)/avg_z_norm
             obj_loss_hn_D = torch.cat(obj_losses_hn_D, 0)/avg_z_norm
-            obj_loss_A = 0.9*obj_loss_en_A+0.1*obj_loss_hn_A
-            obj_loss_D = 0.9*obj_loss_en_D+0.1*obj_loss_hn_D
-            avg_obj_gap_en = (obj_loss-obj_loss_en_D+obj_loss_en_A).mean()
-            avg_obj_gap_hn = (obj_loss-obj_loss_hn_D+obj_loss_hn_A).mean()
-            avg_obj_gap = (obj_loss-obj_loss_D+obj_loss_A).mean()
+            obj_loss_A = torch.cat([torch.log(torch.exp(x/avg_z_norm).sum(1)+torch.exp(y/avg_z_norm)) for x, y in zip(obj_losses_en_A, obj_loss_hn_A)], 0)
+            obj_loss_D = torch.cat([torch.log(torch.exp(x/avg_z_norm).sum(1)+torch.exp(y/avg_z_norm)) for x, y in zip(obj_losses_en_D, obj_loss_hn_D)], 0)
+            avg_obj_gap_en = (obj_loss+obj_loss_en_D-obj_loss_en_A).mean()
+            avg_obj_gap_hn = (obj_loss+obj_loss_hn_D-obj_loss_hn_A).mean()
+            avg_obj_gap = (obj_loss+obj_loss_D-obj_loss_A).mean()
             std_obj_loss = obj_loss.std()/math.sqrt(obj_loss.shape[0])
             avg_obj_loss = obj_loss.mean()
-            avg_obj_ctrast = avg_obj_loss-obj_loss_D.mean()
-            avg_obj_ctrast_en = avg_obj_loss-obj_loss_en_D.mean()
-            avg_obj_ctrast_hn = avg_obj_loss-obj_loss_hn_D.mean()
+            avg_obj_ctrast = avg_obj_loss+obj_loss_D.mean()
+            avg_obj_ctrast_en = avg_obj_loss+obj_loss_en_D.mean()
+            avg_obj_ctrast_hn = avg_obj_loss+obj_loss_hn_D.mean()
 
             # avg_attr_loss = torch.cat(attr_losses, 0)
             # avg_attr_loss_en = (torch.cat(attr_losses_en, 0)-avg_attr_loss).mean()

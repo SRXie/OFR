@@ -248,20 +248,20 @@ class SlotAttentionMethod(pl.LightningModule):
 
             avg_slot_norm = torch.cat(slot_norm, 0).mean()
             obj_greedy_loss_nodup = torch.cat(obj_greedy_losses_nodup, 0)/(avg_slot_norm*self.model.num_slots)
-            obj_greedy_loss_nodup_en_A = torch.cat(obj_greedy_losses_nodup_en_A, 0)/(avg_slot_norm*self.model.num_slots)
-            obj_greedy_loss_nodup_en_D = torch.cat(obj_greedy_losses_nodup_en_D, 0)/(avg_slot_norm*self.model.num_slots)
+            obj_greedy_loss_nodup_en_A = torch.cat([torch.log(torch.exp(x/(avg_slot_norm*self.model.num_slots)).sum(1)) for x in obj_greedy_losses_nodup_en_A], 0)
+            obj_greedy_loss_nodup_en_D = torch.cat([torch.log(torch.exp(x/(avg_slot_norm*self.model.num_slots)).sum(1)) for x in obj_greedy_losses_nodup_en_D], 0)
             obj_greedy_loss_nodup_hn_A = torch.cat(obj_greedy_losses_nodup_hn_A, 0)/(avg_slot_norm*self.model.num_slots) # this should be changed to log sum exp if there are more than one hard negatives
             obj_greedy_loss_nodup_hn_D = torch.cat(obj_greedy_losses_nodup_hn_D, 0)/(avg_slot_norm*self.model.num_slots)
-            obj_greedy_loss_nodup_A = 0.9*obj_greedy_loss_nodup_en_A + 0.1*obj_greedy_loss_nodup_hn_A
-            obj_greedy_loss_nodup_D = 0.9*obj_greedy_loss_nodup_en_D + 0.1*obj_greedy_loss_nodup_hn_D
-            avg_obj_greedy_gap_en = (obj_greedy_loss_nodup-obj_greedy_loss_nodup_en_D+obj_greedy_loss_nodup_en_A).mean()
-            avg_obj_greedy_gap_hn = (obj_greedy_loss_nodup-obj_greedy_loss_nodup_hn_D+obj_greedy_loss_nodup_hn_A).mean()
-            avg_obj_greedy_gap = (obj_greedy_loss_nodup-obj_greedy_loss_nodup_D+obj_greedy_loss_nodup_A).mean()
+            obj_greedy_loss_nodup_A = torch.cat([torch.log(torch.exp(x/(avg_slot_norm*self.model.num_slots)).sum(1)+torch.exp(y/(avg_slot_norm*self.model.num_slots))) for x, y in zip(obj_greedy_losses_nodup_en_A, obj_greedy_losses_nodup_hn_A)], 0)
+            obj_greedy_loss_nodup_D = torch.cat([torch.log(torch.exp(x/(avg_slot_norm*self.model.num_slots)).sum(1)+torch.exp(y/(avg_slot_norm*self.model.num_slots))) for x, y in zip(obj_greedy_losses_nodup_en_D, obj_greedy_losses_nodup_hn_D)], 0)
+            avg_obj_greedy_gap_en = (obj_greedy_loss_nodup+obj_greedy_loss_nodup_en_D-obj_greedy_loss_nodup_en_A).mean()
+            avg_obj_greedy_gap_hn = (obj_greedy_loss_nodup+obj_greedy_loss_nodup_hn_D-obj_greedy_loss_nodup_hn_A).mean()
+            avg_obj_greedy_gap = (obj_greedy_loss_nodup+obj_greedy_loss_nodup_D-obj_greedy_loss_nodup_A).mean()
             std_obj_greedy_loss = obj_greedy_loss_nodup.std()/math.sqrt(obj_greedy_loss_nodup.shape[0])
             avg_obj_greedy_loss = obj_greedy_loss_nodup.mean()
-            avg_obj_greedy_ctrast_en = avg_obj_greedy_loss-obj_greedy_loss_nodup_en_D.mean()
-            avg_obj_greedy_ctrast_hn = avg_obj_greedy_loss-obj_greedy_loss_nodup_hn_D.mean()
-            avg_obj_greedy_ctrast = avg_obj_greedy_loss-obj_greedy_loss_nodup_D.mean()
+            avg_obj_greedy_ctrast_en = avg_obj_greedy_loss+obj_greedy_loss_nodup_en_D.mean()
+            avg_obj_greedy_ctrast_hn = avg_obj_greedy_loss+obj_greedy_loss_nodup_hn_D.mean()
+            avg_obj_greedy_ctrast = avg_obj_greedy_loss+obj_greedy_loss_nodup_D.mean()
 
             # avg_attr_greedy_loss_nodup = torch.cat(attr_greedy_losses_nodup, 0)
             # avg_attr_greedy_loss_nodup_en = (torch.cat(attr_greedy_losses_nodup_en, 0)-avg_attr_greedy_loss_nodup).mean()
