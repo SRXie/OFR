@@ -176,7 +176,7 @@ class SlotAttentionMethod(pl.LightningModule):
                 pseudo_cos_losses, pseudo_cos_losses_en, pseudo_cos_losses_hn, cos_losses_nodup, cos_losses_nodup_en_A, cos_losses_nodup_en_D, cos_losses_nodup_hn_A, cos_losses_nodup_hn_D, dup_threshold=None):
             b_prev = datetime.now()
             for batch in dataloader:
-                print("load data:", datetime.now()-b_prev)
+                # print("load data:", datetime.now()-b_prev)
                 # sample_losses = []
                 # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
                 batch_size = batch[0].shape[0]
@@ -239,7 +239,7 @@ class SlotAttentionMethod(pl.LightningModule):
                 # sample_loss = torch.square(sample_loss).mean(dim=-1)
                 # sample_loss, _ = torch.min(sample_loss, 1)
                 # sample_losses.appiend(sample_loss)
-                print("batch time:", datetime.now()-b_prev)
+                # print("batch time:", datetime.now()-b_prev)
                 b_prev = datetime.now()
 
         with torch.no_grad():
@@ -386,9 +386,9 @@ class SlotAttentionMethod(pl.LightningModule):
         total_steps = self.params.max_epochs * len(self.datamodule.train_dataloader())
 
         def warm_and_decay_lr_scheduler(step: int):
-            # step = step * self.params.gpus # to make the decay consistent over multi-GPU
-            # warmup_steps = warmup_steps #* total_steps
-            # decay_steps = decay_steps #* total_steps
+            step = step * self.params.gpus # to make the decay consistent over multi-GPU
+            warmup_steps = self.params.warmup_steps * total_steps
+            decay_steps = self.params.decay_steps * total_steps
             # assert step < total_steps
             if step < warmup_steps:
                 factor = step / warmup_steps

@@ -13,7 +13,7 @@ from beta_vae.params import BetaVAEParams
 from beta_vae.utils import Tensor
 from beta_vae.utils import split_and_interleave_stack
 from beta_vae.utils import to_rgb_from_tensor, to_tensor_from_rgb
-from beta_vae.utils import compute_loss, compute_cos_loss, compute_partition_loss, compute_partition_loss_hard
+from beta_vae.utils import compute_loss, compute_cosine_loss, compute_partition_loss, compute_partition_loss_hard
 
 
 class BetaVAEMethod(pl.LightningModule):
