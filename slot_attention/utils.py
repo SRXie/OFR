@@ -252,7 +252,7 @@ def compute_cosine_loss(cat_slots_sorted, losses):
     cos_loss = torch.norm(vector_AB-vector_DC, 2, -1)/2
     losses.append(cos_loss.mean(1))
 
-def compute_partition_loss(cat_slots_nodup_sorted, A_losses, D_losses, cos_sim=False):
+def compute_partition_loss(cat_slots_sorted, A_losses, D_losses, cos_sim=False):
     slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots_sorted, cat_slots_sorted.shape[0]//4, 0)
     batch_size, num_slots, slot_size = slots_A.shape
     if not cos_sim:
@@ -273,7 +273,7 @@ def compute_partition_loss(cat_slots_nodup_sorted, A_losses, D_losses, cos_sim=F
         D_loss = torch.exp(-torch.norm(unit_slots_D_prime.view(batch_size, 1, num_slots, slot_size) - unit_slots_D.view(1, batch_size, num_slots, slot_size), 2, -1).sum(1)/2).sum(1)
     D_losses.append(-D_loss)
 
-def bipartite_greedy_loss(cat_slots_nodup_sorted, slots_E, slots_F, losses_AE, losses_DF, cos_sim=False):
+def bipartite_greedy_loss(cat_slots_sorted, slots_E, slots_F, losses_AE, losses_DF, cos_sim=False):
     slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots_sorted, cat_slots_sorted.shape[0]//4, 0)
     slots_D_prime = slots_A-slots_B+slots_C
     batch_size, num_slots, slot_size = slots_A.shape
