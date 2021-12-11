@@ -132,7 +132,7 @@ class CLEVRValset(Dataset):
                 image_path = os.path.join(self.img_root, '{}.png'.format(i))
                 assert os.path.exists(image_path), f"{image_path} does not exist"
                 img_paths.append(image_path)
-                for j in range(self.max_n_objects+1):
+                for j in range(1, self.max_n_objects+2): # For FG ARI
                     mask_path = os.path.join(self.mask_root, '{}_{}.png'.format(i, j))
                     assert os.path.exists(mask_path), f"{mask_path} does not exist"
                     img_paths.append(mask_path)
