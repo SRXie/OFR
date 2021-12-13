@@ -169,7 +169,7 @@ def compute_pseudo_greedy_loss(cat_slots, losses, easy_neg=False, cos_sim=False)
     _, indices_C = greedy_criterion_DC.min(-1)
     slots_C = batched_index_select(slots_C, 1, indices_C)
 
-    losses.append(torch.norm(slots_A-slots_B+slots_C+slots_D, 2, -1))
+    losses.append(torch.norm(slots_A-slots_B+slots_C+slots_D, 2, -1).sum(-1))
 
     return torch.cat([indices_A, indices_B, indices_C, indices_D], 0)
 
