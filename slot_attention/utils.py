@@ -155,30 +155,49 @@ def compute_aggregated_loss(cat_slots, losses):
 def compute_pseudo_greedy_loss(cat_slots, losses, easy_neg=False, cos_sim=False):
     slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
     batch_size, num_slots, slot_size = slots_A.shape
-    if easy_neg:
-        slots_D = slots_D[torch.randperm(batch_size)]
-    # greedy assignment regardless of re-assignment
-    # TODO: check if there is a trivial solution to this assignment
-    ext_A = slots_A.view(batch_size, num_slots, 1, 1, 1, slot_size).expand(-1, -1, num_slots, num_slots, num_slots, -1)
-    ext_B = slots_B.view(batch_size, 1, num_slots, 1, 1, slot_size).expand(-1, num_slots, -1, num_slots, num_slots, -1)
-    ext_C = slots_C.view(batch_size, 1, 1, num_slots, 1, slot_size).expand(-1, num_slots, num_slots, -1, num_slots, -1)
-    ext_D = slots_D.view(batch_size, 1, 1, 1, num_slots, slot_size).expand(-1, num_slots, num_slots, num_slots, -1, -1)
-    if not cos_sim:
-        greedy_criterion = torch.norm(ext_A-ext_B+ext_C-ext_D, 2, -1)
-        norm_term = torch.stack([torch.norm(ext_A-ext_B, 2, -1), torch.norm(ext_A-ext_D, 2, -1), torch.norm(ext_C-ext_B, 2, -1), torch.norm(ext_C-ext_D, 2, -1)], dim=-1)
-        norm_term = torch.max(norm_term, dim=-1)[0]
-        greedy_criterion = greedy_criterion.div(norm_term+0.0001)
-    else:
-        vector_a = (ext_A-ext_B).div(torch.norm(ext_A-ext_B, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size)+0.0001)
-        vector_b = (ext_D-ext_C).div(torch.norm(ext_D-ext_C, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size)+0.0001)
-        greedy_criterion = torch.norm(vector_a-vector_b, 2, -1)/2
-    # backtrace for greedy matching (3 times)
-    greedy_criterion, _ = greedy_criterion.min(-1)
-    greedy_criterion, _ = greedy_criterion.min(-1)
-    greedy_criterion, _ = greedy_criterion.min(-1)
+    indices_A = torch.arange(0, num_slots, dtype=int).unsqueeze(0).repeat(batch_size, 1).to(cat_slots.device)
 
-    greedy_loss = greedy_criterion.sum(dim=-1)/num_slots
-    losses.append(greedy_loss)
+    greedy_criterion_AB = torch.norm(slots_A.view(batch_size, num_slots, 1, slot_size)-slots_B.view(batch_size, 1, num_slots, slot_size), 2, -1)
+    _, indices_B = greedy_criterion_AB.min(-1)
+    indices_B = indices_B.view(batch_size, 1)
+    slots_B = batched_index_select(slots_B, 1, indices_B)
+
+    greedy_criterion_AD = torch.norm(slots_A.view(batch_size, num_slots, 1, slot_size)-slots_D.view(batch_size, 1, num_slots, slot_size), 2, -1)
+    _, indices_D = greedy_criterion_AD.min(-1)
+    indices_D = indices_D.view(batch_size, 1)
+    slots_D = batched_index_select(slots_D, 1, indices_D)
+
+    greedy_criterion_DC = torch.norm(slots_D.view(batch_size, num_slots, 1, slot_size)-slots_C.view(batch_size, 1, num_slots, slot_size), 2, -1)
+    _, indices_C = greedy_criterion_DC.min(-1)
+    indices_C = indices_C.view(batch_size, 1)
+    slots_C = batched_index_select(slots_C, 1, indices_C)
+
+    losses.append(torch.norm(slots_A-slots_B+slots_C+slots_D, 2, -1))
+
+    return torch.cat([indices_A, indices_B, indices_C, indices_D], 0)
+
+    # # greedy assignment regardless of re-assignment
+    # # TODO: check if there is a trivial solution to this assignment
+    # ext_A = slots_A.view(batch_size, num_slots, 1, 1, 1, slot_size).expand(-1, -1, num_slots, num_slots, num_slots, -1)
+    # ext_B = slots_B.view(batch_size, 1, num_slots, 1, 1, slot_size).expand(-1, num_slots, -1, num_slots, num_slots, -1)
+    # ext_C = slots_C.view(batch_size, 1, 1, num_slots, 1, slot_size).expand(-1, num_slots, num_slots, -1, num_slots, -1)
+    # ext_D = slots_D.view(batch_size, 1, 1, 1, num_slots, slot_size).expand(-1, num_slots, num_slots, num_slots, -1, -1)
+    # if not cos_sim:
+    #     greedy_criterion = torch.norm(ext_A-ext_B+ext_C-ext_D, 2, -1)
+    #     norm_term = torch.stack([torch.norm(ext_A-ext_B, 2, -1), torch.norm(ext_A-ext_D, 2, -1), torch.norm(ext_C-ext_B, 2, -1), torch.norm(ext_C-ext_D, 2, -1)], dim=-1)
+    #     norm_term = torch.max(norm_term, dim=-1)[0]
+    #     greedy_criterion = greedy_criterion.div(norm_term+0.0001)
+    # else:
+    #     vector_a = (ext_A-ext_B).div(torch.norm(ext_A-ext_B, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size)+0.0001)
+    #     vector_b = (ext_D-ext_C).div(torch.norm(ext_D-ext_C, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size)+0.0001)
+    #     greedy_criterion = torch.norm(vector_a-vector_b, 2, -1)/2
+    # # backtrace for greedy matching (3 times)
+    # greedy_criterion, _ = greedy_criterion.min(-1)
+    # greedy_criterion, _ = greedy_criterion.min(-1)
+    # greedy_criterion, _ = greedy_criterion.min(-1)
+
+    # greedy_loss = greedy_criterion.sum(dim=-1)/num_slots
+    # losses.append(greedy_loss)
 
 def compute_greedy_loss(cat_slots, losses, cos_sim=False):
     slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
