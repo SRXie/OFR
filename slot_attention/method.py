@@ -275,7 +275,7 @@ class SlotAttentionMethod(pl.LightningModule):
             # std_attr_greedy_loss_nodup = avg_attr_greedy_loss_nodup.std()/math.sqrt(avg_attr_greedy_loss_nodup.shape[0])
             # avg_attr_greedy_loss_nodup = avg_attr_greedy_loss_nodup.mean()
 
-            obj_pd_greedy_loss_nodup = torch.cat(obj_pd_greedy_losses, 0)/(avg_slot_norm*self.model.num_slots)
+            obj_pd_greedy_loss = torch.cat(obj_pd_greedy_losses, 0)/(avg_slot_norm*self.model.num_slots)
             obj_pd_greedy_loss_en_A = torch.cat([(x/(avg_slot_norm*self.model.num_slots)).mean(1) for x in obj_pd_greedy_losses_en_A], 0)
             obj_pd_greedy_loss_en_D = torch.cat([(x/(avg_slot_norm*self.model.num_slots)).mean(1) for x in obj_pd_greedy_losses_en_D], 0)
             obj_pd_greedy_loss_hn_A = torch.cat(obj_pd_greedy_losses_hn_A, 0)/(avg_slot_norm*self.model.num_slots) # this should be changed to log sum exp if there are more than one hard negatives

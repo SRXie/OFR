@@ -159,17 +159,14 @@ def compute_pseudo_greedy_loss(cat_slots, losses, easy_neg=False, cos_sim=False)
 
     greedy_criterion_AB = torch.norm(slots_A.view(batch_size, num_slots, 1, slot_size)-slots_B.view(batch_size, 1, num_slots, slot_size), 2, -1)
     _, indices_B = greedy_criterion_AB.min(-1)
-    indices_B = indices_B.view(batch_size, 1)
     slots_B = batched_index_select(slots_B, 1, indices_B)
 
     greedy_criterion_AD = torch.norm(slots_A.view(batch_size, num_slots, 1, slot_size)-slots_D.view(batch_size, 1, num_slots, slot_size), 2, -1)
     _, indices_D = greedy_criterion_AD.min(-1)
-    indices_D = indices_D.view(batch_size, 1)
     slots_D = batched_index_select(slots_D, 1, indices_D)
 
     greedy_criterion_DC = torch.norm(slots_D.view(batch_size, num_slots, 1, slot_size)-slots_C.view(batch_size, 1, num_slots, slot_size), 2, -1)
     _, indices_C = greedy_criterion_DC.min(-1)
-    indices_C = indices_C.view(batch_size, 1)
     slots_C = batched_index_select(slots_C, 1, indices_C)
 
     losses.append(torch.norm(slots_A-slots_B+slots_C+slots_D, 2, -1))
