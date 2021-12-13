@@ -104,7 +104,8 @@ class BetaVAEMethod(pl.LightningModule):
                 cat_batch = torch.cat(batch[:4], 0)
                 if self.params.gpus > 0:
                     cat_batch = cat_batch.to(self.device)
-                cat_zs = self.model.encode(cat_batch)[0]
+                mu, log_var = self.model.encode(cat_batch)
+                cat_zs = self.model.reparameterize(mu, log_var).detach()
 
                 if dataloader is odl:
                     znorm = torch.norm(cat_zs, 2, -1)
@@ -114,7 +115,8 @@ class BetaVAEMethod(pl.LightningModule):
                 cat_batch_EF = torch.cat(batch[4:], 0)
                 if self.params.gpus > 0:
                     cat_batch_EF = cat_batch_EF.to(self.device)
-                cat_zs_EF = self.model.encode(cat_batch_EF)[0]
+                EF_mu, EF_log_var = self.model.encode(cat_batch_EF)
+                cat_zs_EF = self.model.reparameterize(EF_mu, EF_log_var).detach()
                 zs_E, zs_F = torch.split(cat_zs_EF, batch_size, 0)
 
                 compute_loss(cat_zs, losses)
@@ -140,6 +142,7 @@ class BetaVAEMethod(pl.LightningModule):
             avg_obj_ratio_en = ((obj_loss+obj_loss_en_D).div(obj_loss_en_A)).mean()
             avg_obj_ratio_hn = ((obj_loss+obj_loss_hn_D).div(obj_loss_hn_A)).mean()
             avg_obj_ratio = ((obj_loss+obj_loss_D).div(obj_loss_A)).mean()
+            # print(torch.cat([obj_loss.unsqueeze(1), obj_loss_en_D.unsqueeze(1), obj_loss_en_A.unsqueeze(1)], 1)[:100])
             std_obj_loss = obj_loss.std()/math.sqrt(obj_loss.shape[0])
             avg_obj_loss = obj_loss.mean()
             avg_obj_cos_loss = torch.cat(obj_cos_losses).mean()

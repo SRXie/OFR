@@ -56,7 +56,6 @@ class BetaVAE(nn.Module):
         self.fc_mu = nn.Linear(hidden_dims[-1]*4, latent_dim)
         self.fc_var = nn.Linear(hidden_dims[-1]*4, latent_dim)
 
-
         # Build Decoder
         if decoder_type == 'deconv':
             modules = []
@@ -283,7 +282,6 @@ class BetaTCVAE(nn.Module):
         self.fc = nn.Linear(hidden_dims[-1]*16, 256)
         self.fc_mu = nn.Linear(256, latent_dim)
         self.fc_var = nn.Linear(256, latent_dim)
-
 
         # Build Decoder
         if decoder_type == 'deconv':
