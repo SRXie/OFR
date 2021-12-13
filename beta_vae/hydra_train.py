@@ -11,6 +11,7 @@ from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.utilities.seed import seed_everything
 from torchvision import transforms
 import pandas as pd
+import numpy as np
 
 from beta_vae.data import CLEVRDataModule
 from beta_vae.method import BetaVAEMethod
@@ -37,7 +38,9 @@ class _Workplace(object):
         df = pd.read_csv(cfg.data_mix_csv)
         self.data_weights = df.iloc[cfg.data_mix_idx, 1:-1]
         seed = df.loc[cfg.data_mix_idx, "seed"]
-
+        for dataset, weight in self.data_weights.items():
+            if not np.isnan(weight):
+                self.dataset = dataset
         self.result_csv = cfg.result_csv
         self.data_mix_idx = cfg.data_mix_idx
 
@@ -119,7 +122,7 @@ class _Workplace(object):
 
         self.method = BetaVAEMethod(model=model, datamodule=clevr_datamodule, params=cfg)
 
-        logger_name = "btc-vae/ctrast71-"+cfg.decoder_type+"-beta-"+str(cfg.beta)+"-ldim-"+str(cfg.latent_dim)+ "-s-" + str(seed)#"-dup-"+str(cfg.dup_threshold)
+        logger_name = "btc-vae/"+self.dataset+"/"+cfg.decoder_type+"-beta-"+str(cfg.beta)+"-ldim-"+str(cfg.latent_dim)+ "-s-" + str(seed)#"-dup-"+str(cfg.dup_threshold)
         logger = pl_loggers.WandbLogger(project="objectness-test-clevr6", name=logger_name)
         # Use this line for Tensorboard logger
         # logger = pl_loggers.TensorBoardLogger("./logs/"+logger_name+strftime("-%Y%m%d%H%M%S", localtime()))

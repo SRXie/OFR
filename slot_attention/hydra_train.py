@@ -11,6 +11,7 @@ from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.utilities.seed import seed_everything
 from torchvision import transforms
 import pandas as pd
+import numpy as np
 
 from slot_attention.data import CLEVRDataModule
 from slot_attention.method import SlotAttentionMethod
