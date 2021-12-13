@@ -155,8 +155,8 @@ class SlotAttentionMethod(pl.LightningModule):
         obj_greedy_losses_nodup_en_A, obj_greedy_losses_nodup_en_D, attr_greedy_losses_nodup_en = [], [], []
         obj_greedy_losses_nodup_hn_A, obj_greedy_losses_nodup_hn_D, attr_greedy_losses_nodup_hn = [], [], []
         obj_pd_greedy_losses, attr_pd_greedy_losses = [], []
-        obj_pd_greedy_losses_en, attr_pd_greedy_losses_en = [], []
-        obj_pd_greedy_losses_hn, attr_pd_greedy_losses_hn = [], []
+        obj_pd_greedy_losses_en_A, obj_pd_greedy_losses_en_D, attr_pd_greedy_losses_en = [], [], []
+        obj_pd_greedy_losses_hn_A, obj_pd_greedy_losses_hn_D, attr_pd_greedy_losses_hn = [], [], []
 
         obj_greedy_cos_losses_nodup, attr_greedy_cos_losses_nodup = [], []
         obj_greedy_cos_losses_nodup_en_A, obj_greedy_cos_losses_nodup_en_D, attr_greedy_cos_losses_nodup_en = [], [], []
