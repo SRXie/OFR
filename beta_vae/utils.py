@@ -97,7 +97,7 @@ def split_and_interleave_stack(input, split_size):
 
 def compute_loss(cat_zs, losses):
     zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
-    print(torch.cat([zs_A.unsqueeze(-1), zs_B.unsqueeze(-1), zs_C.unsqueeze(-1), zs_D.unsqueeze(-1)], -1))
+    # print(torch.cat([zs_A.unsqueeze(-1), zs_B.unsqueeze(-1), zs_C.unsqueeze(-1), zs_D.unsqueeze(-1)], -1))
     batch_size, z_dim = zs_A.shape
     loss = torch.norm(zs_A-zs_B+zs_C-zs_D, 2, -1)
 
