@@ -43,6 +43,7 @@ if INSIDE_BLENDER:
     print("$VERSION is your Blender version (such as 2.78).")
     sys.exit(1)
 
+ROOT = '/checkpoint/siruixie/clevr_obj_test/output'
 parser = argparse.ArgumentParser()
 
 # Input options
@@ -100,22 +101,22 @@ parser.add_argument('--split', default='new',
     help="Name of the split for which we are rendering. This will be added to " +
          "the names of rendered images, and will also be stored in the JSON " +
          "scene structure for each image.")
-parser.add_argument('--output_image_dir', default='/checkpoint/siruixie/clevr_obj_test/output/images/',
+parser.add_argument('--output_image_dir', default=ROOT+'/images/',
     help="The directory where output images will be stored. It will be " +
          "created if it does not exist.")
-parser.add_argument('--output_imgbg_dir', default='../output/bgs/',
+parser.add_argument('--output_imgbg_dir', default=ROOT+'/bgs/',
     help="The directory where output images with another backgroun will be stored. " +
          "It will be created if it does not exist.")
-parser.add_argument('--output_mask_dir', default='../output/masks/',
+parser.add_argument('--output_mask_dir', default=ROOT+'/masks/',
     help="The directory where output masks will be stored. It will be " +
          "created if it does not exist.")
-parser.add_argument('--output_scene_dir', default='/checkpoint/siruixie/clevr_obj_test/output/scenes/',
+parser.add_argument('--output_scene_dir', default=ROOT+'/scenes/',
     help="The directory where output JSON scene structures will be stored. " +
          "It will be created if it does not exist.")
-parser.add_argument('--output_meta_dir', default='/checkpoint/siruixie/clevr_obj_test/output/meta/',
+parser.add_argument('--output_meta_dir', default=ROOT+'/meta/',
     help="The directory where output JSON scene structures will be stored. " +
          "It will be created if it does not exist.")
-parser.add_argument('--output_scene_file', default='/checkpoint/siruixie/clevr_obj_test/output/CLEVR_scenes.json',
+parser.add_argument('--output_scene_file', default=ROOT+'/CLEVR_scenes.json',
     help="Path to write a single JSON file containing all scene information")
 parser.add_argument('--output_blend_dir', default='output/blendfiles/',
     help="The directory where blender scene files will be stored, if the " +
