@@ -428,13 +428,13 @@ def render_scene(args,
         print(e)
 
     backgrounds = (rgba, gt_mat, new_rgba, new_gt_mat)
-    render_subscene_obj(scene_struct, blender_objects, backgrounds, output_image, output_bg, output_scene, output_meta, args)
+    render_subscene_obj(scene_struct, blender_objects, backgrounds, output_image, output_bg, output_mask, output_scene, output_meta, args)
 
   if args.attr_test:
     render_subscene_attr(scene_struct, blender_objects, output_image, output_scene, output_meta, args)
 
 
-def render_subscene_obj(scene_struct, blender_objects, backgrounds, output_image, output_bg, output_scene, output_meta, args):
+def render_subscene_obj(scene_struct, blender_objects, backgrounds, output_image, output_bg, output_mask, output_scene, output_meta, args):
 
   scene_index = 0
 
@@ -450,7 +450,7 @@ def render_subscene_obj(scene_struct, blender_objects, backgrounds, output_image
 
       render_args = bpy.context.scene.render
       render_args.filepath = output_image[:-4]+'_%04d' % scene_index+output_image[-4:]
-      mask_path = args.output_mask_dir[:-4]+'_%04d' % scene_index+args.output_mask_dir[-4:]
+      mask_path = output_mask[:-4]+'_%04d' % scene_index+output_mask[-4:]
 
       for obj in blender_objects:
         utils.delete_object(obj)
