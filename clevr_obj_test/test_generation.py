@@ -6,11 +6,13 @@ import os
 import json
 import itertools
 import random
+from PIL import Image
+import numpy as np
 
 SCENE_SUMMARY = None
 
 def create_path(test_root, main_scene_idx, sub_scene_idx=0, file_type='images'):
-    assert file_type == "images" or file_type == "scenes" or file_type == "meta"
+    assert file_type == "images" or file_type == "scenes" or file_type == "meta" or file_type == "masks" or file_type == "bgs"
     global SCENE_SUMMARY
     if not SCENE_SUMMARY:
         with open(os.path.join(test_root, "CLEVR_scenes.json")) as f:
@@ -81,7 +83,10 @@ def obj_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0, decomposed=No
             subset_idx_D = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_D)]
 
             image_B_path = create_path(test_root, main_scene_idx, subset_idx_B)
-            image_D_path = create_path(test_root, main_scene_idx, subset_idx_D)
+            image_D_path = create_path(test_root, main_scene_idx, subset_idx_D, file_type="bgs")
+
+            mask_B_path = create_path(test_root, main_scene_idx, subset_idx_B, file_type="masks")
+            mask_D_path = create_path(test_root, main_scene_idx, subset_idx_D, file_type="masks")
 
             # Then decompose part_23 into part_2 and part_3:
             for num_decomp_2 in range(1,min(len(part_23)-2,7-len(part_1))):
@@ -96,18 +101,35 @@ def obj_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0, decomposed=No
                     subset_idx_C = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_C)]
 
                     image_A_path = create_path(test_root, main_scene_idx, subset_idx_A)
-                    image_C_path = create_path(test_root, main_scene_idx, subset_idx_C)
+                    image_C_path = create_path(test_root, main_scene_idx, subset_idx_C, file_type="bgs")
 
-                    # hard negative
-                    drop_idx = random.randint(0, len(subset_idx_list_A)-1)
-                    subset_idx_E = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_A[:drop_idx]+subset_idx_list_A[drop_idx+1:])]
-                    image_E_path = create_path(test_root, main_scene_idx, subset_idx_E)
+                    mask_A_path = create_path(test_root, main_scene_idx, subset_idx_A, file_type="masks")
+                    mask_C_path = create_path(test_root, main_scene_idx, subset_idx_C, file_type="masks")
 
-                    drop_idx = random.randint(0, len(subset_idx_list_D)-1)
-                    subset_idx_F = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_D[:drop_idx]+subset_idx_list_D[drop_idx+1:])]
-                    image_F_path = create_path(test_root, main_scene_idx, subset_idx_F)
+                    mask_A = np.array(Image.open(mask_A_path))[:,:,0]
+                    mask_A = np.where(mask_A==64, 0.0, mask_A)
+                    mask_A = np.where(mask_A==255, 1.0, mask_A)
+                    mask_B = np.array(Image.open(mask_B_path))[:,:,0]
+                    mask_B = np.where(mask_B==64, 0.0, mask_B)
+                    mask_B = np.where(mask_B==255, 1.0, mask_B)
+                    mask_C = np.array(Image.open(mask_C_path))[:,:,0]
+                    mask_C = np.where(mask_C==64, 0.0, mask_C)
+                    mask_C = np.where(mask_C==255, 1.0, mask_C)
+                    mask_D = np.array(Image.open(mask_D_path))[:,:,0]
+                    mask_D = np.where(mask_D==64, 0.0, mask_D)
+                    mask_D = np.where(mask_D==255, 1.0, mask_D)
 
-                    tuples.append((image_A_path, image_B_path, image_C_path, image_D_path, image_E_path, image_F_path))
+                    if np.abs(mask_A-mask_B+mask_C-mask_D).sum() > 1000.0: # 800 is the minimum number of visible pixels
+                        # hard negative
+                        drop_idx = random.randint(0, len(subset_idx_list_A)-1)
+                        subset_idx_E = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_A[:drop_idx]+subset_idx_list_A[drop_idx+1:])]
+                        image_E_path = create_path(test_root, main_scene_idx, subset_idx_E)
+
+                        drop_idx = random.randint(0, len(subset_idx_list_D)-1)
+                        subset_idx_F = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_D[:drop_idx]+subset_idx_list_D[drop_idx+1:])]
+                        image_F_path = create_path(test_root, main_scene_idx, subset_idx_F)
+
+                        tuples.append((image_A_path, image_B_path, image_C_path, image_D_path, image_E_path, image_F_path))
 
             if not subset_idx_list_B in decomposed:
                 tuples += obj_algebra_test(test_root, main_scene_idx, subset_idx_B, decomposed)

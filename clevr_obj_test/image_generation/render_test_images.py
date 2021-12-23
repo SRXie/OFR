@@ -10,6 +10,7 @@ import math, sys, random, argparse, json, os, tempfile, itertools, copy
 from datetime import datetime as dt
 from collections import Counter
 from obj_scene import Obj, Scene
+import numpy as np
 
 """
 Renders random scenes using Blender, each with with a random number of objects;
@@ -65,9 +66,9 @@ parser.add_argument('--shape_color_combos_json', default=None,
          "for CLEVR-CoGenT.")
 
 # Settings for objects
-parser.add_argument('--min_objects', default=6, type=int,
+parser.add_argument('--min_objects', default=7, type=int,
     help="The minimum number of objects to place in each scene")
-parser.add_argument('--max_objects', default=9, type=int,
+parser.add_argument('--max_objects', default=8, type=int,
     help="The maximum number of objects to place in each scene")
 parser.add_argument('--min_dist', default=0.25, type=float,
     help="The minimum allowed distance between object centers")
@@ -79,6 +80,9 @@ parser.add_argument('--min_pixels_per_object', default=200, type=int,
     help="All objects will have at least this many visible pixels in the " +
          "final rendered images; this ensures that no objects are fully " +
          "occluded by other objects.")
+parser.add_argument('--min_pixels_occluded', default=1000, type=int,
+    help="All rendered images have this number of pixel occluded; this ensures"+
+         "that the object compositionality is non-trivial.")
 parser.add_argument('--max_retries', default=50, type=int,
     help="The number of times to try placing an object before giving up and " +
          "re-placing all objects in the scene.")
@@ -98,6 +102,12 @@ parser.add_argument('--split', default='new',
          "scene structure for each image.")
 parser.add_argument('--output_image_dir', default='/checkpoint/siruixie/clevr_obj_test/output/images/',
     help="The directory where output images will be stored. It will be " +
+         "created if it does not exist.")
+parser.add_argument('--output_imgbg_dir', default='../output/bgs/',
+    help="The directory where output images with another backgroun will be stored. " +
+         "It will be created if it does not exist.")
+parser.add_argument('--output_mask_dir', default='../output/masks/',
+    help="The directory where output masks will be stored. It will be " +
          "created if it does not exist.")
 parser.add_argument('--output_scene_dir', default='/checkpoint/siruixie/clevr_obj_test/output/scenes/',
     help="The directory where output JSON scene structures will be stored. " +
@@ -166,6 +176,8 @@ def main(args):
   num_digits = 6
   prefix = '%s_%s_' % (args.filename_prefix, args.split)
   img_template = '%s%%0%dd.png' % (prefix, num_digits)
+  bg_template = '%s%%0%dd.png' % (prefix, num_digits)
+  mask_template = '%s%%0%dd.png' % (prefix, num_digits)
   scene_template = '%s%%0%dd.json' % (prefix, num_digits)
   meta_template = '%s%%0%dd.json' % (prefix, num_digits)
   blend_template = '%s%%0%dd.blend' % (prefix, num_digits)
@@ -182,18 +194,26 @@ def main(args):
 
   if args.obj_test or args.attr_test:
     args.output_image_dir=insert_test_to_dir(args.output_image_dir)
+    args.output_imgbg_dir=insert_test_to_dir(args.output_imgbg_dir)
+    args.output_mask_dir=insert_test_to_dir(args.output_mask_dir)
     args.output_scene_dir=insert_test_to_dir(args.output_scene_dir)
     args.output_meta_dir=insert_test_to_dir(args.output_meta_dir)
     args.output_blen_dir=insert_test_to_dir(args.output_blend_dir)
     args.output_scene_file=insert_test_to_dir(args.output_scene_file, True)
 
   img_template = os.path.join(args.output_image_dir, img_template)
+  bg_template = os.path.join(args.output_imgbg_dir, bg_template)
+  mask_template = os.path.join(args.output_mask_dir, mask_template)
   scene_template = os.path.join(args.output_scene_dir, scene_template)
   meta_template = os.path.join(args.output_meta_dir, meta_template)
   blend_template = os.path.join(args.output_blend_dir, blend_template)
 
   if not os.path.isdir(args.output_image_dir):
     os.makedirs(args.output_image_dir)
+  if not os.path.isdir(args.output_imgbg_dir):
+    os.makedirs(args.output_imgbg_dir)
+  if not os.path.isdir(args.output_mask_dir):
+    os.makedirs(args.output_mask_dir)
   if not os.path.isdir(args.output_scene_dir):
     os.makedirs(args.output_scene_dir)
   if not os.path.isdir(args.output_meta_dir):
@@ -205,6 +225,8 @@ def main(args):
   all_scene_paths = []
   for i in range(args.num_images):
     img_path = img_template % (i + args.start_idx)
+    bg_path = bg_template % (i + args.start_idx)
+    mask_path = mask_template % (i + args.start_idx)
     scene_path = scene_template % (i + args.start_idx)
     meta_path = meta_template % (i + args.start_idx)
     all_scene_paths.append(scene_path)
@@ -212,7 +234,7 @@ def main(args):
     if args.save_blendfiles == 1:
       blend_path = blend_template % (i + args.start_idx)
     if args.attr_test:
-      num_objects = 1
+      num_objects = 6
     else:
       num_objects = random.randint(args.min_objects, args.max_objects)
     render_scene(args,
@@ -220,6 +242,8 @@ def main(args):
       output_index=(i + args.start_idx),
       output_split=args.split,
       output_image=img_path,
+      output_bg=bg_path,
+      output_mask=mask_path,
       output_scene=scene_path,
       output_meta=meta_path,
       output_blendfile=blend_path,
@@ -250,6 +274,8 @@ def render_scene(args,
     output_index=0,
     output_split='none',
     output_image='render.png',
+    output_bg='render_bg.png',
+    output_mask='mask.png',
     output_scene='render_json',
     output_meta='meta_json',
     output_blendfile=None,
@@ -321,6 +347,21 @@ def render_scene(args,
   # contains the actual ground plane.
   utils.delete_object(plane)
 
+  # Add backgroun color
+  bg_mapping = {}
+  for name, rgb in PROPERTIES['bg_color'].items():
+    rgba = [float(c) / 255.0 for c in rgb]+[1.0]
+    bg_mapping[name] = rgba
+
+  color_name, rgba = random.choice(list(bg_mapping.items()))
+  bpy.data.objects["Ground"].color = rgba
+  gt_mat = bpy.data.materials.new("bgcolor")
+  gt_mat.use_nodes = True
+  diffuse_bsdf = gt_mat.node_tree.nodes["Diffuse BSDF"]
+  diffuse_bsdf.inputs[0].default_value = rgba
+  # gt_mat.use_object_color = True
+  bpy.data.objects["Ground"].active_material = gt_mat
+
   # Save all six axis-aligned directions in the scene struct
   scene_struct.directions['behind'] = tuple(plane_behind)
   scene_struct.directions['front'] = tuple(-plane_behind)
@@ -354,6 +395,8 @@ def render_scene(args,
     except Exception as e:
       print(e)
 
+  render_mask(blender_objects, output_mask)
+
   with open(output_scene, 'w') as f:
     json.dump(scene_struct.to_dictionary(), f, indent=2)
 
@@ -361,15 +404,36 @@ def render_scene(args,
     bpy.ops.wm.save_as_mainfile(filepath=output_blendfile)
 
   if args.obj_test:
-    render_subscene_obj(scene_struct, blender_objects, output_image, output_scene, output_meta, args)
+    # Change the background
+    while True:
+        new_color_name, new_rgba = random.choice(list(bg_mapping.items()))
+        if not new_color_name == color_name:
+          break
+    bpy.data.objects["Ground"].color = new_rgba
+    new_gt_mat = bpy.data.materials.new("bgcolor")
+    new_gt_mat.use_nodes = True
+    diffuse_bsdf = new_gt_mat.node_tree.nodes["Diffuse BSDF"]
+    diffuse_bsdf.inputs[0].default_value = new_rgba
+    # gt_mat.use_object_color = True
+    bpy.data.objects["Ground"].active_material = new_gt_mat
+
+    render_args.filepath = output_bg
+
+    while True:
+      try:
+        bpy.ops.render.render(write_still=True)
+        break
+      except Exception as e:
+        print(e)
+
+    backgrounds = (rgba, gt_mat, new_rgba, new_gt_mat)
+    render_subscene_obj(scene_struct, blender_objects, backgrounds, output_image, output_bg, output_scene, output_meta, args)
 
   if args.attr_test:
     render_subscene_attr(scene_struct, blender_objects, output_image, output_scene, output_meta, args)
 
 
 def render_subscene_obj(scene_struct, blender_objects, output_image, output_scene, output_meta, args):
-  with open(args.properties_json, 'r') as f:
-    properties = json.load(f)
 
   scene_index = 0
 
@@ -385,23 +449,38 @@ def render_subscene_obj(scene_struct, blender_objects, output_image, output_scen
 
       render_args = bpy.context.scene.render
       render_args.filepath = output_image[:-4]+'_%04d' % scene_index+output_image[-4:]
+      mask_path = args.output_mask_dir[:-4]+'_%04d' % scene_index+args.output_mask_dir[-4:]
 
       for obj in blender_objects:
         utils.delete_object(obj)
       blender_objects = []
       for obj in sub_scene_struct.objects:
-        utils.add_object(args.shape_dir, properties['shape'][obj.shape], obj.scale, obj.threed_coords[:2], theta=obj.rotation)
-        utils.add_material(properties['material'][obj.material], Color=[float(c) / 255.0 for c in properties['color'][obj.color]] + [1.0])
+        utils.add_object(args.shape_dir, PROPERTIES['shape'][obj.shape], obj.scale, obj.threed_coords[:2], theta=obj.rotation)
+        utils.add_material(PROPERTIES['material'][obj.material], Color=[float(c) / 255.0 for c in PROPERTIES['color'][obj.color]] + [1.0])
         b_obj = bpy.context.object
         blender_objects.append(b_obj)
 
       sub_scene_struct.relationships = compute_all_relationships(sub_scene_struct)
+      rgba, gt_mat, new_rgba, new_gt_mat = backgrounds
+      bpy.data.objects["Ground"].color = rgba
+      bpy.data.objects["Ground"].active_material = gt_mat
       while True:
         try:
           bpy.ops.render.render(write_still=True)
           break
         except Exception as e:
           print(e)
+      render_args.filepath = output_bg[:-4]+'_%04d' % scene_index+output_bg[-4:]
+      bpy.data.objects["Ground"].color = new_rgba
+      bpy.data.objects["Ground"].active_material = new_gt_mat
+      while True:
+        try:
+          bpy.ops.render.render(write_still=True)
+          break
+        except Exception as e:
+          print(e)
+
+      render_mask(blender_objects, mask_path)
 
       if k > 1:
         map_objs_to_idx["-".join([str(i) for i in sub_scene_struct.objs_idx])] = scene_index
@@ -418,49 +497,45 @@ def render_subscene_obj(scene_struct, blender_objects, output_image, output_scen
   return
 
 def render_subscene_attr(scene_struct, blender_objects, output_image, output_scene, output_meta, args):
-  with open(args.properties_json, 'r') as f:
-    properties = json.load(f)
-
-  scene_index = 0
 
   map_attrs_to_idx = {}
 
-  attr_list = list(properties.keys())
+  attr_list = list(PROPERTIES.keys())
 
-  for k in range(1, len(attr_list)+1):
-    for attr_subset in itertools.combinations(attr_list, k):
-      sub_scene_struct = copy.deepcopy(scene_struct)
-      objs = sub_scene_struct.objects[0].edit_attrs(attr_subset)
-      for obj in objs:
-        sub_scene_struct.objects[0] = obj
-        scene_index += 1
+  attr_list.remove('bg_color')
 
-        render_args = bpy.context.scene.render
-        render_args.filepath = output_image[:-4]+'_%04d' % scene_index+output_image[-4:]
+  for scene_index, attr in enumerate(attr_list):
+    sub_scene_struct = copy.deepcopy(scene_struct)
+    obj = sub_scene_struct.objects[scene_index].edit_attrs([attr])[0]
+    sub_scene_struct.objects[scene_index] = obj
 
-        for b_obj in blender_objects:
-          # Note: we may not need to delete all objects in multi-obj scene
-          utils.delete_object(b_obj)
-        scale = properties['size'][obj.size]
-        if obj.shape == 'Cube':
-          scale /= math.sqrt(2)
-        utils.add_object(args.shape_dir, properties['shape'][obj.shape], scale, obj.threed_coords[:2], theta=obj.rotation)
-        utils.add_material(properties['material'][obj.material], Color=[float(c) / 255.0 for c in properties['color'][obj.color]] + [1.0])
-        b_obj = bpy.context.object
-        blender_objects.append(b_obj)
+    render_args = bpy.context.scene.render
+    render_args.filepath = output_image[:-4]+'_'+attr+output_image[-4:]
 
-        sub_scene_struct.relationships = compute_all_relationships(sub_scene_struct)
-        while True:
-          try:
-            bpy.ops.render.render(write_still=True)
-            break
-          except Exception as e:
-            print(e)
+    for b_obj in blender_objects:
+      # Note: we may not need to delete all objects in multi-obj scene
+      utils.delete_object(b_obj)
+    for obj in sub_scene_struct.objects:
+      scale = properties['size'][obj.size]
+      if obj.shape == 'Cube':
+        scale /= math.sqrt(2)
+      utils.add_object(args.shape_dir, properties['shape'][obj.shape], scale, obj.threed_coords[:2], theta=obj.rotation)
+      utils.add_material(properties['material'][obj.material], Color=[float(c) / 255.0 for c in properties['color'][obj.color]] + [1.0])
+      b_obj = bpy.context.object
+      blender_objects.append(b_obj)
 
-        map_attrs_to_idx["-".join([str(obj.size), str(obj.color), str(obj.material), str(obj.shape)])] = scene_index
+    sub_scene_struct.relationships = compute_all_relationships(sub_scene_struct)
+    while True:
+      try:
+        bpy.ops.render.render(write_still=True)
+        break
+      except Exception as e:
+        print(e)
 
-        with open(output_scene[:-5]+'_%04d' % scene_index+output_scene[-5:], 'w') as f:
-          json.dump(sub_scene_struct.to_dictionary(), f, indent=2)
+    map_attrs_to_idx["-".join([str(obj.size), str(obj.color), str(obj.material), str(obj.shape)])] = scene_index
+
+    with open(output_scene[:-5]+'_'+attr+output_scene[-5:], 'w') as f:
+      json.dump(sub_scene_struct.to_dictionary(), f, indent=2)
 
   with open(output_meta, 'w') as f:
         json.dump(map_attrs_to_idx, f, indent=2)
@@ -470,21 +545,18 @@ def add_random_objects(scene_struct, num_objects, args, camera):
   Add random objects to the current blender scene
   """
 
-  # Load the property file
-  with open(args.properties_json, 'r') as f:
-    properties = json.load(f)
-    color_name_to_rgba = {}
-    for name, rgb in properties['color'].items():
-      rgba = [float(c) / 255.0 for c in rgb] + [1.0]
-      color_name_to_rgba[name] = rgba
-    material_mapping = [(v, k) for k, v in properties['material'].items()]
-    object_mapping = [(v, k) for k, v in properties['shape'].items()]
-    size_mapping = list(properties['size'].items())
+  color_name_to_rgba = {}
+  for name, rgb in PROPERTIES['color'].items():
+    rgba = [float(c) / 255.0 for c in rgb] + [1.0]
+    color_name_to_rgba[name] = rgba
+  material_mapping = [(v, k) for k, v in PROPERTIES['material'].items()]
+  object_mapping = [(v, k) for k, v in PROPERTIES['shape'].items()]
+  size_mapping = list(PROPERTIES['size'].items())
 
   shape_color_combos = None
-  if args.shape_color_combos_json is not None:
-    with open(args.shape_color_combos_json, 'r') as f:
-      shape_color_combos = list(json.load(f).items())
+  # if args.shape_color_combos_json is not None:
+  #   with open(args.shape_color_combos_json, 'r') as f:
+  #     shape_color_combos = list(json.load(f).items())
 
   positions = []
   objects = []
@@ -571,10 +643,11 @@ def add_random_objects(scene_struct, num_objects, args, camera):
 
   # Check that all objects are at least partially visible in the rendered image
   all_visible = check_visibility(blender_objects, args.min_pixels_per_object)
-  if not all_visible:
+  sufficent_occlusion = check_occlusion(blender_objects, args.min_pixels_occluded, args.output_mask_dir)
+  if not all_visible or not sufficent_occlusion:
     # If any of the objects are fully occluded then start over; delete all
     # objects from the scene and place them all again.
-    print('Some objects are occluded; replacing objects')
+    print('Some objects are over occluded or not sufficiently occluded; replacing objects')
     for obj in blender_objects:
       utils.delete_object(obj)
     return add_random_objects(scene_struct, num_objects, args, camera)
@@ -626,6 +699,7 @@ def check_visibility(blender_objects, min_pixels_per_object):
   p = list(img.pixels)
   color_count = Counter((p[i], p[i+1], p[i+2], p[i+3])
                         for i in range(0, len(p), 4))
+  bpy.data.images.remove(img)
   os.remove(path)
   if len(color_count) != len(blender_objects) + 1:
     return False
@@ -634,6 +708,37 @@ def check_visibility(blender_objects, min_pixels_per_object):
       return False
   return True
 
+def check_occlusion(blender_objects, min_pixels_occluded, output_mask):
+  """
+  Check whether the total number of occluded pixels meets our requirement;
+  to accomplish this we assign white color to all objects, and render using
+  no lighting or shading or antialiasing; this ensures that each object is
+  just a solid uniform color. We can then sum the white pixels together and count
+  the total number of occluded pixels
+  Returns True if occlusion is sufficient and False otherwise
+  """
+  pixels = []
+  for i in range(len(blender_objects)):
+    # f, path = tempfile.mkstemp(suffix='.png')
+    path = output_mask+'%04d.png' % i
+    render_mask(blender_objects, path=path, obj_index=i)
+    img = bpy.data.images.load(path)
+    p = list(img.pixels)
+    p = np.array(p[0::4])
+    p = np.where(p<1.0, 0.0, p)
+    pixels.append(p)
+    bpy.data.images.remove(img)
+    os.remove(path)
+  overlap = np.stack(pixels).sum(0)
+  overlap = np.where(overlap>1.0, 1.0, 0.0).sum()
+  if overlap>min_pixels_occluded:
+    del pixels
+    del overlap
+    return True
+  else:
+    del pixels
+    del overlap
+    return False
 
 def render_shadeless(blender_objects, path='flat.png'):
   """
@@ -696,12 +801,141 @@ def render_shadeless(blender_objects, path='flat.png'):
 
   return object_colors
 
+def render_mask(blender_objects, path='mask.png', obj_index=None):
+  """
+  Render a version of the scene with shading disabled and unique materials
+  assigned to all objects, and return a set of all colors that should be in the
+  rendered image. The image itself is written to path. This is used to ensure
+  that all objects will be visible in the final rendered scene.
+  """
+
+  render_args = bpy.context.scene.render
+
+  # Cache the render args we are about to clobber
+  old_filepath = render_args.filepath
+  old_engine = render_args.engine
+  old_use_antialiasing = render_args.use_antialiasing
+  old_bg_color = bpy.data.objects["Ground"].color
+
+  # Override some render settings to have flat shading
+  render_args.filepath = path
+
+  render_args.engine = 'BLENDER_RENDER'
+  render_args.use_antialiasing = False
+
+  # Move the lights and ground to layer 2 so they don't render
+  utils.set_layer(bpy.data.objects['Lamp_Key'], 2)
+  utils.set_layer(bpy.data.objects['Lamp_Fill'], 2)
+  utils.set_layer(bpy.data.objects['Lamp_Back'], 2)
+  utils.set_layer(bpy.data.objects['Ground'], 2)
+
+  # Add white shadeless materials to all objects
+  old_materials = []
+  for i, obj in enumerate(blender_objects):
+      old_materials.append(obj.data.materials[0])
+      if obj_index is None or obj_index==i:
+        bpy.ops.material.new()
+        mat = bpy.data.materials['Material']
+        mat.name = 'Material_%d' % i
+        r, g, b = [1 for _ in range(3)] # 1 for white color
+        mat.diffuse_color = [r, g, b]
+        mat.use_shadeless = True
+        obj.data.materials[0] = mat
+      else:
+        utils.set_layer(obj, 2)
+
+  # Render the scene
+  bpy.ops.render.render(write_still=True)
+
+  # Undo the above; first restore the materials to objects
+  if not obj_index is None:
+    for obj in blender_objects:
+      utils.set_layer(obj, 0)
+  for mat, obj in zip(old_materials, blender_objects):
+    obj.data.materials[0] = mat
+
+  # Move the lights and ground back to layer 0
+  utils.set_layer(bpy.data.objects['Lamp_Key'], 0)
+  utils.set_layer(bpy.data.objects['Lamp_Fill'], 0)
+  utils.set_layer(bpy.data.objects['Lamp_Back'], 0)
+  utils.set_layer(bpy.data.objects['Ground'], 0)
+
+  # Set the render settings back to what they were
+  render_args.filepath = old_filepath
+  render_args.engine = old_engine
+  render_args.use_antialiasing = old_use_antialiasing
+
+def render_mask(blender_objects, path='mask.png', obj_index=None):
+  """
+  Render a version of the scene with shading disabled and white color assigned
+  to all objects. The image itself is written to path. This is used to ensure
+  that all objects will be visible in the final rendered scene.
+  """
+
+  render_args = bpy.context.scene.render
+
+  # Cache the render args we are about to clobber
+  old_filepath = render_args.filepath
+  old_engine = render_args.engine
+  old_use_antialiasing = render_args.use_antialiasing
+  old_bg_color = bpy.data.objects["Ground"].color
+
+  # Override some render settings to have flat shading
+  render_args.filepath = path
+
+  render_args.engine = 'BLENDER_RENDER'
+  render_args.use_antialiasing = False
+
+  # Move the lights and ground to layer 2 so they don't render
+  utils.set_layer(bpy.data.objects['Lamp_Key'], 2)
+  utils.set_layer(bpy.data.objects['Lamp_Fill'], 2)
+  utils.set_layer(bpy.data.objects['Lamp_Back'], 2)
+  utils.set_layer(bpy.data.objects['Ground'], 2)
+
+  # Add white shadeless materials to all objects
+  old_materials = []
+  for i, obj in enumerate(blender_objects):
+      old_materials.append(obj.data.materials[0])
+      if obj_index is None or obj_index==i:
+        bpy.ops.material.new()
+        mat = bpy.data.materials['Material']
+        mat.name = 'Material_%d' % i
+        r, g, b = [1 for _ in range(3)] # 1 for white color
+        mat.diffuse_color = [r, g, b]
+        mat.use_shadeless = True
+        obj.data.materials[0] = mat
+      else:
+        utils.set_layer(obj, 2)
+
+  # Render the scene
+  bpy.ops.render.render(write_still=True)
+
+  # Undo the above; first restore the materials to objects
+  if not obj_index is None:
+    for obj in blender_objects:
+      utils.set_layer(obj, 0)
+  for mat, obj in zip(old_materials, blender_objects):
+    obj.data.materials[0] = mat
+
+  # Move the lights and ground back to layer 0
+  utils.set_layer(bpy.data.objects['Lamp_Key'], 0)
+  utils.set_layer(bpy.data.objects['Lamp_Fill'], 0)
+  utils.set_layer(bpy.data.objects['Lamp_Back'], 0)
+  utils.set_layer(bpy.data.objects['Ground'], 0)
+
+  # Set the render settings back to what they were
+  render_args.filepath = old_filepath
+  render_args.engine = old_engine
+  render_args.use_antialiasing = old_use_antialiasing
 
 if __name__ == '__main__':
   if INSIDE_BLENDER:
     # Run normally
     argv = utils.extract_args()
     args = parser.parse_args(argv)
+    # Load the property file
+    with open(args.properties_json, 'r') as f:
+      PROPERTIES = json.load(f)
     main(args)
   elif '--help' in sys.argv or '-h' in sys.argv:
     parser.print_help()

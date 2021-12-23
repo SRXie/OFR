@@ -1,5 +1,6 @@
 # Define Class of scene and obj
 import itertools
+import random
 from copy import deepcopy
 
 # TODO: load it from properties.json
@@ -30,11 +31,11 @@ ATTR_GRAM = {
                 }
 
 class Obj(object):
-    def __init__(self, 
-        index, 
-        shape, 
-        size, 
-        scale, 
+    def __init__(self,
+        index,
+        shape,
+        size,
+        scale,
         material,
         threed_coords,
         rotation,
@@ -42,17 +43,17 @@ class Obj(object):
         color,
         attrs2img=None,):
 
-        self.index = index 
-        self.shape = shape 
-        self.size = size 
-        self.scale = scale 
+        self.index = index
+        self.shape = shape
+        self.size = size
+        self.scale = scale
         self.material = material
         self.threed_coords = threed_coords
         self.rotation = rotation
         self.pixel_coords = pixel_coords
         self.color = color
         self.attrs2img = attrs2img
-    
+
     def edit_attrs(self, attributes, return_imgs=False):
         ### Attrbutes is a list of attributes to be edited ###
         ### Check if it is the case first ##
@@ -72,16 +73,16 @@ class Obj(object):
 
         # if only one attribute to edit, there is no combination
         if len(attributes) == 1:
-            for attr_val in attrs_enumeration[0]:
-                obj1 = deepcopy(self)
-                attr_str = '"'+attr_val+'"'
-                exec('obj1.'+attributes[0]+'='+ attr_str)
-                objs.append(obj1)
-                
-                if return_imgs:
-                    img_idx = self.attrs2img["-".join([str(obj1.size), str(obj1.color), str(obj1.material), str(obj1.shape)])]
-                    images.append(img_idx)
-            
+            attr_val = random.choice(attrs_enumeration[0])
+            obj1 = deepcopy(self)
+            attr_str = '"'+attr_val+'"'
+            exec('obj1.'+attributes[0]+'='+ attr_str)
+            objs.append(obj1)
+
+            if return_imgs:
+                img_idx = self.attrs2img["-".join([str(obj1.size), str(obj1.color), str(obj1.material), str(obj1.shape)])]
+                images.append(img_idx)
+
             if return_imgs:
                 return images
             else:
@@ -92,12 +93,12 @@ class Obj(object):
             gather = []
             for item in object:
                 if isinstance(item, (list, tuple, set)):
-                    gather.extend(flatten(item))            
+                    gather.extend(flatten(item))
                 else:
                     gather.append(item)
-            return gather    
+            return gather
 
-        # a recurrsive function to compose attribute edits 
+        # a recurrsive function to compose attribute edits
         def recurr_edit(prod, level):
             if level == 0:
                 for cp in itertools.product(attrs_enumeration[level], prod):
@@ -115,7 +116,7 @@ class Obj(object):
                     return images
                 else:
                     return objs
-            else: 
+            else:
                 prod = list(itertools.product(attrs_enumeration[level], prod))
                 return recurr_edit(prod, level-1)
 
@@ -125,18 +126,18 @@ class Obj(object):
 
 
 class Scene(object):
-    def __init__(self, 
-        split, 
-        image_index, 
-        image_filename, 
-        objects, 
+    def __init__(self,
+        split,
+        image_index,
+        image_filename,
+        objects,
         directions,
-        objs_idx, 
+        objs_idx,
         objs2img=None,
         bg_image_index=0):
 
         self.split = split
-        self.image_index = image_index 
+        self.image_index = image_index
         self.image_filename = image_filename
         self.objects = objects
         self.directions = directions
@@ -154,7 +155,7 @@ class Scene(object):
 
     def get_bg_image(self):
         return self.bg_image_index
-    
+
     def get_obj_attrs(self):
         return set(ATTR_GRAM.keys())
 
@@ -162,7 +163,7 @@ class Scene(object):
         dictionary = deepcopy(self.__dict__)
         dictionary['objects'] = [obj.__dict__ for obj in self.objects]
         return dictionary
-    
+
     def decompose(self, num_obj_decomp):
         image_pairs = []
         for obj_subset in itertools.combinations(set(self.objs_idx), num_obj_decomp):
@@ -175,7 +176,3 @@ class Scene(object):
             image_pairs.append((image_1, image_2)) # these are image indices
 
         return image_pairs
-
-        
-
-        
