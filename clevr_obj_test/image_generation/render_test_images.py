@@ -80,7 +80,7 @@ parser.add_argument('--min_pixels_per_object', default=200, type=int,
     help="All objects will have at least this many visible pixels in the " +
          "final rendered images; this ensures that no objects are fully " +
          "occluded by other objects.")
-parser.add_argument('--min_pixels_occluded', default=1000, type=int,
+parser.add_argument('--min_pixels_occluded', default=800, type=int,
     help="All rendered images have this number of pixel occluded; this ensures"+
          "that the object compositionality is non-trivial.")
 parser.add_argument('--max_retries', default=50, type=int,
@@ -433,7 +433,7 @@ def render_scene(args,
     render_subscene_attr(scene_struct, blender_objects, output_image, output_scene, output_meta, args)
 
 
-def render_subscene_obj(scene_struct, blender_objects, output_image, output_scene, output_meta, args):
+def render_subscene_obj(scene_struct, blender_objects, backgrounds, output_image, output_bg, output_scene, output_meta, args):
 
   scene_index = 0
 
@@ -516,11 +516,11 @@ def render_subscene_attr(scene_struct, blender_objects, output_image, output_sce
       # Note: we may not need to delete all objects in multi-obj scene
       utils.delete_object(b_obj)
     for obj in sub_scene_struct.objects:
-      scale = properties['size'][obj.size]
+      scale = PROPERTIES['size'][obj.size]
       if obj.shape == 'Cube':
         scale /= math.sqrt(2)
-      utils.add_object(args.shape_dir, properties['shape'][obj.shape], scale, obj.threed_coords[:2], theta=obj.rotation)
-      utils.add_material(properties['material'][obj.material], Color=[float(c) / 255.0 for c in properties['color'][obj.color]] + [1.0])
+      utils.add_object(args.shape_dir, PROPERTIES['shape'][obj.shape], scale, obj.threed_coords[:2], theta=obj.rotation)
+      utils.add_material(PROPERTIES['material'][obj.material], Color=[float(c) / 255.0 for c in PROPERTIES['color'][obj.color]] + [1.0])
       b_obj = bpy.context.object
       blender_objects.append(b_obj)
 
