@@ -343,7 +343,7 @@ def compute_shuffle_greedy_loss(cat_slots_sorted, A_losses, D_losses, cos_sim=Fa
         # cat_indices_holder[:, num_slots-i-1] = tmp
         replace = replace.unsqueeze(-1).repeat(1, 1, slot_size)
         slots_cat = torch.where(replace, slots_cat[:,-1,:].unsqueeze(1).repeat(1, num_slots-i, 1), slots_cat)[:,:-1,:]
-        slots_A, slots_D_prime, slots_E, slots_F = torch.split(slots_cat, batch_size, 0)
+        slots_A, slots_D_prime, slots_E, slots_F = torch.split(slots_cat, batch_size*batch_size, 0)
 
     A_losses.append(-greedy_loss_A)
     D_losses.append(-greedy_loss_D)
