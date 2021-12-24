@@ -323,15 +323,15 @@ def compute_shuffle_greedy_loss(cat_slots_sorted, A_losses, D_losses, cos_sim=Fa
         # backtrace for greedy matching (2 times)
         greedy_criterion, indices_EF = greedy_criterion.min(-1)
         greedy_criterion, indices_AD = greedy_criterion.min(-1)
-        greedy_criterion_AE, greedy_criterion_DF = torch.split(greedy_criterion, batch_size*batch_size, 0)
-        greedy_loss_AE += greedy_criterion_AE.view(batch_size, batch_size, num_slots, slot_size).mean(1)
-        greedy_loss_DF += greedy_criterion_DF.view(batch_size, batch_size, num_slots, slot_size).mean(1)
+        greedy_criterion_A, greedy_criterion_D = torch.split(greedy_criterion, batch_size*batch_size, 0)
+        greedy_loss_A += greedy_criterion_A.view(batch_size, batch_size, num_slots, slot_size).mean(1)
+        greedy_loss_D += greedy_criterion_D.view(batch_size, batch_size, num_slots, slot_size).mean(1)
 
         index_AD = indices_AD.view(indices_AD.shape[0],1)
         index_EF = batched_index_select(indices_EF, 1, index_AD)
         index_EF = index_EF.view(index_EF.shape[0],1)
 
-        replace = torch.zeros(batch_size*4, num_slots-i, dtype=torch.bool)
+        replace = torch.zeros(batch_size*batch_size*4, num_slots-i, dtype=torch.bool)
         replace = replace.to(cat_slots_sorted.device)
         index_cat = torch.cat([index_AD, index_EF], dim=0)
         slots_cat = torch.cat([slots_AD, slots_EF], dim=0)
@@ -345,8 +345,8 @@ def compute_shuffle_greedy_loss(cat_slots_sorted, A_losses, D_losses, cos_sim=Fa
         slots_cat = torch.where(replace, slots_cat[:,-1,:].unsqueeze(1).repeat(1, num_slots-i, 1), slots_cat)[:,:-1,:]
         slots_A, slots_D_prime, slots_E, slots_F = torch.split(slots_cat, batch_size, 0)
 
-    losses_AE.append(-greedy_loss_AE)
-    losses_DF.append(-greedy_loss_DF)
+    A_losses.append(-greedy_loss_A)
+    D_losses.append(-greedy_loss_D)
 
 def compute_ari(table):
     """
