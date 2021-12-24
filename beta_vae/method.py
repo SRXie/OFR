@@ -120,9 +120,9 @@ class BetaVAEMethod(pl.LightningModule):
                 zs_E, zs_F = torch.split(cat_zs_EF, batch_size, 0)
 
                 compute_loss(cat_zs, losses)
-                compute_cosine_loss(cat_zs, cos_losses)
+                # compute_cosine_loss(cat_zs, cos_losses)
                 compute_partition_loss(cat_zs, losses_en_A, losses_en_D)
-                compute_partition_loss_hard(cat_zs, zs_E, zs_F, losses_hn_A, losses_hn_D)
+                # compute_partition_loss_hard(cat_zs, zs_E, zs_F, losses_hn_A, losses_hn_D)
 
                 # print("batch time:", datetime.now()-b_prev)
                 b_prev = datetime.now()
@@ -132,23 +132,23 @@ class BetaVAEMethod(pl.LightningModule):
             # compute_test_losses(adl, attr_losses, attr_losses_en, attr_losses_hn)
 
             avg_z_norm = torch.cat(z_norms).mean()
-            obj_loss = torch.cat(obj_losses, 0)/avg_z_norm
-            obj_loss_en_A = torch.cat([(x/avg_z_norm).mean(1) for x in obj_losses_en_A], 0)
-            obj_loss_en_D = torch.cat([(x/avg_z_norm).mean(1) for x in obj_losses_en_D], 0)
-            obj_loss_hn_A = torch.cat(obj_losses_hn_A, 0)/avg_z_norm
-            obj_loss_hn_D = torch.cat(obj_losses_hn_D, 0)/avg_z_norm
-            obj_loss_A = torch.cat([0.9*(x/avg_z_norm).mean(1)+0.1*(y/avg_z_norm) for x, y in zip(obj_losses_en_A, obj_losses_hn_A)], 0)
-            obj_loss_D = torch.cat([0.9*(x/avg_z_norm).mean(1)+0.1*(y/avg_z_norm) for x, y in zip(obj_losses_en_D, obj_losses_hn_D)], 0)
+            obj_loss = torch.cat(obj_losses, 0)
+            obj_loss_en_A = torch.cat([(x).mean(1) for x in obj_losses_en_A], 0)
+            obj_loss_en_D = torch.cat([(x).mean(1) for x in obj_losses_en_D], 0)
+            # obj_loss_hn_A = torch.cat(obj_losses_hn_A, 0)/avg_z_norm
+            # obj_loss_hn_D = torch.cat(obj_losses_hn_D, 0)/avg_z_norm
+            # obj_loss_A = torch.cat([0.9*(x/avg_z_norm).mean(1)+0.1*(y/avg_z_norm) for x, y in zip(obj_losses_en_A, obj_losses_hn_A)], 0)
+            # obj_loss_D = torch.cat([0.9*(x/avg_z_norm).mean(1)+0.1*(y/avg_z_norm) for x, y in zip(obj_losses_en_D, obj_losses_hn_D)], 0)
             avg_obj_ratio_en = ((obj_loss+obj_loss_en_D).div(obj_loss_en_A)).mean()
-            avg_obj_ratio_hn = ((obj_loss+obj_loss_hn_D).div(obj_loss_hn_A)).mean()
-            avg_obj_ratio = ((obj_loss+obj_loss_D).div(obj_loss_A)).mean()
+            # avg_obj_ratio_hn = ((obj_loss+obj_loss_hn_D).div(obj_loss_hn_A)).mean()
+            # avg_obj_ratio = ((obj_loss+obj_loss_D).div(obj_loss_A)).mean()
             # print(torch.cat([obj_loss.unsqueeze(1), obj_loss_en_D.unsqueeze(1), obj_loss_en_A.unsqueeze(1)], 1)[:100])
             std_obj_loss = obj_loss.std()/math.sqrt(obj_loss.shape[0])
             avg_obj_loss = obj_loss.mean()
-            avg_obj_cos_loss = torch.cat(obj_cos_losses).mean()
-            avg_obj_ctrast = avg_obj_loss+obj_loss_D.mean()
+            # avg_obj_cos_loss = torch.cat(obj_cos_losses).mean()
+            # avg_obj_ctrast = avg_obj_loss+obj_loss_D.mean()
             avg_obj_ctrast_en = avg_obj_loss+obj_loss_en_D.mean()
-            avg_obj_ctrast_hn = avg_obj_loss+obj_loss_hn_D.mean()
+            # avg_obj_ctrast_hn = avg_obj_loss+obj_loss_hn_D.mean()
 
             # avg_attr_loss = torch.cat(attr_losses, 0)
             # avg_attr_loss_en = (torch.cat(attr_losses_en, 0)-avg_attr_loss).mean()
@@ -160,15 +160,15 @@ class BetaVAEMethod(pl.LightningModule):
                 "avg_z_norms": avg_z_norm,
                 "avg_val_loss": avg_loss,
                 "avg_obj_loss": avg_obj_loss,
-                "avg_obj_cos_loss": avg_obj_cos_loss,
+                # "avg_obj_cos_loss": avg_obj_cos_loss,
                 # "avg_attr_loss": avg_attr_loss,
-                "avg_obj_ratio": avg_obj_ratio,
-                "avg_obj_ctrast": avg_obj_ctrast,
+                # "avg_obj_ratio": avg_obj_ratio,
+                # "avg_obj_ctrast": avg_obj_ctrast,
                 "avg_obj_ctrast_en": avg_obj_ctrast_en,
-                "avg_obj_ctrast_hn":avg_obj_ctrast_hn,
+                # "avg_obj_ctrast_hn":avg_obj_ctrast_hn,
                 "avg_obj_ratio_en": avg_obj_ratio_en,
                 # "avg_attr_loss_en": avg_attr_loss_en,
-                "avg_obj_ratio_hn": avg_obj_ratio_hn,
+                # "avg_obj_ratio_hn": avg_obj_ratio_hn,
                 # "avg_attr_loss_hn": avg_attr_loss_hn,
                 "std_obj_loss": std_obj_loss,
                 # "std_attr_loss": std_attr_loss,
