@@ -104,6 +104,7 @@ class BetaVAEMethod(pl.LightningModule):
                 cat_batch = torch.cat(batch[:4], 0)
                 if self.params.gpus > 0:
                     cat_batch = cat_batch.to(self.device)
+                # cat_zs = cat_batch.view(batch_size*4, -1)
                 mu, log_var = self.model.encode(cat_batch)
                 cat_zs = self.model.reparameterize(mu, log_var).detach()
 
