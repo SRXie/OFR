@@ -299,8 +299,8 @@ def compute_shuffle_greedy_loss(cat_slots_sorted, A_losses, D_losses, cos_sim=Fa
     greedy_loss_D = torch.zeros(batch_size).to(cat_slots_sorted.device)
     # cat_indices_holder = torch.arange(0, num_slots, dtype=int).unsqueeze(0).repeat(4*batch_size, 1).to(cat_slots_sorted.device)
 
-    slots_E = torch.repeat_interleave(slots_A.unsqueeze(1), batch_size, 0)
-    slots_F = torch.repeat_interleave(slots_D.unsqueeze(1), batch_size, 0)
+    slots_E = torch.repeat_interleave(slots_A, batch_size, 0)
+    slots_F = torch.repeat_interleave(slots_D, batch_size, 0)
     slots_A = slots_A.unsqueeze(1).repeat(1, batch_size, 1, 1).view(batch_size*batch_size, num_slots, slot_size)
     slots_D_prime = slots_D_prime.unsqueeze(1).repeat(1, batch_size, 1, 1).view(batch_size*batch_size, num_slots, slot_size)
 
@@ -324,8 +324,8 @@ def compute_shuffle_greedy_loss(cat_slots_sorted, A_losses, D_losses, cos_sim=Fa
         greedy_criterion, indices_EF = greedy_criterion.min(-1)
         greedy_criterion, indices_AD = greedy_criterion.min(-1)
         greedy_criterion_A, greedy_criterion_D = torch.split(greedy_criterion, batch_size*batch_size, 0)
-        greedy_loss_A += greedy_criterion_A.view(batch_size, batch_size, num_slots, slot_size).mean(1)
-        greedy_loss_D += greedy_criterion_D.view(batch_size, batch_size, num_slots, slot_size).mean(1)
+        greedy_loss_A += greedy_criterion_A.view(batch_size, batch_size).mean(1)
+        greedy_loss_D += greedy_criterion_D.view(batch_size, batch_size).mean(1)
 
         index_AD = indices_AD.view(indices_AD.shape[0],1)
         index_EF = batched_index_select(indices_EF, 1, index_AD)
