@@ -299,8 +299,8 @@ def compute_shuffle_greedy_loss(cat_slots_sorted, A_losses, D_losses, cos_sim=Fa
     greedy_loss_D = torch.zeros(batch_size).to(cat_slots_sorted.device)
     # cat_indices_holder = torch.arange(0, num_slots, dtype=int).unsqueeze(0).repeat(4*batch_size, 1).to(cat_slots_sorted.device)
 
-    slots_E = torch.cat([torch.cat([slots_A, slots_C], 0)]*2*batch_size, 0)
-    slots_F = torch.cat([torch.cat([slots_B, slots_D], 0)]*2*batch_size, 0)
+    slots_E = torch.cat([torch.cat([slots_A, slots_C], 0)]*batch_size, 0)
+    slots_F = torch.cat([torch.cat([slots_B, slots_D], 0)]*batch_size, 0)
     slots_A = slots_A.unsqueeze(1).repeat(1, 2*batch_size, 1, 1).view(2*batch_size*batch_size, num_slots, slot_size)
     slots_D_prime = slots_D_prime.unsqueeze(1).repeat(1, 2*batch_size, 1, 1).view(2*batch_size*batch_size, num_slots, slot_size)
 
