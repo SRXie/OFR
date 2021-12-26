@@ -248,7 +248,7 @@ class SlotAttentionMethod(pl.LightningModule):
                 b_prev = datetime.now()
 
         with torch.no_grad():
-            compute_test_losses(odl, obj_greedy_losses_nodup, obj_greedy_losses_nodup_en_A, obj_greedy_losses_nodup_en_D, dup_threshold=self.params.dup_threshold)
+            compute_test_losses(odl, obj_greedy_losses_nodup, obj_greedy_losses_nodup_en_A, obj_greedy_losses_nodup_en_D, obj_greedy_std_nodup, dup_threshold=self.params.dup_threshold)
             # compute_test_losses(adl, attr_pd_greedy_losses, attr_pd_greedy_losses_en, attr_pd_greedy_losses_hn, attr_greedy_losses_nodup, attr_greedy_losses_nodup_en, attr_greedy_losses_nodup_hn,
             #     attr_pd_greedy_cos_losses, attr_pd_greedy_cos_losses_en, attr_pd_greedy_cos_losses_hn, attr_greedy_cos_losses_nodup, attr_greedy_cos_losses_nodup_en, attr_greedy_cos_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
 
