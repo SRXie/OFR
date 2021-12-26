@@ -184,7 +184,7 @@ class SlotAttentionMethod(pl.LightningModule):
                     cat_batch = cat_batch.to(self.device)
                 cat_slots, cat_attns, cat_slots_nodup = self.model.forward(cat_batch, slots_only=True, dup_threshold=dup_threshold)
 
-                compute_bipartite_greedy_loss(cat_slots[:batch_size], cat_slots[4*batch_size, 5*batch_size], obj_greedy_std_nodup)
+                compute_bipartite_greedy_loss(cat_slots[:batch_size], cat_slots[4*batch_size:5*batch_size], obj_greedy_std_nodup)
                 # slots_E = cat_slots[4*batch_size: 5*batch_size]
                 # slots_E_nodup = cat_slots_nodup[4*batch_size: 5*batch_size]
                 # slots_F = cat_slots[5*batch_size: 6*batch_size]
