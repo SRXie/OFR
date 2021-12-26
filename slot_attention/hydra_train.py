@@ -116,8 +116,8 @@ class _Workplace(object):
 
         self.method = SlotAttentionMethod(model=model, datamodule=clevr_datamodule, params=cfg)
 
-        logger_name = "slot-attn/"+self.dataset+"/lr-"+str(cfg.lr) + "-it-"+str(cfg.num_iterations)+ "-s-" + str(seed)+"-dup-"+str(cfg.dup_threshold)
-        logger = pl_loggers.WandbLogger(project="objectness-test-clevr6", name=logger_name)
+        logger_name = "slot-attn/"+self.dataset+"/s-" + str(seed)+"-dup-"+str(cfg.dup_threshold)
+        logger = pl_loggers.WandbLogger(project="objectness-test", name=logger_name)
         # Use this line for Tensorboard logger
         # logger = pl_loggers.TensorBoardLogger("./logs/"+logger_name+strftime("-%Y%m%d%H%M%S", localtime()))
 
