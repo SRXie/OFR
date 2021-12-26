@@ -179,7 +179,7 @@ class SlotAttentionMethod(pl.LightningModule):
                 # sample_losses = []
                 # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
                 batch_size = batch[0].shape[0]
-                cat_batch = torch.cat(batch[:4]+batch[0], 0)
+                cat_batch = torch.cat(batch[:4]+[batch[0]], 0)
                 if self.params.gpus > 0:
                     cat_batch = cat_batch.to(self.device)
                 cat_slots, cat_attns, cat_slots_nodup = self.model.forward(cat_batch, slots_only=True, dup_threshold=dup_threshold)
