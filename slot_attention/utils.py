@@ -362,7 +362,8 @@ def compute_bipartite_greedy_loss(slots_A, slots_E, losses, cos_sim=False):
         replace = replace.unsqueeze(-1).repeat(1, 1, slot_size)
         slots_cat = torch.where(replace, slots_cat[:,-1,:].unsqueeze(1).repeat(1, num_slots-i, 1), slots_cat)[:,:-1,:]
         slots_A, slots_E = torch.split(slots_cat, batch_size, 0)
-
+    loss_A, loss_B, loss_C, loss_D = greedy_loss.split(batch_size//4, 0)
+    greedy_loss = torch.abs(loss_A-loss_B+loss_C-loss_D)
     losses.append(greedy_loss)
 
 def compute_ari(table):
