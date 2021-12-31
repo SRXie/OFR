@@ -214,6 +214,7 @@ class SlotAttentionMethod(pl.LightningModule):
                 DC_norm = torch.norm((cat_slots_nodup_sorted[3*batch_size: 4*batch_size]-cat_slots_nodup_sorted[2*batch_size: 3*batch_size]).view(batch_size, -1), 2, -1)
                 AB_norm = torch.norm((cat_slots_nodup_sorted[: batch_size]-cat_slots_nodup_sorted[1*batch_size: 2*batch_size]).view(batch_size, -1), 2, -1)
                 #print("delta: ", ((torch.square(slots_D_norm)+torch.square(slots_D_prime_norm)-losses_nodup[-1]).div(2*slots_D_norm*slots_D_prime_norm)).max())
+                # losses_nodup[-1]=torch.acos(torch.clamp((torch.square(slots_D_norm)+torch.square(slots_D_prime_norm)-losses_nodup[-1]).div(2*slots_D_norm*slots_D_prime_norm), max=1.0))
                 losses_nodup[-1]=torch.acos(torch.clamp((torch.square(AB_norm)+torch.square(DC_norm)-losses_nodup[-1]).div(2*AB_norm*CD_norm), max=1.0))
                 compute_shuffle_greedy_loss(cat_slots_nodup_sorted, losses_nodup_en_A, losses_nodup_en_D)
 
