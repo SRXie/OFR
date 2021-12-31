@@ -287,8 +287,8 @@ def compute_shuffle_greedy_loss(cat_slots_sorted, A_losses, D_losses, cos_sim=Fa
     for i in range(num_slots):
         slots_AD = torch.cat([slots_A, slots_D_prime], 0)
         slots_EF = torch.cat([slots_E, slots_F], 0)
-        ext_AD = slots_AD.view(batch_size*batch_size, num_slots-i, 1, slot_size).expand(-1, -1, num_slots-i, -1)
-        ext_EF = slots_EF.view(batch_size*batch_size, 1, num_slots-i, slot_size).expand(-1, num_slots-i, -1, -1)
+        ext_AD = slots_AD.view(2*batch_size*batch_size, num_slots-i, 1, slot_size).expand(-1, -1, num_slots-i, -1)
+        ext_EF = slots_EF.view(2*batch_size*batch_size, 1, num_slots-i, slot_size).expand(-1, num_slots-i, -1, -1)
 
         if not cos_sim:
             greedy_criterion = torch.square(ext_AD-ext_EF).sum(-1)#torch.norm(ext_AD-ext_EF, 2, -1)
