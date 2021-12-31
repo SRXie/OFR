@@ -73,11 +73,12 @@ class SlotAttentionMethod(pl.LightningModule):
             attns_perm = batched_index_select(attns, 2, cat_indices)
             masked_recons_perm, masked_attn_perm, masks_perm = captioned_masked_recons(recons_perm, masks_perm, slots_perm, attns_perm)
 
-            cat_indices_nodup = compute_greedy_loss(slots_nodup, [])
-            recons_perm_nodup = batched_index_select(recons_nodup, 1, cat_indices_nodup)
-            masks_perm_nodup = batched_index_select(masks_nodup, 1, cat_indices_nodup)
-            slots_perm_nodup = batched_index_select(slots_nodup, 1, cat_indices_nodup)
-            attns_perm_nodup = batched_index_select(attns, 2, cat_indices_nodup)
+            # No need to match again
+            # cat_indices_nodup = compute_greedy_loss(slots_nodup, [])
+            recons_perm_nodup = recons_nodup #batched_index_select(recons_nodup, 1, cat_indices_nodup)
+            masks_perm_nodup = masks_nodup #batched_index_select(masks_nodup, 1, cat_indices_nodup)
+            slots_perm_nodup = slots_nodup #batched_index_select(slots_nodup, 1, cat_indices_nodup)
+            attns_perm_nodup = attns #batched_index_select(attns, 2, cat_indices_nodup)
             masked_recons_perm_nodup, masked_attn_perm_nodup, masks_perm_nodup = captioned_masked_recons(recons_perm_nodup, masks_perm_nodup, slots_perm_nodup, attns_perm_nodup)
 
             batch = split_and_interleave_stack(batch, self.params.n_samples)
@@ -208,10 +209,12 @@ class SlotAttentionMethod(pl.LightningModule):
 
                 # compute_cosine_loss(cat_slots_nodup, cat_indices, cos_losses_nodup)
                 cat_slots_nodup_sorted = batched_index_select(cat_slots_nodup, 1, cat_indices)
-                slots_D_norm = torch.norm(cat_slots_nodup_sorted[3*batch_size: 4*batch_size].view(batch_size, -1), 2, -1)
-                slots_D_prime_norm = torch.norm((cat_slots_nodup_sorted[: batch_size]-cat_slots_nodup_sorted[1*batch_size: 2*batch_size]+cat_slots_nodup_sorted[2*batch_size: 3*batch_size]).view(batch_size, -1), 2, -1)
+                #slots_D_norm = torch.norm(cat_slots_nodup_sorted[3*batch_size: 4*batch_size].view(batch_size, -1), 2, -1)
+                #slots_D_prime_norm = torch.norm((cat_slots_nodup_sorted[: batch_size]-cat_slots_nodup_sorted[1*batch_size: 2*batch_size]+cat_slots_nodup_sorted[2*batch_size: 3*batch_size]).view(batch_size, -1), 2, -1)
+                DC_norm = torch.norm((cat_slots_nodup_sorted[3*batch_size: 4*batch_size]-cat_slots_nodup_sorted[2*batch_size: 3*batch_size]).view(batch_size, -1), 2, -1)
+                AB_norm = torch.norm((cat_slots_nodup_sorted[: batch_size]-cat_slots_nodup_sorted[1*batch_size: 2*batch_size]).view(batch_size, -1), 2, -1)
                 #print("delta: ", ((torch.square(slots_D_norm)+torch.square(slots_D_prime_norm)-losses_nodup[-1]).div(2*slots_D_norm*slots_D_prime_norm)).max())
-                losses_nodup[-1]=torch.acos(torch.clamp((torch.square(slots_D_norm)+torch.square(slots_D_prime_norm)-losses_nodup[-1]).div(2*slots_D_norm*slots_D_prime_norm), max=1.0))
+                losses_nodup[-1]=torch.acos(torch.clamp((torch.square(AB_norm)+torch.square(DC_norm)-losses_nodup[-1]).div(2*AB_norm*CD_norm), max=1.0))
                 compute_shuffle_greedy_loss(cat_slots_nodup_sorted, losses_nodup_en_A, losses_nodup_en_D)
 
                 # bipartite_greedy_loss(cat_slots_nodup_sorted, slots_E_nodup, slots_F_nodup, losses_nodup_hn_A, losses_nodup_hn_D)
