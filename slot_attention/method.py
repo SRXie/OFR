@@ -53,7 +53,7 @@ class SlotAttentionMethod(pl.LightningModule):
 
         with torch.no_grad():
 
-            recon_combined, recons, masks, slots, attns, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold)
+            recon_combined, recons, masks, slots, attns, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold, algebra=True)
 
             # throw background slot back
             cat_indices = swap_bg_slot_back(attns)
@@ -179,12 +179,12 @@ class SlotAttentionMethod(pl.LightningModule):
                 # sample_losses = []
                 # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
                 batch_size = batch[0].shape[0]
-                cat_batch = torch.cat(batch[:4]+batch[:4], 0)
+                cat_batch = torch.cat(batch[:4]+[batch[3]], 0)
                 if self.params.gpus > 0:
                     cat_batch = cat_batch.to(self.device)
                 cat_slots, cat_attns, cat_slots_nodup = self.model.forward(cat_batch, slots_only=True, dup_threshold=dup_threshold)
 
-                compute_bipartite_greedy_loss(cat_slots_nodup[:4*batch_size], cat_slots_nodup[4*batch_size:], obj_greedy_std_nodup)
+                compute_bipartite_greedy_loss(cat_slots_nodup[3*batch_size:4*batch_size], cat_slots_nodup[4*batch_size:], obj_greedy_std_nodup)
                 # slots_E = cat_slots[4*batch_size: 5*batch_size]
                 # slots_E_nodup = cat_slots_nodup[4*batch_size: 5*batch_size]
                 # slots_F = cat_slots[5*batch_size: 6*batch_size]
@@ -208,6 +208,10 @@ class SlotAttentionMethod(pl.LightningModule):
 
                 # compute_cosine_loss(cat_slots_nodup, cat_indices, cos_losses_nodup)
                 cat_slots_nodup_sorted = batched_index_select(cat_slots_nodup, 1, cat_indices)
+                slots_D_norm = torch.norm(cat_slots_nodup_sorted[3*batch_size: 4*batch_size].view(batch_size, -1), 2, -1)
+                slots_D_prime_norm = torch.norm((cat_slots_nodup_sorted[: batch_size]-cat_slots_nodup_sorted[1*batch_size: 2*batch_size]+cat_slots_nodup_sorted[2*batch_size: 3*batch_size]).view(batch_size, -1), 2, -1)
+                #print("delta: ", ((torch.square(slots_D_norm)+torch.square(slots_D_prime_norm)-losses_nodup[-1]).div(2*slots_D_norm*slots_D_prime_norm)).max())
+                losses_nodup[-1]=torch.acos(torch.clamp((torch.square(slots_D_norm)+torch.square(slots_D_prime_norm)-losses_nodup[-1]).div(2*slots_D_norm*slots_D_prime_norm), max=1.0))
                 compute_shuffle_greedy_loss(cat_slots_nodup_sorted, losses_nodup_en_A, losses_nodup_en_D)
 
                 # bipartite_greedy_loss(cat_slots_nodup_sorted, slots_E_nodup, slots_F_nodup, losses_nodup_hn_A, losses_nodup_hn_D)
@@ -245,7 +249,7 @@ class SlotAttentionMethod(pl.LightningModule):
                 # sample_loss, _ = torch.min(sample_loss, 1)
                 # sample_losses.appiend(sample_loss)
                 # print("batch time:", datetime.now()-b_prev)
-                b_prev = datetime.now()
+                # b_prev = datetime.now()
 
         with torch.no_grad():
             compute_test_losses(odl, obj_greedy_losses_nodup, obj_greedy_losses_nodup_en_A, obj_greedy_losses_nodup_en_D, obj_greedy_std_nodup, dup_threshold=self.params.dup_threshold)
@@ -261,7 +265,7 @@ class SlotAttentionMethod(pl.LightningModule):
             # obj_greedy_loss_nodup_hn_D = torch.cat(obj_greedy_losses_nodup_hn_D, 0)/(avg_slot_norm*self.model.num_slots)
             # obj_greedy_loss_nodup_A = torch.cat([0.9*(x/(avg_slot_norm*self.model.num_slots)).mean(1)+0.1*y/(avg_slot_norm*self.model.num_slots) for x, y in zip(obj_greedy_losses_nodup_en_A, obj_greedy_losses_nodup_hn_A)], 0)
             # obj_greedy_loss_nodup_D = torch.cat([0.9*(x/(avg_slot_norm*self.model.num_slots)).mean(1)+0.1*y/(avg_slot_norm*self.model.num_slots) for x, y in zip(obj_greedy_losses_nodup_en_D, obj_greedy_losses_nodup_hn_D)], 0)
-            avg_obj_greedy_ratio_en = ((obj_greedy_loss_nodup+obj_greedy_loss_nodup_en_D).div(slot_std+obj_greedy_loss_nodup_en_D)).mean()
+            avg_obj_greedy_ratio_en = ((obj_greedy_loss_nodup+obj_greedy_loss_nodup_en_D).div(obj_greedy_loss_nodup_en_D)).mean()
             # avg_obj_greedy_ratio_hn = ((obj_greedy_loss_nodup+obj_greedy_loss_nodup_hn_D).div(obj_greedy_loss_nodup_hn_D)).mean()
             # avg_obj_greedy_ratio = ((obj_greedy_loss_nodup+obj_greedy_loss_nodup_D).div(obj_greedy_loss_nodup_A)).mean()
             std_obj_greedy_loss = obj_greedy_loss_nodup.std()/math.sqrt(obj_greedy_loss_nodup.shape[0])
