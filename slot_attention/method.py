@@ -173,7 +173,7 @@ class SlotAttentionMethod(pl.LightningModule):
                 compute_bipartite_greedy_loss(cat_slots_nodup[3*batch_size:4*batch_size], cat_slots_nodup[4*batch_size:], z_angle)
                 slots_D = cat_slots_nodup[3*batch_size:4*batch_size].view(batch_size, -1)
                 slots_D_prime = cat_slots_nodup[4*batch_size:].view(batch_size, -1)
-                z_angle[-1] = (torch.acos(torch.clamp((torch.square(slots_D).sum(-1)+torch.square(slots_D_prime).sum(-1)-z_angle[-1]).div(2*torch.norm(slots_D, 2, -1)*torch.norm(slots_D_prime, 2, -1), max=1.0))))
+                z_angle[-1] = (torch.acos(torch.clamp((torch.square(slots_D).sum(-1)+torch.square(slots_D_prime).sum(-1)-z_angle[-1]).div(2*torch.norm(slots_D, 2, -1)*torch.norm(slots_D_prime, 2, -1)), max=1.0)))
                 std_nodup[-1]=torch.acos(torch.clamp((torch.square(CD_norm)+torch.square(CD_prime_norm)-std_nodup[-1]).div(2*CD_norm*CD_prime_norm), max=1.0))
 
                 # slots_E = cat_slots[4*batch_size: 5*batch_size]
