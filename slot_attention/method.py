@@ -62,8 +62,8 @@ class SlotAttentionMethod(pl.LightningModule):
             slots = batched_index_select(slots, 1, cat_indices)
             attns = batched_index_select(attns, 2, cat_indices)
             recons_nodup = batched_index_select(recons_nodup, 1, cat_indices)
-            masks_nodup = batched_index_select(masks_nodup, 1, cat_indices)
-            slots_nodup = batched_index_select(slots_nodup, 1, cat_indices)
+            # masks_nodup = batched_index_select(masks_nodup, 1, cat_indices)
+            # slots_nodup = batched_index_select(slots_nodup, 1, cat_indices)
 
             # reorder with matching
             cat_indices = compute_greedy_loss(slots, [])
@@ -71,7 +71,7 @@ class SlotAttentionMethod(pl.LightningModule):
             masks_perm = batched_index_select(masks, 1, cat_indices)
             slots_perm = batched_index_select(slots, 1, cat_indices)
             attns_perm = batched_index_select(attns, 2, cat_indices)
-            masked_recons_perm, masked_attn_perm, masks_perm = captioned_masked_recons(recons_perm, masks_perm, slots_perm, attns_perm)
+            masked_recons_perm, masked_attn_perm, recons_perm = captioned_masked_recons(recons_perm, masks_perm, slots_perm, attns_perm)
 
             # No need to match again
             # cat_indices_nodup = compute_greedy_loss(slots_nodup, [])
@@ -79,7 +79,7 @@ class SlotAttentionMethod(pl.LightningModule):
             masks_perm_nodup = masks_nodup #batched_index_select(masks_nodup, 1, cat_indices_nodup)
             slots_perm_nodup = slots_nodup #batched_index_select(slots_nodup, 1, cat_indices_nodup)
             attns_perm_nodup = attns #batched_index_select(attns, 2, cat_indices_nodup)
-            masked_recons_perm_nodup, masked_attn_perm_nodup, masks_perm_nodup = captioned_masked_recons(recons_perm_nodup, masks_perm_nodup, slots_perm_nodup, attns_perm_nodup)
+            masked_recons_perm_nodup, masked_attn_perm_nodup, recons_perm_nodup = captioned_masked_recons(recons_perm_nodup, masks_perm_nodup, slots_perm_nodup, attns_perm_nodup)
 
             batch = split_and_interleave_stack(batch, self.params.n_samples)
             recon_combined = split_and_interleave_stack(recon_combined, self.params.n_samples)
@@ -102,7 +102,7 @@ class SlotAttentionMethod(pl.LightningModule):
                         torch.cat([batch.unsqueeze(1), batch.unsqueeze(1)], dim=0),  # original images
                         torch.cat([recon_combined.unsqueeze(1),recon_combined_nodup.unsqueeze(1)], dim=0),  # reconstructions
                         torch.cat([masked_recons_perm, masked_recons_perm_nodup], dim=0),
-                        torch.cat([masks_perm, masks_perm_nodup], dim=0),
+                        torch.cat([recons_perm, recons_perm_nodup], dim=0),
                         torch.cat([masked_attn_perm, masked_attn_perm_nodup], dim=0),  # each slot
                     ],
                     dim=1,

@@ -497,8 +497,9 @@ def captioned_masked_recons(recons, masks, slots, attns):
     feature_dup_idx = feature_dup_idx[:,:,1]
 
     attn = attns.permute(0, 2, 1).view(recons.shape[0], recons.shape[1], recons.shape[3], recons.shape[4])
-    masked_recons = recons #* masks + (1 - masks)
+    masked_recons = recons * masks + (1 - masks)
     masked_recons = to_rgb_from_tensor(masked_recons)
+    recons = to_rgb_from_tensor(recons)
     masked_attns = torch.zeros_like(recons)
     masked_attns[:,:,2,:,:] = masked_attns[:,:,2,:,:]+masks.squeeze(2)
     masked_attns[:,:,0,:,:] = masked_attns[:,:,0,:,:]+attn
@@ -529,12 +530,12 @@ def captioned_masked_recons(recons, masks, slots, attns):
             img = to_tensor_from_rgb(img)
             masked_attns[i,j] = img
         for j in range(masked_recons.shape[1]):
-            img = transforms.ToPILImage()(masks[i,j])
+            img = transforms.ToPILImage()(recons[i,j])
             draw = ImageDraw.Draw(img)
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 8)
             pixel_text = "attn: {:.4f}".format(mask_mass[i,j].item())
             draw.text((4,0), pixel_text, (0, 0, 0), font=font)
             img = transforms.ToTensor()(img)
             img = to_tensor_from_rgb(img)
-            masks[i,j] = img
-    return masked_recons, masked_attns, masks
+            recons[i,j] = img
+    return masked_recons, masked_attns, recons
