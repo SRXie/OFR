@@ -188,9 +188,9 @@ class SlotAttentionMethod(pl.LightningModule):
                 slots_D_norm = torch.norm(slots_D, 2, -1)
                 scaling_AB = slots_A_norm.div(slots_B_norm)
                 scaling_DC = slots_D_norm.div(slots_C_norm)
-                cos = torch.nn.CosineSimilarity(dim=slots_A.shape[1], eps=1e-6)
-                angle_AB = torch.acos(torch.clamp((cos(slots_A, slots_B), max=1.0)))
-                angle_DC = torch.acos(torch.clamp((cos(slots_D, slots_C), max=1.0)))
+                cos = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
+                angle_AB = torch.acos(torch.clamp(cos(slots_A, slots_B), max=1.0))
+                angle_DC = torch.acos(torch.clamp(cos(slots_D, slots_C), max=1.0))
 
                 z_norm.append(torch.cat([slots_A_norm, slots_B_norm, slots_C_norm, slots_D_norm], 0))
                 scalings.append(torch.cat([scaling_AB, scaling_DC], 0))
