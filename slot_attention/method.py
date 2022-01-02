@@ -125,29 +125,7 @@ class SlotAttentionMethod(pl.LightningModule):
     def validation_epoch_end(self, outputs):
         avg_loss = torch.stack([x["loss"] for x in outputs]).mean()
         avg_ari_mask = np.stack([x["mask_ari"] for x in outputs]).mean()
-        # schema_distance_disc = torch.cat([x["schema_distance_disc"] for x in outputs])
-        # schema_distance_pos = torch.cat([x["schema_distance_pos"] for x in outputs])
-        # schema_distance_size = torch.cat([x["schema_distance_size"] for x in outputs])
-        # schema_distance_material = torch.cat([x["schema_distance_material"] for x in outputs])
-        # schema_distance_shape = torch.cat([x["schema_distance_shape"] for x in outputs])
-        # schema_distance_color = torch.cat([x["schema_distance_color"] for x in outputs])
-        # schema_distance = schema_distance_disc + schema_distance_pos
-        # slots_distance = torch.cat([x["slots_distance"] for x in outputs])
-        # corr_coef_disc = compute_corr_coef(schema_distance_disc, slots_distance)
-        # corr_coef_size = compute_corr_coef(schema_distance_size, slots_distance)
-        # corr_coef_material = compute_corr_coef(schema_distance_material, slots_distance)
-        # corr_coef_shape = compute_corr_coef(schema_distance_shape, slots_distance)
-        # corr_coef_color = compute_corr_coef(schema_distance_color, slots_distance)
-        # corr_coef_pos = compute_corr_coef(schema_distance_pos, slots_distance)
-        # corr_coef = compute_corr_coef(schema_distance, slots_distance)
 
-        # corr_rank_disc = compute_rank_correlation(schema_distance_disc.unsqueeze(0), slots_distance.unsqueeze(0))
-        # corr_rank_size = compute_rank_correlation(schema_distance_size.unsqueeze(0), slots_distance.unsqueeze(0))
-        # corr_rank_material = compute_rank_correlation(schema_distance_material.unsqueeze(0), slots_distance.unsqueeze(0))
-        # corr_rank_shape = compute_rank_correlation(schema_distance_shape.unsqueeze(0), slots_distance.unsqueeze(0))
-        # corr_rank_color = compute_rank_correlation(schema_distance_color.unsqueeze(0), slots_distance.unsqueeze(0))
-        # corr_rank_pos = compute_rank_correlation(schema_distance_pos.unsqueeze(0), slots_distance.unsqueeze(0))
-        # corr_rank = compute_rank_correlation(schema_distance.unsqueeze(0), slots_distance.unsqueeze(0))
         # Algebra Test starts here
         odl = self.datamodule.obj_test_dataloader()
         adl = self.datamodule.attr_test_dataloader()
@@ -166,12 +144,8 @@ class SlotAttentionMethod(pl.LightningModule):
         # obj_pd_greedy_cos_losses_en, attr_pd_greedy_cos_losses_en = [], []
         # obj_pd_greedy_cos_losses_hn, attr_pd_greedy_cos_losses_hn = [], []
 
-        slot_norm = []
-        # rand = torch.rand(self.params.batch_size*sample_size*3, self.params.num_slots)
-        # batch_rand_perm = rand.argsort(dim=1)
-        # del rand
-        # if self.params.gpus > 0:
-            # batch_rand_perm = batch_rand_perm.to(self.device)
+        z_norm = []
+        scalings, angles, scaling_deltas, angle_deltas, scaling_ratios, angle_ratios = [], [], [], [], [], []
 
         def compute_test_losses(dataloader, losses_nodup, losses_nodup_en_A, losses_nodup_en_D, std_nodup, dup_threshold=None):
             # b_prev = datetime.now()
@@ -194,11 +168,6 @@ class SlotAttentionMethod(pl.LightningModule):
                 cat_attns = cat_attns[:4*batch_size]
                 cat_slots_nodup = cat_slots_nodup[:4*batch_size]
 
-                if dataloader is odl:
-                    snorm = torch.norm(cat_slots, 2, -1)
-                    snorm = torch.cat(torch.split(snorm, snorm.shape[0]//4, 0), 1).mean(1)
-                    slot_norm.append(snorm)
-
                 # cat_slots_nodup = torch.Tensor([[[1.0], [3.0], [2.0]], [[2.0], [0.5], [1.0]], [[0.5], [0.5], [2.0]], [[0.5], [0.5], [1.0]], [[0.5], [0.5], [6.0]], [[0.5], [4.0], [0.5]], [[2.0], [3.0], [6.0]], [[2.0], [4.0], [0.5]]]).to(cat_slots_nodup.device)
                 # batch_size = 2
                 cat_indices = compute_greedy_loss(cat_slots_nodup, losses_nodup)
@@ -212,7 +181,24 @@ class SlotAttentionMethod(pl.LightningModule):
                 # compute_cosine_loss(cat_slots_nodup, cat_indices, cos_losses_nodup)
                 cat_slots_nodup_sorted = batched_index_select(cat_slots_nodup, 1, cat_indices)
                 # print("cat_slots_nodup_sorted", cat_slots_nodup_sorted)
-                #slots_D_norm = torch.norm(cat_slots_nodup_sorted[3*batch_size: 4*batch_size].view(batch_size, -1), 2, -1)
+                slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots_nodup_sorted.view(4*batch_size, -1), batch_size, 0)
+                slots_A_norm = torch.norm(slots_A, 2, -1)
+                slots_B_norm = torch.norm(slots_B, 2, -1)
+                slots_C_norm = torch.norm(slots_C, 2, -1)
+                slots_D_norm = torch.norm(slots_D, 2, -1)
+                scaling_AB = slots_A_norm.div(slots_B_norm)
+                scaling_DC = slots_D_norm.div(slots_C_norm)
+                cos = torch.nn.CosineSimilarity(dim=slots_A.shape[1], eps=1e-6)
+                angle_AB = torch.acos(torch.clamp((cos(slots_A, slots_B), max=1.0)))
+                angle_DC = torch.acos(torch.clamp((cos(slots_D, slots_C), max=1.0)))
+
+                z_norm.append(torch.cat([slots_A_norm, slots_B_norm, slots_C_norm, slots_D_norm], 0))
+                scalings.append(torch.cat([scaling_AB, scaling_DC], 0))
+                angles.append(torch.cat([angle_AB, angle_DC], 0))
+                scaling_deltas.append(torch.abs(scaling_AB - scaling_DC))
+                angle_deltas.append(torch.abs(angle_AB - angle_DC))
+                scaling_ratios.append(torch.maximum(scaling_AB, scaling_DC).div(torch.minimum(scaling_AB, scaling_DC)))
+                angle_ratios.append(torch.maximum(angle_AB, angle_DC).div(torch.minimum(angle_AB, angle_DC)))
                 #slots_D_prime_norm = torch.norm((cat_slots_nodup_sorted[: batch_size]-cat_slots_nodup_sorted[1*batch_size: 2*batch_size]+cat_slots_nodup_sorted[2*batch_size: 3*batch_size]).view(batch_size, -1), 2, -1)
                 DC_norm = torch.norm((cat_slots_nodup_sorted[3*batch_size: 4*batch_size]-cat_slots_nodup_sorted[2*batch_size: 3*batch_size]).view(batch_size, -1), 2, -1)
                 AB_norm = torch.norm((cat_slots_nodup_sorted[: batch_size]-cat_slots_nodup_sorted[1*batch_size: 2*batch_size]).view(batch_size, -1), 2, -1)
@@ -242,30 +228,19 @@ class SlotAttentionMethod(pl.LightningModule):
                 # compute_pseudo_greedy_loss(cat_slots, pseudo_cos_losses_en, easy_neg=True, cos_sim=True)
                 # compute_pseudo_greedy_loss(cat_slots_hn, pseudo_cos_losses_hn, cos_sim=True)
 
-                # slots_A = slots_A.repeat(sample_size, 1, 1)
-                # slots_B = slots_B.repeat(sample_size, 1, 1)
-                # slots_C = slots_C.repeat(sample_size, 1, 1)
-                # slots_D = slots_D.repeat(sample_size, 1, 1)
-
-                # # batch random permutation of slots https://discuss.pytorch.org/t/batch-version-of-torch-randperm/111121/3
-                # emb_A =slots_A.view(batch_size*sample_size, -1)
-                # emb_B =slots_B[torch.arange(slots_B.shape[0]).unsqueeze(-1), batch_rand_perm[:batch_size*sample_size]].view(batch_size*sample_size, -1)
-                # emb_C =slots_C[torch.arange(slots_C.shape[0]).unsqueeze(-1), batch_rand_perm[batch_size*sample_size:2*batch_size*sample_size]].view(batch_size*sample_size, -1)
-                # emb_D =slots_D[torch.arange(slots_D.shape[0]).unsqueeze(-1), batch_rand_perm[2*batch_size*sample_size:3*batch_size*sample_size]].view(batch_size*sample_size, -1)
-                # sample_loss = emb_A-emb_B+emb_C-emb_D
-                # sample_loss = torch.stack(torch.split(sample_loss, batch_size, 0), 1)
-                # sample_loss = torch.square(sample_loss).mean(dim=-1)
-                # sample_loss, _ = torch.min(sample_loss, 1)
-                # sample_losses.appiend(sample_loss)
-                # print("batch time:", datetime.now()-b_prev)
-                # b_prev = datetime.now()
 
         with torch.no_grad():
             compute_test_losses(odl, obj_greedy_losses_nodup, obj_greedy_losses_nodup_en_A, obj_greedy_losses_nodup_en_D, obj_greedy_std_nodup, dup_threshold=self.params.dup_threshold)
             # compute_test_losses(adl, attr_pd_greedy_losses, attr_pd_greedy_losses_en, attr_pd_greedy_losses_hn, attr_greedy_losses_nodup, attr_greedy_losses_nodup_en, attr_greedy_losses_nodup_hn,
             #     attr_pd_greedy_cos_losses, attr_pd_greedy_cos_losses_en, attr_pd_greedy_cos_losses_hn, attr_greedy_cos_losses_nodup, attr_greedy_cos_losses_nodup_en, attr_greedy_cos_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
 
-            avg_slot_norm = torch.cat(slot_norm, 0).mean()
+            avg_z_norm = torch.cat(z_norm, 0).mean()
+            avg_scaling = torch.cat(scalings, 0).mean()
+            avg_angle = torch.cat(angles, 0).mean()
+            avg_scaling_delta = torch.cat(scaling_deltas, 0).mean()
+            avg_angle_delta = torch.cat(angle_deltas, 0).mean()
+            avg_scaling_ratio = torch.cat(scaling_ratios, 0).mean()
+            avg_angle_ratio = torch.cat(angle_ratios, 0).mean()
             slot_std = torch.cat(obj_greedy_std_nodup, 0)
             obj_greedy_loss_nodup = torch.cat(obj_greedy_losses_nodup, 0)
             obj_greedy_loss_nodup_en_A = torch.cat([x for x in obj_greedy_losses_nodup_en_A], 0)
@@ -345,21 +320,13 @@ class SlotAttentionMethod(pl.LightningModule):
             logs = {
                 # "avg_val_loss": avg_loss,
                 "avg_ari_mask": avg_ari_mask,
-                # "corr_coef_disc": corr_coef_disc,
-                # "corr_coef_pos": corr_coef_pos,
-                # "corr_coef_size": corr_coef_size,
-                # "corr_coef_material": corr_coef_material,
-                # "corr_coef_shape": corr_coef_shape,
-                # "corr_coef_color": corr_coef_color,
-                # "corr_coef": corr_coef,
-                # "corr_rank_disc": corr_rank_disc,
-                # "corr_rank_pos": corr_rank_pos,
-                # "corr_rank_size": corr_rank_size,
-                # "corr_rank_material": corr_rank_material,
-                # "corr_rank_shape": corr_rank_shape,
-                # "corr_rank_color": corr_rank_color,
-                # "corr_rank": corr_rank,
-                "avg_slot_norm": avg_slot_norm,
+                "avg_z_norm": avg_z_norm,
+                "avg_scaling": avg_scaling,
+                "avg_angle": avg_angle,
+                "avg_scaling_delta": avg_scaling_delta,
+                "avg_angle_delta": avg_angle_delta,
+                "avg_scaling_ratio": avg_scaling_ratio,
+                "avg_angle_ratio": avg_angle_ratio,
                 "avg_slot_std": avg_slot_std,
                 "avg_obj_greedy_ctrast_en": avg_obj_greedy_ctrast_en,
                 # "avg_obj_greedy_ctrast_hn": avg_obj_greedy_ctrast_hn,
