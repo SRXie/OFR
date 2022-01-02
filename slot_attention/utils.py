@@ -497,7 +497,7 @@ def captioned_masked_recons(recons, masks, slots, attns):
     feature_dup_idx = feature_dup_idx[:,:,1]
 
     attn = attns.permute(0, 2, 1).view(recons.shape[0], recons.shape[1], recons.shape[3], recons.shape[4])
-    masked_recons = recons * masks + (1 - masks)
+    masked_recons = recons * masks - (1 - masks)
     masked_recons = to_rgb_from_tensor(masked_recons)
     recons = to_rgb_from_tensor(recons)
     masked_attns = torch.zeros_like(recons)
