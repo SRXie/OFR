@@ -172,7 +172,7 @@ class SlotAttentionMethod(pl.LightningModule):
                 # losses_nodup[-1]=torch.acos(torch.clamp((torch.square(slots_D_norm)+torch.square(slots_D_prime_norm)-losses_nodup[-1]).div(2*slots_D_norm*slots_D_prime_norm), max=1.0))
                 slots_D = cat_slots_two_fwd[:batch_size].view(batch_size, -1)
                 slots_D_prime = cat_slots_two_fwd[3*batch_size:].view(batch_size, -1)
-                z_angle = z_angle.append(torch.acos(torch.clamp(cos(slots_D, slots_D_prime), max=1.0)))
+                z_angle.append(torch.acos(torch.clamp(cos(slots_D, slots_D_prime), max=1.0)))
                 std_nodup[-1]=torch.acos(torch.clamp((torch.square(CD_norm)+torch.square(CD_prime_norm)-std_nodup[-1]).div(2*CD_norm*CD_prime_norm), max=1.0))
 
                 # slots_E = cat_slots[4*batch_size: 5*batch_size]
