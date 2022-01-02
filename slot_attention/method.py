@@ -199,6 +199,8 @@ class SlotAttentionMethod(pl.LightningModule):
                     snorm = torch.cat(torch.split(snorm, snorm.shape[0]//4, 0), 1).mean(1)
                     slot_norm.append(snorm)
 
+                # cat_slots_nodup = torch.Tensor([[[1.0], [3.0], [2.0]], [[2.0], [0.5], [1.0]], [[0.5], [0.5], [2.0]], [[0.5], [0.5], [1.0]], [[0.5], [0.5], [6.0]], [[0.5], [4.0], [0.5]], [[2.0], [3.0], [6.0]], [[2.0], [4.0], [0.5]]]).to(cat_slots_nodup.device)
+                # batch_size = 2
                 cat_indices = compute_greedy_loss(cat_slots_nodup, losses_nodup)
 
                 # starting here we want to use the cat_indices and match A' and D' to it A' = batch[4], D' = batch[5]
@@ -209,14 +211,17 @@ class SlotAttentionMethod(pl.LightningModule):
 
                 # compute_cosine_loss(cat_slots_nodup, cat_indices, cos_losses_nodup)
                 cat_slots_nodup_sorted = batched_index_select(cat_slots_nodup, 1, cat_indices)
+                # print("cat_slots_nodup_sorted", cat_slots_nodup_sorted)
                 #slots_D_norm = torch.norm(cat_slots_nodup_sorted[3*batch_size: 4*batch_size].view(batch_size, -1), 2, -1)
                 #slots_D_prime_norm = torch.norm((cat_slots_nodup_sorted[: batch_size]-cat_slots_nodup_sorted[1*batch_size: 2*batch_size]+cat_slots_nodup_sorted[2*batch_size: 3*batch_size]).view(batch_size, -1), 2, -1)
                 DC_norm = torch.norm((cat_slots_nodup_sorted[3*batch_size: 4*batch_size]-cat_slots_nodup_sorted[2*batch_size: 3*batch_size]).view(batch_size, -1), 2, -1)
                 AB_norm = torch.norm((cat_slots_nodup_sorted[: batch_size]-cat_slots_nodup_sorted[1*batch_size: 2*batch_size]).view(batch_size, -1), 2, -1)
                 #print("delta: ", ((torch.square(slots_D_norm)+torch.square(slots_D_prime_norm)-losses_nodup[-1]).div(2*slots_D_norm*slots_D_prime_norm)).max())
                 # losses_nodup[-1]=torch.acos(torch.clamp((torch.square(slots_D_norm)+torch.square(slots_D_prime_norm)-losses_nodup[-1]).div(2*slots_D_norm*slots_D_prime_norm), max=1.0))
-                losses_nodup[-1]=torch.acos(torch.clamp((torch.square(AB_norm)+torch.square(DC_norm)-losses_nodup[-1]).div(2*AB_norm*CD_norm), max=1.0))
+                losses_nodup[-1]=torch.acos(torch.clamp((torch.square(AB_norm)+torch.square(DC_norm)-losses_nodup[-1]).div(2*AB_norm*DC_norm), max=1.0))
+                # print("losses_nodup", losses_nodup[-1])
                 compute_shuffle_greedy_loss(cat_slots_nodup_sorted, losses_nodup_en_A, losses_nodup_en_D)
+                # print("losses_nodup_en_D", losses_nodup_en_D)
 
                 # bipartite_greedy_loss(cat_slots_nodup_sorted, slots_E_nodup, slots_F_nodup, losses_nodup_hn_A, losses_nodup_hn_D)
                 # compute_greedy_loss(cat_slots_nodup_hn, losses_nodup_hn)

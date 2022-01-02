@@ -51,19 +51,19 @@ class _Workplace(object):
         clevr_transforms = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.CenterCrop(240),
+                transforms.CenterCrop(192),
                 transforms.Lambda(rescale),  # rescale between -1 and 1
                 transforms.Resize(tuple(cfg.resolution)),
             ]
         )
 
-        if os.path.exists(os.path.join(cfg.test_root, "obj_test", "CLEVR_test_cases.csv")):
-            with open(os.path.join(cfg.test_root, "obj_test", "CLEVR_test_cases_tmp.csv"), "r") as f:
+        if os.path.exists(os.path.join(cfg.test_root, "obj_test_occ", "CLEVR_test_cases_tmp.csv")):
+            with open(os.path.join(cfg.test_root, "obj_test_occ", "CLEVR_test_cases_tmp.csv"), "r") as f:
                 csv_reader = reader(f)
                 self.obj_algebra_test_cases = list(csv_reader)
         else:
             self.obj_algebra_test_cases = None
-            print(os.path.join(cfg.test_root, "obj_test", "CLEVR_test_cases.csv")+" does not exist.")
+            print(os.path.join(cfg.test_root, "obj_test_occ", "CLEVR_test_cases_tmp.csv")+" does not exist.")
 
         if os.path.exists(os.path.join(cfg.test_root, "attr_test", "CLEVR_test_cases.csv")):
             with open(os.path.join(cfg.test_root, "attr_test", "CLEVR_test_cases.csv"), "r") as f:
@@ -116,8 +116,8 @@ class _Workplace(object):
 
         self.method = SlotAttentionMethod(model=model, datamodule=clevr_datamodule, params=cfg)
 
-        logger_name = "slot-attn/"+self.dataset+"/s-" + str(seed)+"-dup-"+str(cfg.dup_threshold)
-        logger = pl_loggers.WandbLogger(project="objectness-test", name=logger_name)
+        logger_name = "slot-attn-std/"+self.dataset+"/s-" + str(seed)+"-dup-"+str(cfg.dup_threshold)
+        logger = pl_loggers.WandbLogger(project="objectness-test-occ", name=logger_name)
         # Use this line for Tensorboard logger
         # logger = pl_loggers.TensorBoardLogger("./logs/"+logger_name+strftime("-%Y%m%d%H%M%S", localtime()))
 

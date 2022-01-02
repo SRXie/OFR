@@ -158,7 +158,10 @@ class CLEVRAlgebraTestset(Dataset):
         self.data_root = data_root
         self.clevr_transforms = clevr_transforms
         self.max_num_main_scenes = max_num_images
-        self.test_root =  os.path.join(data_root, f"{test_type}_test")
+        if test_type == "obj":
+            self.test_root =  os.path.join(data_root, "obj_test_occ")
+        else:
+            self.test_root =  os.path.join(data_root, f"{test_type}_test")
         self.data_path = os.path.join(self.test_root, "images")
         self.max_n_objects = max_n_objects
         self.test_type = test_type
@@ -332,9 +335,9 @@ class CLEVRDataModule(pl.LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,
-            sampler=rand_sampler,
+            #sampler=rand_sampler,
             worker_init_fn=seed_worker,
-            generator=g,
+            #generator=g,
         )
 
     def attr_test_dataloader(self):

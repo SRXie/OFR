@@ -13,7 +13,7 @@ from beta_vae.params import BetaVAEParams
 from beta_vae.utils import Tensor
 from beta_vae.utils import split_and_interleave_stack
 from beta_vae.utils import to_rgb_from_tensor, to_tensor_from_rgb
-from beta_vae.utils import compute_loss, compute_cosine_loss, compute_partition_loss, compute_partition_loss_hard
+from beta_vae.utils import compute_loss, compute_cosine_loss, compute_partition_loss, compute_partition_cosine_loss
 
 
 class BetaVAEMethod(pl.LightningModule):
@@ -104,9 +104,11 @@ class BetaVAEMethod(pl.LightningModule):
                 cat_batch = torch.cat(batch[:4], 0)
                 if self.params.gpus > 0:
                     cat_batch = cat_batch.to(self.device)
-                # cat_zs = cat_batch.view(batch_size*4, -1)
-                mu, log_var = self.model.encode(cat_batch)
-                cat_zs = self.model.reparameterize(mu, log_var).detach()
+                if self.trainer.running_sanity_check:
+                    cat_zs = cat_batch.view(batch_size*2, -1)
+                else:
+                    mu, log_var = self.model.encode(cat_batch)
+                    cat_zs = self.model.reparameterize(mu, log_var).detach()
 
                 if dataloader is odl:
                     znorm = torch.norm(cat_zs, 2, -1)
@@ -116,17 +118,25 @@ class BetaVAEMethod(pl.LightningModule):
                 cat_batch_EF = torch.cat(batch[4:], 0)
                 if self.params.gpus > 0:
                     cat_batch_EF = cat_batch_EF.to(self.device)
-                EF_mu, EF_log_var = self.model.encode(cat_batch_EF)
-                cat_zs_EF = self.model.reparameterize(EF_mu, EF_log_var).detach()
+                if self.trainer.running_sanity_check:
+                    cat_zs_EF = cat_batch_EF.view(batch_size*2, -1)
+                else:
+                    EF_mu, EF_log_var = self.model.encode(cat_batch_EF)
+                    cat_zs_EF = self.model.reparameterize(EF_mu, EF_log_var).detach()
                 zs_E, zs_F = torch.split(cat_zs_EF, batch_size, 0)
 
-                compute_loss(cat_zs, losses)
+                zs_A = cat_zs[:batch_size]
+                # print((1-torch.norm((cat_zs[:batch_size]-cat_zs[batch_size:2*batch_size]+cat_zs[2*batch_size:3*batch_size]-cat_zs[3*batch_size:4*batch_size]).view(batch_size, -1), 2, -1).div(torch.norm(zs_A.view(batch_size, 1, -1) - zs_A.view(1, batch_size, -1), 2, -1).mean(-1))).mean())
+                # cat_zs = torch.Tensor([[1.0,1.0,2.0],[3.0,2.0,1.0],[4.0,3.0,2.0],[2.0,2.0,1.0]])
+                compute_cosine_loss(cat_zs, losses)
+                # print(losses[-1])
+                # exit(0)
                 # compute_cosine_loss(cat_zs, cos_losses)
-                compute_partition_loss(cat_zs, losses_en_A, losses_en_D)
+                compute_partition_cosine_loss(cat_zs, losses_en_A, losses_en_D)
                 # compute_partition_loss_hard(cat_zs, zs_E, zs_F, losses_hn_A, losses_hn_D)
 
                 # print("batch time:", datetime.now()-b_prev)
-                b_prev = datetime.now()
+                # b_prev = datetime.now()
 
         with torch.no_grad():
             compute_test_losses(odl, obj_losses, obj_cos_losses, obj_losses_en_A, obj_losses_en_D, obj_losses_hn_A, obj_losses_hn_D)
@@ -140,7 +150,7 @@ class BetaVAEMethod(pl.LightningModule):
             # obj_loss_hn_D = torch.cat(obj_losses_hn_D, 0)/avg_z_norm
             # obj_loss_A = torch.cat([0.9*(x/avg_z_norm).mean(1)+0.1*(y/avg_z_norm) for x, y in zip(obj_losses_en_A, obj_losses_hn_A)], 0)
             # obj_loss_D = torch.cat([0.9*(x/avg_z_norm).mean(1)+0.1*(y/avg_z_norm) for x, y in zip(obj_losses_en_D, obj_losses_hn_D)], 0)
-            avg_obj_ratio_en = ((obj_loss+obj_loss_en_D).div(obj_loss_en_A)).mean()
+            avg_obj_ratio_en = ((obj_loss+obj_loss_en_D.mean()).div(obj_loss_en_D.mean())).mean()
             # avg_obj_ratio_hn = ((obj_loss+obj_loss_hn_D).div(obj_loss_hn_A)).mean()
             # avg_obj_ratio = ((obj_loss+obj_loss_D).div(obj_loss_A)).mean()
             # print(torch.cat([obj_loss.unsqueeze(1), obj_loss_en_D.unsqueeze(1), obj_loss_en_A.unsqueeze(1)], 1)[:100])
