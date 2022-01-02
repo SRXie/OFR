@@ -145,7 +145,7 @@ class SlotAttentionMethod(pl.LightningModule):
         # obj_pd_greedy_cos_losses_hn, attr_pd_greedy_cos_losses_hn = [], []
 
         cos = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
-        z_norm, z_angle = []
+        z_norm, z_angle = [], []
         scalings, angles, scaling_deltas, angle_deltas, scaling_ratios, angle_ratios = [], [], [], [], [], []
 
         def compute_test_losses(dataloader, losses_nodup, losses_nodup_en_A, losses_nodup_en_D, std_nodup, dup_threshold=None):
@@ -248,6 +248,7 @@ class SlotAttentionMethod(pl.LightningModule):
             #     attr_pd_greedy_cos_losses, attr_pd_greedy_cos_losses_en, attr_pd_greedy_cos_losses_hn, attr_greedy_cos_losses_nodup, attr_greedy_cos_losses_nodup_en, attr_greedy_cos_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
 
             avg_z_norm = torch.cat(z_norm, 0).mean()
+            avg_z_angle = torch.cat(z_angle, 0).mean()
             avg_scaling = torch.cat(scalings, 0).mean()
             avg_angle = torch.cat(angles, 0).mean()
             avg_scaling_delta = torch.cat(scaling_deltas, 0).mean()
@@ -334,6 +335,7 @@ class SlotAttentionMethod(pl.LightningModule):
                 # "avg_val_loss": avg_loss,
                 "avg_ari_mask": avg_ari_mask,
                 "avg_z_norm": avg_z_norm,
+                "avg_z_angle": avg_z_angle,
                 "avg_scaling": avg_scaling,
                 "avg_angle": avg_angle,
                 "avg_scaling_delta": avg_scaling_delta,
