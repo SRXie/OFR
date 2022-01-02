@@ -144,7 +144,8 @@ class SlotAttentionMethod(pl.LightningModule):
         # obj_pd_greedy_cos_losses_en, attr_pd_greedy_cos_losses_en = [], []
         # obj_pd_greedy_cos_losses_hn, attr_pd_greedy_cos_losses_hn = [], []
 
-        z_norm = []
+        cos = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
+        z_norm, z_angle = []
         scalings, angles, scaling_deltas, angle_deltas, scaling_ratios, angle_ratios = [], [], [], [], [], []
 
         def compute_test_losses(dataloader, losses_nodup, losses_nodup_en_A, losses_nodup_en_D, std_nodup, dup_threshold=None):
@@ -159,7 +160,20 @@ class SlotAttentionMethod(pl.LightningModule):
                     cat_batch = cat_batch.to(self.device)
                 cat_slots, cat_attns, cat_slots_nodup = self.model.forward(cat_batch, slots_only=True, dup_threshold=dup_threshold)
 
-                compute_bipartite_greedy_loss(cat_slots_nodup[3*batch_size:4*batch_size], cat_slots_nodup[4*batch_size:], obj_greedy_std_nodup)
+                # compute_bipartite_greedy_loss(cat_slots_nodup[3*batch_size:4*batch_size], cat_slots_nodup[4*batch_size:], std_nodup)
+                # Here we compute the angle between DC and D'C
+                cat_slots_two_fwd = torch.cat([cat_slots[3*batch_size:4*batch_size], cat_slots[2*batch_size:3*batch_size], cat_slots[2*batch_size:3*batch_size], cat_slots[4*batch_size:]], 0)
+                cat_indices = compute_greedy_loss(cat_slots_two_fwd, obj_greedy_std_nodup)
+                cat_slots_two_fwd = batched_index_select(cat_slots_two_fwd, 1, cat_indices)
+                CD_prime = (cat_slots_two_fwd[3*batch_size: 4*batch_size]-cat_slots_two_fwd[2*batch_size: 3*batch_size]).view(batch_size, -1)
+                CD = (cat_slots_two_fwd[: batch_size]-cat_slots_two_fwd[1*batch_size: 2*batch_size]).view(batch_size, -1)
+                CD_norm = torch.norm(CD, 2, -1)
+                CD_prime_norm = torch.norm(CD_prime, 2, -1)
+                #print("delta: ", ((torch.square(slots_D_norm)+torch.square(slots_D_prime_norm)-losses_nodup[-1]).div(2*slots_D_norm*slots_D_prime_norm)).max())
+                # losses_nodup[-1]=torch.acos(torch.clamp((torch.square(slots_D_norm)+torch.square(slots_D_prime_norm)-losses_nodup[-1]).div(2*slots_D_norm*slots_D_prime_norm), max=1.0))
+                z_angle.append(torch.acos(torch.clamp(cos(CD, CD_prime), max=1.0)))
+                std_nodup[-1]=torch.acos(torch.clamp((torch.square(CD_norm)+torch.square(CD_prime_norm)-std_nodup[-1]).div(2*CD_norm*CD_prime_norm), max=1.0))
+
                 # slots_E = cat_slots[4*batch_size: 5*batch_size]
                 # slots_E_nodup = cat_slots_nodup[4*batch_size: 5*batch_size]
                 # slots_F = cat_slots[5*batch_size: 6*batch_size]
@@ -188,7 +202,6 @@ class SlotAttentionMethod(pl.LightningModule):
                 slots_D_norm = torch.norm(slots_D, 2, -1)
                 scaling_AB = slots_A_norm.div(slots_B_norm)
                 scaling_DC = slots_D_norm.div(slots_C_norm)
-                cos = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
                 angle_AB = torch.acos(torch.clamp(cos(slots_A, slots_B), max=1.0))
                 angle_DC = torch.acos(torch.clamp(cos(slots_D, slots_C), max=1.0))
 
@@ -200,7 +213,7 @@ class SlotAttentionMethod(pl.LightningModule):
                 scaling_ratios.append(torch.maximum(scaling_AB, scaling_DC).div(torch.minimum(scaling_AB, scaling_DC)))
                 angle_ratios.append(torch.maximum(angle_AB, angle_DC).div(torch.minimum(angle_AB, angle_DC)))
                 #slots_D_prime_norm = torch.norm((cat_slots_nodup_sorted[: batch_size]-cat_slots_nodup_sorted[1*batch_size: 2*batch_size]+cat_slots_nodup_sorted[2*batch_size: 3*batch_size]).view(batch_size, -1), 2, -1)
-                DC_norm = torch.norm((cat_slots_nodup_sorted[3*batch_size: 4*batch_size]-cat_slots_nodup_sorted[2*batch_size: 3*batch_size]).view(batch_size, -1), 2, -1)
+                DC_norm = torch.norm(slots_D-slots_C, 2, -1)
                 AB_norm = torch.norm((cat_slots_nodup_sorted[: batch_size]-cat_slots_nodup_sorted[1*batch_size: 2*batch_size]).view(batch_size, -1), 2, -1)
                 #print("delta: ", ((torch.square(slots_D_norm)+torch.square(slots_D_prime_norm)-losses_nodup[-1]).div(2*slots_D_norm*slots_D_prime_norm)).max())
                 # losses_nodup[-1]=torch.acos(torch.clamp((torch.square(slots_D_norm)+torch.square(slots_D_prime_norm)-losses_nodup[-1]).div(2*slots_D_norm*slots_D_prime_norm), max=1.0))
