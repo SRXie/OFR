@@ -43,7 +43,7 @@ if INSIDE_BLENDER:
     print("$VERSION is your Blender version (such as 2.78).")
     sys.exit(1)
 
-ROOT = '/checkpoint/siruixie/clevr_obj_test/output'
+ROOT = '/checkpoint/siruixie/clevr_obj_test/output/obj_test_occ_prep/12'
 parser = argparse.ArgumentParser()
 
 # Input options
@@ -354,7 +354,7 @@ def render_scene(args,
     rgba = [float(c) / 255.0 for c in rgb]+[1.0]
     bg_mapping[name] = rgba
 
-  color_name, rgba = random.choice(list(bg_mapping.items()))
+  color_name, rgba = random.choice(list(bg_mapping.items())[1:])
   bpy.data.objects["Ground"].color = rgba
   gt_mat = bpy.data.materials.new("bgcolor")
   gt_mat.use_nodes = True
@@ -407,7 +407,7 @@ def render_scene(args,
   if args.obj_test:
     # Change the background
     while True:
-        new_color_name, new_rgba = random.choice(list(bg_mapping.items()))
+        new_color_name, new_rgba = list(bg_mapping.items())[0]
         if not new_color_name == color_name:
           break
     bpy.data.objects["Ground"].color = new_rgba

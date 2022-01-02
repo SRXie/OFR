@@ -37,7 +37,7 @@ def create_scene_from_path(test_root, main_scene_idx, sub_scene_idx=0):
         scene_dict = json.load(f1)
 
     with open(meta_path) as f2:
-        if "/obj_test/" in meta_path:
+        if "/obj_test_occ/" in meta_path:
             objs2img = json.load(f2)
             attrs2img = None
         elif "/attr_test/" in meta_path:
@@ -106,30 +106,33 @@ def obj_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0, decomposed=No
                     mask_A_path = create_path(test_root, main_scene_idx, subset_idx_A, file_type="masks")
                     mask_C_path = create_path(test_root, main_scene_idx, subset_idx_C, file_type="masks")
 
-                    mask_A = np.array(Image.open(mask_A_path))[:,:,0]
-                    mask_A = np.where(mask_A==64, 0.0, mask_A)
-                    mask_A = np.where(mask_A==255, 1.0, mask_A)
-                    mask_B = np.array(Image.open(mask_B_path))[:,:,0]
-                    mask_B = np.where(mask_B==64, 0.0, mask_B)
-                    mask_B = np.where(mask_B==255, 1.0, mask_B)
-                    mask_C = np.array(Image.open(mask_C_path))[:,:,0]
-                    mask_C = np.where(mask_C==64, 0.0, mask_C)
-                    mask_C = np.where(mask_C==255, 1.0, mask_C)
-                    mask_D = np.array(Image.open(mask_D_path))[:,:,0]
-                    mask_D = np.where(mask_D==64, 0.0, mask_D)
-                    mask_D = np.where(mask_D==255, 1.0, mask_D)
+                    try:
+                        mask_A = np.array(Image.open(mask_A_path))[:,:,0]
+                        mask_A = np.where(mask_A==64, 0.0, mask_A)
+                        mask_A = np.where(mask_A==255, 1.0, mask_A)
+                        mask_B = np.array(Image.open(mask_B_path))[:,:,0]
+                        mask_B = np.where(mask_B==64, 0.0, mask_B)
+                        mask_B = np.where(mask_B==255, 1.0, mask_B)
+                        mask_C = np.array(Image.open(mask_C_path))[:,:,0]
+                        mask_C = np.where(mask_C==64, 0.0, mask_C)
+                        mask_C = np.where(mask_C==255, 1.0, mask_C)
+                        mask_D = np.array(Image.open(mask_D_path))[:,:,0]
+                        mask_D = np.where(mask_D==64, 0.0, mask_D)
+                        mask_D = np.where(mask_D==255, 1.0, mask_D)
 
-                    if np.abs(mask_A-mask_B+mask_C-mask_D).sum() > 1000.0: # 800 is the minimum number of visible pixels
-                        # hard negative
-                        drop_idx = random.randint(0, len(subset_idx_list_A)-1)
-                        subset_idx_E = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_A[:drop_idx]+subset_idx_list_A[drop_idx+1:])]
-                        image_E_path = create_path(test_root, main_scene_idx, subset_idx_E)
+                        if np.abs(mask_A-mask_B+mask_C-mask_D).sum() > 1200.0: # 800 is the minimum number of visible pixels
+                            # hard negative
+                            drop_idx = random.randint(0, len(subset_idx_list_A)-1)
+                            subset_idx_E = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_A[:drop_idx]+subset_idx_list_A[drop_idx+1:])]
+                            image_E_path = create_path(test_root, main_scene_idx, subset_idx_E)
 
-                        drop_idx = random.randint(0, len(subset_idx_list_D)-1)
-                        subset_idx_F = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_D[:drop_idx]+subset_idx_list_D[drop_idx+1:])]
-                        image_F_path = create_path(test_root, main_scene_idx, subset_idx_F)
+                            drop_idx = random.randint(0, len(subset_idx_list_D)-1)
+                            subset_idx_F = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_D[:drop_idx]+subset_idx_list_D[drop_idx+1:])]
+                            image_F_path = create_path(test_root, main_scene_idx, subset_idx_F)
 
-                        tuples.append((image_A_path, image_B_path, image_C_path, image_D_path, image_E_path, image_F_path))
+                            tuples.append((image_A_path, image_B_path, image_C_path, image_D_path, image_E_path, image_F_path))
+                    except Exception as e:
+                        print(e)
 
             if not subset_idx_list_B in decomposed:
                 tuples += obj_algebra_test(test_root, main_scene_idx, subset_idx_B, decomposed)
