@@ -61,7 +61,7 @@ class SlotAttentionMethod(pl.LightningModule):
             masks = batched_index_select(masks, 1, cat_indices)
             slots = batched_index_select(slots, 1, cat_indices)
             attns = batched_index_select(attns, 2, cat_indices)
-            recons_nodup = batched_index_select(recons_nodup, 1, cat_indices)
+            # recons_nodup = batched_index_select(recons_nodup, 1, cat_indices)
             # masks_nodup = batched_index_select(masks_nodup, 1, cat_indices)
             # slots_nodup = batched_index_select(slots_nodup, 1, cat_indices)
 
@@ -389,6 +389,7 @@ class SlotAttentionMethod(pl.LightningModule):
         #         # "std_obj_pseudo_greedy_cos_loss": std_obj_pd_greedy_cos_loss,
         #         # "std_attr_pseudo_greedy_cos_loss": std_attr_pd_greedy_cos_loss,
         #     }
+            logs = {}
             if self.trainer.running_sanity_check:
                 self.trainer.running_sanity_check = False  # so that loggers don't skip logging
                 self.log_dict(logs, sync_dist=True)
