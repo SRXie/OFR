@@ -51,7 +51,7 @@ class _Workplace(object):
         clevr_transforms = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.CenterCrop(192),
+                transforms.CenterCrop(168),
                 transforms.Lambda(rescale),  # rescale between -1 and 1
                 transforms.Resize(tuple(cfg.resolution)),
             ]
@@ -132,7 +132,7 @@ class _Workplace(object):
             callbacks=[LearningRateMonitor("step"), ImageLogCallback(),] if cfg.is_logger_enabled else [],
         )
         # to log the metric from the sanity check
-        self.trainer.current_epoch = -1
+        # self.trainer.current_epoch = -1
 
     def run_training(self):
         self.trainer.fit(self.method)

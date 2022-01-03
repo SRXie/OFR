@@ -15,7 +15,7 @@ from slot_attention.utils import batched_index_select
 from slot_attention.utils import compute_mask_ari
 from slot_attention.utils import to_rgb_from_tensor
 from slot_attention.utils import compute_corr_coef
-from slot_attention.utils import compute_greedy_loss
+from slot_attention.utils import compute_greedy_loss, compute_pseudo_greedy_loss
 
 
 class SlotAttention(nn.Module):
@@ -269,16 +269,18 @@ class SlotAttentionModel(nn.Module):
         if slots_only:
             return slots, attn, slots_nodup
 
-        slots = slots.view(batch_size * num_slots, slot_size, 1, 1)
+        # slots = slots.view(batch_size * num_slots, slot_size, 1, 1)
         if dup_threshold:
             if algebra:
-                cat_indices = compute_greedy_loss(slots_nodup, [])
-                slots_nodup = batched_index_select(slots_nodup, 1, cat_indices)
+                cat_indices = compute_greedy_loss(slots_nodup, []) #compute_pseudo_greedy_loss(slots, [])
+                slots_nodup = batched_index_select(slots_nodup, 1, cat_indices) # batched_index_select(slots, 1, cat_indices)
                 slots_nodup[3*(batch_size//4):]=slots_nodup[:(batch_size//4)]-slots_nodup[(batch_size//4):2*(batch_size//4)]+slots_nodup[2*(batch_size//4):3*(batch_size//4)]
+            slots = slots.view(batch_size * num_slots, slot_size, 1, 1)
             slots_nodup = slots_nodup.view(batch_size * num_slots, slot_size, 1, 1)
             slots_cat = torch.cat([slots, slots_nodup])
             batch_size = batch_size*2
         else:
+            slots = slots.view(batch_size * num_slots, slot_size, 1, 1)
             slots_cat = slots
         decoder_in = slots_cat.repeat(1, 1, self.decoder_resolution[0], self.decoder_resolution[1])
 
