@@ -257,14 +257,10 @@ class SlotAttentionModel(nn.Module):
             duplicated = torch.triu(duplicated, diagonal=1)
             duplicated = torch.sum(duplicated, dim=1)
             duplicated_index = torch.nonzero(duplicated, as_tuple=True)
-            # sample blank slots
-            slots_init = torch.randn((duplicated_index[0].shape[0], slot_size))
-            slots_init = slots_init.type_as(slots)
-            self.slots_mu = self.slots_mu.to(slots.device)
-            self.slots_log_sigma = self.slots_log_sigma.to(slots.device)
-            blank_slots = self.slots_mu.squeeze(0) # + self.slots_log_sigma.squeeze(0).exp() * slots_init
+            # get blank slots
+            blank_slots = slots.view(-1, slot_size).mean(0).unsqueeze(0)
             # fill in deuplicated slots with blank slots
-            slots_nodup[duplicated_index[0], duplicated_index[1]] = slots.view(-1, slot_size).mean(0).unsqueeze(0)
+            slots_nodup[duplicated_index[0], duplicated_index[1]] = blank_slots
 
         if slots_only:
             return slots, attn, slots_nodup
@@ -292,16 +288,9 @@ class SlotAttentionModel(nn.Module):
         out = out.view(batch_size, num_slots, num_channels + 1, height, width)
         recons = out[:, :, :num_channels, :, :]
         masks = out[:, :, -1:, :, :]
+        if dup_threshold:
+            unnormalized_masks_nodup = masks[:batch_size//2]
         masks = F.softmax(masks, dim=1)
-
-        # masks_sum = masks.view(batch_size*num_slots, height*width).sum(-1)
-        # blank_masks = masks_sum < height*width*0.001
-        # index = torch.nonzero(blank_masks).squeeze(1)
-        # if not torch.is_tensor(self.blank_slot):
-        #     self.blank_slot = torch.rand_like(self.slots_mu.squeeze(0).squeeze(0))
-        # if not index.shape[0] == 0:
-        #     blank_slots = slots.view(batch_size*num_slots, -1)[index].mean(0)
-        #     self.blank_slot = 0.995 * self.blank_slot + 0.005*blank_slots
 
         recon_combined = torch.sum(recons * masks, dim=1)
 
@@ -311,6 +300,16 @@ class SlotAttentionModel(nn.Module):
             masks, masks_nodup = torch.split(masks, batch_size, 0)
             recon_combined, recon_combined_nodup = torch.split(recon_combined, batch_size, 0)
             slots_nodup = slots_nodup.view(batch_size, num_slots, slot_size)
+
+            masks_nodup_mass = masks_nodup.view(batch_size, num_slots, -1)
+            masks_nodup_mass = torch.where(masks_nodup_mass>=masks_nodup_mass.max(dim=1)[0].unsqueeze(1).repeat(1,recons.shape[1],1), masks_nodup_mass, torch.zeros_like(masks_nodup_mass)).sum(-1)
+            invisible_index = torch.zero(masks_nodup_mass, as_tuple=True)
+            slots_nodup[invisible_index[0], invisible_index[1]] = blank_slots
+
+            # Here we mask the de-duplicated slots in generation
+            unnormalized_masks_nodup[duplicated_index[0], duplicated_index[1]] = -10000.0*torch.ones_like(masks_nodup_mass[0,0])
+            masks_nodup = F.softmax(unnormalized_masks_nodup, dim=1)
+            recon_combined_nodup = torch.sum(recons_nodup * masks_nodup, dim=1)
         slots = slots.view(batch_size, num_slots, slot_size)
         if dup_threshold:
             return recon_combined, recons, masks, slots, attn, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup

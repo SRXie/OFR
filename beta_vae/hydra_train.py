@@ -49,7 +49,7 @@ class _Workplace(object):
         clevr_transforms = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.CenterCrop(192),
+                transforms.CenterCrop(168),
                 transforms.Lambda(rescale),  # rescale between -1 and 1
                 transforms.Resize(tuple(cfg.resolution)),
             ]
