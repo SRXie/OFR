@@ -516,7 +516,7 @@ def captioned_masked_recons(recons, masks, slots, attns):
             draw = ImageDraw.Draw(img)
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 8)
             feature_text = "feat: "+str(feature_dup_idx[i,j].item())+" - {:.4f}".format(feature_dup_sim[i,j].item())
-            draw.text((4,55), feature_text, (0, 0, 0), font=font)
+            draw.text((4,55), feature_text, (255, 255, 255), font=font)
             img = transforms.ToTensor()(img)
             img = to_tensor_from_rgb(img)
             masked_recons[i,j] = img
