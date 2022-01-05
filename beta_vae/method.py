@@ -89,11 +89,11 @@ class BetaVAEMethod(pl.LightningModule):
         odl = self.datamodule.obj_test_dataloader()
         adl = self.datamodule.attr_test_dataloader()
 
-        z_norms = []
+        z_norm = []
         obj_losses, obj_cos_losses, obj_acos_losses, attr_losses = [], [], [], []
-        obj_losses_en_D, , obj_cos_losses_en_D,  obj_acos_losses_en_D, attr_losses_en = [], [], [], []
+        obj_losses_en_D, obj_cos_losses_en_D,  obj_acos_losses_en_D, attr_losses_en = [], [], [], []
 
-        def compute_test_losses(dataloader, losses, cos_losses, acos_losses, losses_en_D, cos_losses_en_D, acos_losses_D):
+        def compute_test_losses(dataloader, losses, cos_losses, acos_losses, losses_en_D, cos_losses_en_D, acos_losses_en_D):
             b_prev = datetime.now()
             for batch in dataloader:
                 # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
@@ -110,7 +110,7 @@ class BetaVAEMethod(pl.LightningModule):
                 if dataloader is odl:
                     znorm = torch.norm(cat_zs, 2, -1)
                     znorm = torch.stack(torch.split(znorm, znorm.shape[0]//4, 0), 1).mean(1)
-                    z_norms.append(znorm)
+                    z_norm.append(znorm)
 
                 cat_batch_EF = torch.cat(batch[4:], 0)
                 if self.params.gpus > 0:
@@ -127,7 +127,7 @@ class BetaVAEMethod(pl.LightningModule):
                 compute_cosine_loss(cat_zs, cos_losses, acos_losses)
 
                 compute_partition_loss(cat_zs, losses_en_D)
-                compute_partition_cosine_loss(cat_zs, obj_cos_en_D, obj_acos_en_D)
+                compute_partition_cosine_loss(cat_zs, cos_losses_en_D, acos_losses_en_D)
                 # compute_partition_loss_hard(cat_zs, zs_E, zs_F, losses_hn_A, losses_hn_D)
 
         with torch.no_grad():
@@ -155,15 +155,15 @@ class BetaVAEMethod(pl.LightningModule):
 
             obj_cos = torch.cat(obj_cos_losses, 0)
             obj_cos_en_D = torch.cat([x for x in obj_cos_losses_en_D], 0)
-            obj_cos_ratio = ((obj_cos_en_D-obj_cos_nodup).div(obj_cos_en_D))
+            obj_cos_ratio = ((obj_cos_en_D-obj_cos).div(obj_cos_en_D))
             std_obj_cos_ratio = obj_cos_ratio.std()/math.sqrt(obj_cos_ratio.shape[0])
             avg_obj_cos_ratio = obj_cos_ratio.mean()
             avg_obj_cos = obj_cos.mean()
-            avg_obj_cos_ctrast_en = obj_cos_nodup_en_D.mean()-avg_obj_cos
+            avg_obj_cos_ctrast_en = obj_cos_en_D.mean()-avg_obj_cos
 
             obj_acos = torch.cat(obj_acos_losses, 0)
             obj_acos_en_D = torch.cat([x for x in obj_acos_losses_en_D], 0)
-            obj_acos_ratio = ((obj_acos_en_D-obj_acos_nodup).div(obj_acos_en_D))
+            obj_acos_ratio = ((obj_acos_en_D-obj_acos).div(obj_acos_en_D))
             std_obj_acos_ratio = obj_acos_ratio.std()/math.sqrt(obj_acos_ratio.shape[0])
             avg_obj_acos_ratio = obj_acos_ratio.mean()
             avg_obj_acos = obj_acos.mean()
@@ -171,16 +171,15 @@ class BetaVAEMethod(pl.LightningModule):
 
             logs = {
                 "avg_val_loss": avg_loss,
-                "avg_ari_mask": avg_ari_mask,
                 "avg_z_norm": avg_z_norm.to(self.device),
-                "avg_z_angle": avg_z_angle.to(self.device),
-                "avg_scaling": avg_scaling.to(self.device),
-                "avg_angle": avg_angle.to(self.device),
-                "avg_scaling_delta": avg_scaling_delta.to(self.device),
-                "avg_angle_delta": avg_angle_delta.to(self.device),
-                "avg_scaling_ratio": avg_scaling_ratio.to(self.device),
-                "avg_angle_ratio": avg_angle_ratio.to(self.device),
-                "avg_slot_std": avg_slot_std.to(self.device),
+                # "avg_z_angle": avg_z_angle.to(self.device),
+                # "avg_scaling": avg_scaling.to(self.device),
+                # "avg_angle": avg_angle.to(self.device),
+                # "avg_scaling_delta": avg_scaling_delta.to(self.device),
+                # "avg_angle_delta": avg_angle_delta.to(self.device),
+                # "avg_scaling_ratio": avg_scaling_ratio.to(self.device),
+                # "avg_angle_ratio": avg_angle_ratio.to(self.device),
+                # "avg_slot_std": avg_slot_std.to(self.device),
                 "avg_obj_l2_ratio": avg_obj_l2_ratio.to(self.device),
                 "avg_obj_l2": avg_obj_l2.to(self.device),
                 "avg_obj_l2_ctrast_en": avg_obj_l2_ctrast_en.to(self.device),

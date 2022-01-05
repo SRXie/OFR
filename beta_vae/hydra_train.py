@@ -123,7 +123,7 @@ class _Workplace(object):
         self.method = BetaVAEMethod(model=model, datamodule=clevr_datamodule, params=cfg)
 
         logger_name = "btc-vae/"+self.dataset+"/"+cfg.decoder_type+"-beta-"+str(cfg.beta)+"-ldim-"+str(cfg.latent_dim)+ "-s-" + str(seed)#"-dup-"+str(cfg.dup_threshold)
-        logger = pl_loggers.WandbLogger(project="objectness-test-occ", name=logger_name)
+        logger = pl_loggers.WandbLogger(project="objectness-test-metric", name=logger_name)
         # Use this line for Tensorboard logger
         # logger = pl_loggers.TensorBoardLogger("./logs/"+logger_name+strftime("-%Y%m%d%H%M%S", localtime()))
 

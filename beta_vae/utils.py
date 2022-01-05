@@ -103,7 +103,7 @@ def compute_loss(cat_zs, losses):
     # vector_D = (zs_D).div(torch.norm(zs_D, 2, -1).unsqueeze(-1).repeat(1, cat_zs.shape[1]))
     # cos_loss = torch.square(vector_ABC-vector_D).sum(-1)/2
     # loss = torch.acos(1.0-cos_loss)
-    loss = torch.acos((torch.square(zs_A-zs_B+zs_C).sum(-1)+torch.square(zs_D).sum(-1)-torch.square(zs_A-zs_B+zs_C-zs_D).sum(-1)).div(2*torch.norm(zs_A-zs_B+zs_C, 2, -1)*torch.norm(zs_D, 2, -1)))
+    loss = torch.square(zs_A-zs_B+zs_C-zs_D).sum(-1)
     losses.append(loss)
 
 def compute_cosine_loss(cat_zs, cos_losses, acos_losses):
@@ -126,9 +126,9 @@ def compute_partition_loss(cat_zs, D_losses):
     zs_D = zs_D.view(1, batch_size, z_dim).repeat(batch_size, 1, 1)
     zs_D_prime = zs_D_prime.view(batch_size, 1, z_dim).repeat(1, batch_size, 1)
     zs_D_delta = zs_D_prime - zs_D
-    D_loss = -torch.acos((torch.square(zs_D).sum(-1)+torch.square(zs_D_prime).sum(-1)-torch.square(zs_D_delta).sum(-1)).div(2*torch.norm(zs_D_prime, 2, -1)*torch.norm(zs_D, 2, -1)))
+    D_loss = torch.square(zs_D_delta).sum(-1)
     # A_losses.append(A_loss)
-    D_losses.append(D_loss)
+    D_losses.append(D_loss.mean(1))
 
 def compute_partition_cosine_loss(cat_zs, cos_losses, acos_losses):
     zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
@@ -142,7 +142,7 @@ def compute_partition_cosine_loss(cat_zs, cos_losses, acos_losses):
     vector_AB = vector_AB.view(1, batch_size, z_dim).repeat(batch_size, 1, 1)
     vector_DC = vector_DC.view(batch_size, 1, z_dim).repeat(1, batch_size, 1)
     cos_loss = torch.square(vector_AB-vector_DC).sum(-1)/2
-    acos_loss = torch.acos(1.0-delta)
+    acos_loss = torch.acos(1.0-cos_loss)
     # D_loss = -torch.acos((torch.square(vector_AB).sum(-1)+torch.square(vector_DC).sum(-1)-torch.square(delta).sum(-1))/2.0)
 
     cos_losses.append(cos_loss.mean(1))
