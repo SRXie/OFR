@@ -53,7 +53,7 @@ class SlotAttentionMethod(pl.LightningModule):
 
         with torch.no_grad():
 
-            recon_combined, recons, masks, slots, attns, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold, algebra=True)
+            recon_combined, recons, masks, slots, attns, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold)
 
             # throw background slot back
             cat_indices = swap_bg_slot_back(attns)
@@ -111,7 +111,7 @@ class SlotAttentionMethod(pl.LightningModule):
 
             batch_size, num_slots, C, H, W = recons.shape
             images = vutils.make_grid(
-                out.view(2 * batch_size * out.shape[1], C, H, W).cpu(), normalize=False, nrow=out.shape[1],
+                out.view(2 * batch_size * out.shape[1]+batch_size, C, H, W).cpu(), normalize=False, nrow=out.shape[1],
             )
 
         return images
