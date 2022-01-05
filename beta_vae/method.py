@@ -108,7 +108,7 @@ class BetaVAEMethod(pl.LightningModule):
                     cat_zs = cat_batch.view(batch_size*2, -1)
                 else:
                     mu, log_var = self.model.encode(cat_batch)
-                    cat_zs = self.model.reparameterize(mu, log_var).detach()
+                    cat_zs = mu #self.model.reparameterize(mu, log_var).detach()
 
                 if dataloader is odl:
                     znorm = torch.norm(cat_zs, 2, -1)
@@ -122,7 +122,7 @@ class BetaVAEMethod(pl.LightningModule):
                     cat_zs_EF = cat_batch_EF.view(batch_size*2, -1)
                 else:
                     EF_mu, EF_log_var = self.model.encode(cat_batch_EF)
-                    cat_zs_EF = self.model.reparameterize(EF_mu, EF_log_var).detach()
+                    cat_zs_EF = EF_mu # self.model.reparameterize(EF_mu, EF_log_var).detach()
                 zs_E, zs_F = torch.split(cat_zs_EF, batch_size, 0)
 
                 zs_A = cat_zs[:batch_size]

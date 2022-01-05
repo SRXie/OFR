@@ -159,7 +159,7 @@ class CLEVRAlgebraTestset(Dataset):
         self.clevr_transforms = clevr_transforms
         self.max_num_main_scenes = max_num_images
         if test_type == "obj":
-            self.test_root =  os.path.join(data_root, "obj_test_occ")
+            self.test_root =  os.path.join(data_root, "obj_test_occ_w")
         else:
             self.test_root =  os.path.join(data_root, f"{test_type}_test")
         self.data_path = os.path.join(self.test_root, "images")
