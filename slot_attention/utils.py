@@ -353,7 +353,7 @@ def compute_shuffle_greedy_loss(cat_slots_sorted, D_losses, D_cos, D_acos, cos_s
     # A_losses.append(-torch.sqrt(greedy_loss_A).mean(1))
     D_losses.append(greedy_loss_D.mean(1))
     D_cos.append((1.0-(AB_sqsum+DC_sqsum-greedy_loss_D).div(2*torch.sqrt(AB_sqsum)*torch.sqrt(DC_sqsum))).mean(1))
-    D_acos.append(torch.acos(torch.clamp(1.0-D_cos[-1], max=1.0)).mean(1))
+    D_acos.append(torch.acos(torch.clamp((AB_sqsum+DC_sqsum-greedy_loss_D).div(2*torch.sqrt(AB_sqsum)*torch.sqrt(DC_sqsum)), max=1.0)).mean(1))
 
 def compute_bipartite_greedy_loss(slots_A, slots_E, losses, cos_sim=False):
     batch_size, num_slots, slot_size = slots_A.shape
