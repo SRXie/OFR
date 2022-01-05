@@ -44,10 +44,10 @@ class SlotAttentionMethod(pl.LightningModule):
         dl = self.datamodule.obj_test_dataloader()
         random_idx = torch.randint(high=len(dl), size=(1,))
         batch = next(iter(dl))  # list of A, B, C, D, E, F -- E and F are hard negatives
-        perm = torch.randperm(self.params.val_batch_size)
+        perm = torch.randperm(self.params.test_batch_size)
         idx = perm[: self.params.n_samples]
         batch = torch.cat([b[idx] for b in batch[:4]], 0)
-        print(batch.shape)
+        
         if self.params.gpus > 0:
             batch = batch.to(self.device)
 
@@ -157,18 +157,30 @@ class SlotAttentionMethod(pl.LightningModule):
 
         def compute_test_losses(dataloader, losses_nodup, losses_nodup_en_A, losses_nodup_en_D, std_nodup, dup_threshold=None):
             # b_prev = datetime.now()
+            slots_nodup_list = []
+            i = 0
             for batch in dataloader:
                 # print("load data:", datetime.now()-b_prev)
                 # sample_losses = []
                 # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
+                i += 0.01
                 batch_size = batch[0].shape[0]
                 cat_batch = torch.cat(batch[:4]+[batch[3]], 0)
                 if self.params.gpus > 0:
                     cat_batch = cat_batch.to(self.device)
-                _, _, _, cat_slots, cat_attns, _, _, _, cat_slots_nodup = self.model.forward(cat_batch, slots_only=False, dup_threshold=dup_threshold, viz=False)
+                _, _, _, slots, _, _, _, _, slots_nodup = self.model.forward(cat_batch, slots_only=False, dup_threshold=dup_threshold, viz=False)
 
+                slots_nodup = slots_nodup.cpu()
+                slots_nodup_list.append(slots_nodup)
+                if len(slots_nodup_list)==64//self.params.test_batch_size:
+                    cat_slots_nodup = torch.cat(slots_nodup_list, 0)
+                    cat_slots_nodup = split_and_interleave_stack(cat_slots_nodup, slots_nodup.shape[0])
+                    slots_nodup_list = []
+                else:
+                    continue
                 # compute_bipartite_greedy_loss(cat_slots_nodup[3*batch_size:4*batch_size], cat_slots_nodup[4*batch_size:], std_nodup)
                 # Here we compute the angle between DC and D'C
+                batch_size*=8
                 cat_slots_two_fwd = torch.cat([cat_slots_nodup[3*batch_size:4*batch_size], cat_slots_nodup[2*batch_size:3*batch_size], cat_slots_nodup[2*batch_size:3*batch_size], cat_slots_nodup[4*batch_size:]], 0)
                 cat_indices = compute_greedy_loss(cat_slots_two_fwd, std_nodup)
                 cat_slots_two_fwd = batched_index_select(cat_slots_two_fwd, 1, cat_indices)
@@ -186,8 +198,8 @@ class SlotAttentionMethod(pl.LightningModule):
                 # slots_E_nodup = cat_slots_nodup[4*batch_size: 5*batch_size]
                 # slots_F = cat_slots[5*batch_size: 6*batch_size]
                 # slots_F_nodup = cat_slots_nodup[5*batch_size: 6*batch_size]
-                cat_slots = cat_slots[:4*batch_size]
-                cat_attns = cat_attns[:4*batch_size]
+                # cat_slots = cat_slots[:4*batch_size]
+                # cat_attns = cat_attns[:4*batch_size]
                 cat_slots_nodup = cat_slots_nodup[:4*batch_size]
 
                 # cat_slots_nodup = torch.Tensor([[[1.0], [3.0], [2.0]], [[2.0], [0.5], [1.0]], [[0.5], [0.5], [2.0]], [[0.5], [0.5], [1.0]], [[0.5], [0.5], [6.0]], [[0.5], [4.0], [0.5]], [[2.0], [3.0], [6.0]], [[2.0], [4.0], [0.5]]]).to(cat_slots_nodup.device)
@@ -340,25 +352,25 @@ class SlotAttentionMethod(pl.LightningModule):
             # avg_attr_pd_greedy_cos_loss = avg_attr_pd_greedy_cos_loss.mean()
 
             logs = {
-                # "avg_val_loss": avg_loss,
+                "avg_val_loss": avg_loss,
                 "avg_ari_mask": avg_ari_mask,
-                "avg_z_norm": avg_z_norm,
-                "avg_z_angle": avg_z_angle,
-                "avg_scaling": avg_scaling,
-                "avg_angle": avg_angle,
-                "avg_scaling_delta": avg_scaling_delta,
-                "avg_angle_delta": avg_angle_delta,
-                "avg_scaling_ratio": avg_scaling_ratio,
-                "avg_angle_ratio": avg_angle_ratio,
-                "avg_slot_std": avg_slot_std,
-                "avg_obj_greedy_ctrast_en": avg_obj_greedy_ctrast_en,
+                "avg_z_norm": avg_z_norm.to(self.device),
+                "avg_z_angle": avg_z_angle.to(self.device),
+                "avg_scaling": avg_scaling.to(self.device),
+                "avg_angle": avg_angle.to(self.device),
+                "avg_scaling_delta": avg_scaling_delta.to(self.device),
+                "avg_angle_delta": avg_angle_delta.to(self.device),
+                "avg_scaling_ratio": avg_scaling_ratio.to(self.device),
+                "avg_angle_ratio": avg_angle_ratio.to(self.device),
+                "avg_slot_std": avg_slot_std.to(self.device),
+                "avg_obj_greedy_ctrast_en": avg_obj_greedy_ctrast_en.to(self.device),
                 # "avg_obj_greedy_ctrast_hn": avg_obj_greedy_ctrast_hn,
                 # "avg_obj_greedy_ctrast": avg_obj_greedy_ctrast,
-                "avg_obj_greedy_loss": avg_obj_greedy_loss,
+                "avg_obj_greedy_loss": avg_obj_greedy_loss.to(self.device),
                 # "avg_attr_greedy_loss_nodup": avg_attr_greedy_loss_nodup,
                 # "avg_obj_pseudo_greedy_loss": avg_obj_pd_greedy_loss,
                 # "avg_attr_pseudo_greedy_loss": avg_attr_pd_greedy_loss,
-                "avg_obj_greedy_ratio_en": avg_obj_greedy_ratio_en,
+                "avg_obj_greedy_ratio_en": avg_obj_greedy_ratio_en.to(self.device),
                 # "avg_attr_greedy_loss_nodup_en": avg_attr_greedy_loss_nodup_en,
                 # "avg_obj_pseudo_greedy_loss_en": avg_obj_pd_greedy_loss_en,
                 # "avg_attr_pseudo_greedy_loss_en": avg_attr_pd_greedy_loss_en,
