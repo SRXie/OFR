@@ -120,7 +120,7 @@ class SlotAttentionModel(nn.Module):
         in_channels: int = 3,
         kernel_size: int = 5,
         slot_size: int = 64,
-        hidden_dims: Tuple[int, ...] = (64, 64, 64, 64), #delete one entry for 128 -> 64
+        hidden_dims: Tuple[int, ...] = (64, 64, 64), #delete one entry for 128 -> 64
         decoder_resolution: Tuple[int, int] = (8, 8),
         empty_cache=False,
     ):
@@ -261,7 +261,7 @@ class SlotAttentionModel(nn.Module):
             blank_slots = slots.view(-1, slot_size).mean(0).unsqueeze(0)
             # fill in deuplicated slots with blank slots
             slots_nodup[duplicated_index[0], duplicated_index[1]] = blank_slots
-
+            
         if slots_only:
             return slots, attn, slots_nodup
 
@@ -289,7 +289,7 @@ class SlotAttentionModel(nn.Module):
         recons = out[:, :, :num_channels, :, :]
         masks = out[:, :, -1:, :, :]
         if dup_threshold:
-            unnormalized_masks_nodup = masks[:batch_size//2]
+            unnormalized_masks_nodup = masks[batch_size//2:]
         masks = F.softmax(masks, dim=1)
 
         recon_combined = torch.sum(recons * masks, dim=1)
@@ -303,11 +303,13 @@ class SlotAttentionModel(nn.Module):
 
             masks_nodup_mass = masks_nodup.view(batch_size, num_slots, -1)
             masks_nodup_mass = torch.where(masks_nodup_mass>=masks_nodup_mass.max(dim=1)[0].unsqueeze(1).repeat(1,recons.shape[1],1), masks_nodup_mass, torch.zeros_like(masks_nodup_mass)).sum(-1)
-            invisible_index = torch.zero(masks_nodup_mass, as_tuple=True)
+            invisible_index = torch.nonzero(masks_nodup_mass==0.0, as_tuple=True)
             slots_nodup[invisible_index[0], invisible_index[1]] = blank_slots
 
             # Here we mask the de-duplicated slots in generation
-            unnormalized_masks_nodup[duplicated_index[0], duplicated_index[1]] = -10000.0*torch.ones_like(masks_nodup_mass[0,0])
+            detect_blank_slots = slots_nodup.view(batch_size, num_slots, -1)
+            detect_blank_slots = ((detect_blank_slots - blank_slots.unsqueeze(0)).sum(-1)==0.0).nonzero(as_tuple=True)
+            unnormalized_masks_nodup[detect_blank_slots[0], detect_blank_slots[1]] = -10000.0*torch.ones_like(masks_nodup_mass[0,0])
             masks_nodup = F.softmax(unnormalized_masks_nodup, dim=1)
             recon_combined_nodup = torch.sum(recons_nodup * masks_nodup, dim=1)
         slots = slots.view(batch_size, num_slots, slot_size)
