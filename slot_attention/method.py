@@ -225,7 +225,7 @@ class SlotAttentionMethod(pl.LightningModule):
 
 
         with torch.no_grad():
-            compute_test_losses(odl, obj_greedy_losses_nodup, obj_greedy_losses_nodup_en_D, obj_greedy_std_nodup, obj_cos_losses_nodup, obj_cos_losses_nodup_en_D, obj_cos_std_nodup, 
+            compute_test_losses(odl, obj_greedy_losses_nodup, obj_greedy_losses_nodup_en_D, obj_greedy_std_nodup, obj_cos_losses_nodup, obj_cos_losses_nodup_en_D, obj_cos_std_nodup,
                     obj_acos_losses_nodup, obj_acos_losses_nodup_en_D, obj_acos_std_nodup, dup_threshold=self.params.dup_threshold)
             # compute_test_losses(adl, attr_pd_greedy_losses, attr_pd_greedy_losses_en, attr_pd_greedy_losses_hn, attr_greedy_losses_nodup, attr_greedy_losses_nodup_en, attr_greedy_losses_nodup_hn,
             #     attr_pd_greedy_cos_losses, attr_pd_greedy_cos_losses_en, attr_pd_greedy_cos_losses_hn, attr_greedy_cos_losses_nodup, attr_greedy_cos_losses_nodup_en, attr_greedy_cos_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
@@ -238,12 +238,16 @@ class SlotAttentionMethod(pl.LightningModule):
             avg_angle_delta = torch.cat(angle_deltas, 0).mean()
             avg_scaling_ratio = torch.cat(scaling_ratios, 0).mean()
             avg_angle_ratio = torch.cat(angle_ratios, 0).mean()
-            slot_std = torch.cat(obj_greedy_std_nodup, 0)
-            avg_slot_std = slot_std.mean()
+            l2_std = torch.cat(obj_greedy_std_nodup, 0)
+            cos_std = torch.cat(obj_cos_std_nodup, 0)
+            acos_std = torch.cat(obj_acos_std_nodup, 0)
+            avg_l2_std = l2_std.mean()
+            avg_cos_std = cos_std.mean()
+            avg_acos_std = acos_std.mean()
 
             obj_l2_nodup = torch.cat(obj_greedy_losses_nodup, 0)
             obj_l2_nodup_en_D = torch.cat([x for x in obj_greedy_losses_nodup_en_D], 0)
-            obj_l2_ratio = ((obj_l2_nodup_en_D-obj_l2_nodup).div(obj_l2_nodup_en_D))
+            obj_l2_ratio = ((obj_l2_nodup_en_D-obj_l2_nodup).div(obj_l2_nodup_en_D-avg_l2_std))
             std_obj_l2_ratio = obj_l2_ratio.std()/math.sqrt(obj_l2_ratio.shape[0])
             avg_obj_l2_ratio = obj_l2_ratio.mean()
             avg_obj_l2 = obj_l2_nodup.mean()
@@ -251,7 +255,7 @@ class SlotAttentionMethod(pl.LightningModule):
 
             obj_cos_nodup = torch.cat(obj_cos_losses_nodup, 0)
             obj_cos_nodup_en_D = torch.cat([x for x in obj_cos_losses_nodup_en_D], 0)
-            obj_cos_ratio = ((obj_cos_nodup_en_D-obj_cos_nodup).div(obj_cos_nodup_en_D))
+            obj_cos_ratio = ((obj_cos_nodup_en_D-obj_cos_nodup).div(obj_cos_nodup_en_D-avg_cos_std))
             std_obj_cos_ratio = obj_cos_ratio.std()/math.sqrt(obj_cos_ratio.shape[0])
             avg_obj_cos_ratio = obj_cos_ratio.mean()
             avg_obj_cos = obj_cos_nodup.mean()
@@ -259,7 +263,7 @@ class SlotAttentionMethod(pl.LightningModule):
 
             obj_acos_nodup = torch.cat(obj_acos_losses_nodup, 0)
             obj_acos_nodup_en_D = torch.cat([x for x in obj_acos_losses_nodup_en_D], 0)
-            obj_acos_ratio = ((obj_acos_nodup_en_D-obj_acos_nodup).div(obj_acos_nodup_en_D))
+            obj_acos_ratio = ((obj_acos_nodup_en_D-obj_acos_nodup).div(obj_acos_nodup_en_D-avg_acos_std))
             std_obj_acos_ratio = obj_acos_ratio.std()/math.sqrt(obj_acos_ratio.shape[0])
             avg_obj_acos_ratio = obj_acos_ratio.mean()
             avg_obj_acos = obj_acos_nodup.mean()
@@ -276,18 +280,20 @@ class SlotAttentionMethod(pl.LightningModule):
                 "avg_angle_delta": avg_angle_delta.to(self.device),
                 "avg_scaling_ratio": avg_scaling_ratio.to(self.device),
                 "avg_angle_ratio": avg_angle_ratio.to(self.device),
-                "avg_slot_std": avg_slot_std.to(self.device),
                 "avg_obj_l2_ratio": avg_obj_l2_ratio.to(self.device),
                 "avg_obj_l2": avg_obj_l2.to(self.device),
                 "avg_obj_l2_ctrast_en": avg_obj_l2_ctrast_en.to(self.device),
+                "avg_obj_l2_std": avg_l2_std.to(self.device),
                 "std_obj_l2_ratio": std_obj_l2_ratio.to(self.device),
                 "avg_obj_cos_ratio": avg_obj_cos_ratio.to(self.device),
                 "avg_obj_cos": avg_obj_cos.to(self.device),
                 "avg_obj_cos_ctrast_en": avg_obj_cos_ctrast_en.to(self.device),
+                "avg_obj_cos_std": avg_cos_std.to(self.device),
                 "std_obj_cos_ratio": std_obj_cos_ratio.to(self.device),
                 "avg_obj_acos_ratio": avg_obj_acos_ratio.to(self.device),
                 "avg_obj_acos": avg_obj_acos.to(self.device),
                 "avg_obj_acos_ctrast_en": avg_obj_acos_ctrast_en.to(self.device),
+                "avg_obj_acos_std": avg_acos_std.to(self.device),
                 "std_obj_acos_ratio": std_obj_acos_ratio.to(self.device),
             }
 
