@@ -118,10 +118,10 @@ def set_seed_everywhere(seed):
     random.seed(seed)
 
 def split_and_interleave_stack(input, split_size):
-    x, y, z, w = torch.split(input, split_size, 0)
-    view_shape = [size for size in x.shape]
-    view_shape[0]*=4
-    return torch.stack((x, y, z, w), dim=1).view(view_shape)
+    split_list = torch.split(input, split_size, 0)
+    view_shape = [size for size in split_list[0].shape]
+    view_shape[0]*=len(split_list)
+    return torch.stack(split_list, dim=1).view(view_shape)
 
 def interleave_stack(x, y):
     return torch.stack((x, y), dim=1).view(2*x.shape[0], x.shape[1], x.shape[2], x.shape[3], x.shape[4])

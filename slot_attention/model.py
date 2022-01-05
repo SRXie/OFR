@@ -289,9 +289,10 @@ class SlotAttentionModel(nn.Module):
         masks = F.softmax(masks, dim=1)
 
         recon_combined = torch.sum(recons * masks, dim=1)
-
+        
         if dup_threshold:
             batch_size = batch_size//2
+            slots = slots.view(batch_size, num_slots, slot_size)
             recons, recons_nodup = torch.split(recons, batch_size, 0)
             masks, masks_nodup = torch.split(masks, batch_size, 0)
             recon_combined, recon_combined_nodup = torch.split(recon_combined, batch_size, 0)
@@ -302,7 +303,7 @@ class SlotAttentionModel(nn.Module):
             invisible_index = torch.nonzero(masks_nodup_mass==0.0, as_tuple=True)
             slots_nodup[invisible_index[0], invisible_index[1]] = blank_slots
 
-            unnormalized_masks_nodup[duplicated_index[0], duplicated_index[1]] = -10000.0*torch.ones_like(masks_nodup_mass[0,0])
+            unnormalized_masks_nodup[duplicated_index[0], duplicated_index[1]] = -10000000.0*torch.ones_like(masks_nodup_mass[0,0])
             masks_nodup = F.softmax(unnormalized_masks_nodup, dim=1)
             recon_combined_nodup = torch.sum(recons_nodup * masks_nodup, dim=1)
 
@@ -311,6 +312,8 @@ class SlotAttentionModel(nn.Module):
                 batch_size = batch_size//4
                 cat_indices = compute_greedy_loss(slots_nodup, []) #compute_pseudo_greedy_loss(slots, [])
                 slots_nodup = batched_index_select(slots_nodup, 1, cat_indices) # batched_index_select(slots, 1, cat_indices)
+                recons_nodup = batched_index_select(recons_nodup, 1, cat_indices)
+                masks_nodup = batched_index_select(masks_nodup, 1, cat_indices)
                 slots_D_prime=slots_nodup[:batch_size]-slots_nodup[batch_size:2*batch_size]+slots_nodup[2*batch_size:3*batch_size]
                 slots_D_prime = slots_D_prime.view(batch_size * num_slots, slot_size, 1, 1)
 
@@ -338,7 +341,7 @@ class SlotAttentionModel(nn.Module):
                 slots_nodup = torch.cat(list(slots_nodup.split(batch_size, 0))+[slots_D_prime], 0)
             return recon_combined, recons, masks, slots, attn, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup
         else:
-            slots = slots.view(batch_size, num_slots, slot_size)
+            # slots = slots.view(batch_size, num_slots, slot_size)
             return recon_combined, recons, masks, slots, attn
 
     def loss_function(self, input, mask_gt=None, schema_gt=None):
