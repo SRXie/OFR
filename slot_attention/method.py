@@ -158,7 +158,7 @@ class SlotAttentionMethod(pl.LightningModule):
                 cat_batch = torch.cat(batch[:4]+[batch[3]], 0)
                 if self.params.gpus > 0:
                     cat_batch = cat_batch.to(self.device)
-                _, _, _, cat_slots, cat_attns, _, _, _, cat_slots_nodup = self.model.forward(cat_batch, slots_only=False, dup_threshold=dup_threshold)
+                _, _, _, cat_slots, cat_attns, _, _, _, cat_slots_nodup = self.model.forward(cat_batch, slots_only=False, dup_threshold=dup_threshold, viz=True)
 
                 # compute_bipartite_greedy_loss(cat_slots_nodup[3*batch_size:4*batch_size], cat_slots_nodup[4*batch_size:], std_nodup)
                 # Here we compute the angle between DC and D'C
