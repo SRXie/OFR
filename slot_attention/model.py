@@ -285,7 +285,7 @@ class SlotAttentionModel(nn.Module):
         recons = out[:, :, :num_channels, :, :]
         masks = out[:, :, -1:, :, :]
         if dup_threshold:
-            unnormalized_masks_nodup = masks[batch_size//2:]
+            unnormalized_masks_nodup = masks[:batch_size//2]
         masks = F.softmax(masks, dim=1)
 
         recon_combined = torch.sum(recons * masks, dim=1)
@@ -303,7 +303,7 @@ class SlotAttentionModel(nn.Module):
             invisible_index = torch.nonzero(masks_nodup_mass==0.0, as_tuple=True)
             slots_nodup[invisible_index[0], invisible_index[1]] = blank_slots
 
-            unnormalized_masks_nodup[duplicated_index[0], duplicated_index[1]] = -10000000.0*torch.ones_like(masks_nodup_mass[0,0])
+            unnormalized_masks_nodup[duplicated_index[0], duplicated_index[1]] = -1000000.0*torch.ones_like(masks_nodup_mass[0,0])
             masks_nodup = F.softmax(unnormalized_masks_nodup, dim=1)
             recon_combined_nodup = torch.sum(recons_nodup * masks_nodup, dim=1)
 
