@@ -90,15 +90,12 @@ class BetaVAEMethod(pl.LightningModule):
         adl = self.datamodule.attr_test_dataloader()
 
         z_norms = []
-        obj_losses, obj_cos_losses, attr_losses = [], [], []
-        obj_losses_en_A, obj_losses_en_D, attr_losses_en = [], [], []
-        obj_losses_hn_A, obj_losses_hn_D, attr_losses_hn = [], [], []
+        obj_losses, obj_cos_losses, obj_acos_losses, attr_losses = [], [], [], []
+        obj_losses_en_D, , obj_cos_losses_en_D,  obj_acos_losses_en_D, attr_losses_en = [], [], [], []
 
-        def compute_test_losses(dataloader, losses, cos_losses, losses_en_A, losses_en_D, losses_hn_A, losses_hn_D):
+        def compute_test_losses(dataloader, losses, cos_losses, acos_losses, losses_en_D, cos_losses_en_D, acos_losses_D):
             b_prev = datetime.now()
             for batch in dataloader:
-                # print("load data:", datetime.now()-b_prev)
-                # sample_losses = []
                 # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
                 batch_size = batch[0].shape[0]
                 cat_batch = torch.cat(batch[:4], 0)
@@ -126,63 +123,76 @@ class BetaVAEMethod(pl.LightningModule):
                 zs_E, zs_F = torch.split(cat_zs_EF, batch_size, 0)
 
                 zs_A = cat_zs[:batch_size]
-                # print((1-torch.norm((cat_zs[:batch_size]-cat_zs[batch_size:2*batch_size]+cat_zs[2*batch_size:3*batch_size]-cat_zs[3*batch_size:4*batch_size]).view(batch_size, -1), 2, -1).div(torch.norm(zs_A.view(batch_size, 1, -1) - zs_A.view(1, batch_size, -1), 2, -1).mean(-1))).mean())
-                # cat_zs = torch.Tensor([[1.0,1.0,2.0],[3.0,2.0,1.0],[4.0,3.0,2.0],[2.0,2.0,1.0]])
-                compute_cosine_loss(cat_zs, losses)
-                # print(losses[-1])
-                # exit(0)
-                # compute_cosine_loss(cat_zs, cos_losses)
-                compute_partition_cosine_loss(cat_zs, losses_en_A, losses_en_D)
+                compute_loss(cat_zs, losses)
+                compute_cosine_loss(cat_zs, cos_losses, acos_losses)
+
+                compute_partition_loss(cat_zs, losses_en_D)
+                compute_partition_cosine_loss(cat_zs, obj_cos_en_D, obj_acos_en_D)
                 # compute_partition_loss_hard(cat_zs, zs_E, zs_F, losses_hn_A, losses_hn_D)
 
-                # print("batch time:", datetime.now()-b_prev)
-                # b_prev = datetime.now()
-
         with torch.no_grad():
-            compute_test_losses(odl, obj_losses, obj_cos_losses, obj_losses_en_A, obj_losses_en_D, obj_losses_hn_A, obj_losses_hn_D)
+            compute_test_losses(odl, obj_losses, obj_cos_losses, obj_acos_losses, obj_losses_en_D, obj_cos_losses_en_D, obj_acos_losses_en_D)
             # compute_test_losses(adl, attr_losses, attr_losses_en, attr_losses_hn)
 
-            avg_z_norm = torch.cat(z_norms).mean()
-            obj_loss = torch.cat(obj_losses, 0)
-            obj_loss_en_A = torch.cat([(x).mean(1) for x in obj_losses_en_A], 0)
-            obj_loss_en_D = torch.cat([(x).mean(1) for x in obj_losses_en_D], 0)
-            # obj_loss_hn_A = torch.cat(obj_losses_hn_A, 0)/avg_z_norm
-            # obj_loss_hn_D = torch.cat(obj_losses_hn_D, 0)/avg_z_norm
-            # obj_loss_A = torch.cat([0.9*(x/avg_z_norm).mean(1)+0.1*(y/avg_z_norm) for x, y in zip(obj_losses_en_A, obj_losses_hn_A)], 0)
-            # obj_loss_D = torch.cat([0.9*(x/avg_z_norm).mean(1)+0.1*(y/avg_z_norm) for x, y in zip(obj_losses_en_D, obj_losses_hn_D)], 0)
-            avg_obj_ratio_en = ((obj_loss+obj_loss_en_D.mean()).div(obj_loss_en_D.mean())).mean()
-            # avg_obj_ratio_hn = ((obj_loss+obj_loss_hn_D).div(obj_loss_hn_A)).mean()
-            # avg_obj_ratio = ((obj_loss+obj_loss_D).div(obj_loss_A)).mean()
-            # print(torch.cat([obj_loss.unsqueeze(1), obj_loss_en_D.unsqueeze(1), obj_loss_en_A.unsqueeze(1)], 1)[:100])
-            std_obj_loss = obj_loss.std()/math.sqrt(obj_loss.shape[0])
-            avg_obj_loss = obj_loss.mean()
-            # avg_obj_cos_loss = torch.cat(obj_cos_losses).mean()
-            # avg_obj_ctrast = avg_obj_loss+obj_loss_D.mean()
-            avg_obj_ctrast_en = avg_obj_loss+obj_loss_en_D.mean()
-            # avg_obj_ctrast_hn = avg_obj_loss+obj_loss_hn_D.mean()
+            avg_z_norm = torch.cat(z_norm, 0).mean()
+            # avg_z_angle = torch.cat(z_angle, 0).mean()
+            # avg_scaling = torch.cat(scalings, 0).mean()
+            # avg_angle = torch.cat(angles, 0).mean()
+            # avg_scaling_delta = torch.cat(scaling_deltas, 0).mean()
+            # avg_angle_delta = torch.cat(angle_deltas, 0).mean()
+            # avg_scaling_ratio = torch.cat(scaling_ratios, 0).mean()
+            # avg_angle_ratio = torch.cat(angle_ratios, 0).mean()
+            # slot_std = torch.cat(obj_greedy_std_nodup, 0)
+            # avg_slot_std = slot_std.mean()
 
-            # avg_attr_loss = torch.cat(attr_losses, 0)
-            # avg_attr_loss_en = (torch.cat(attr_losses_en, 0)-avg_attr_loss).mean()
-            # avg_attr_loss_hn = (torch.cat(attr_losses_hn, 0)-avg_attr_loss).mean()
-            # std_attr_loss = avg_attr_loss.std()/math.sqrt(avg_attr_loss.shape[0])
-            # avg_attr_loss = avg_attr_loss.mean()
+            obj_l2 = torch.cat(obj_losses, 0)
+            obj_l2_en_D = torch.cat([x for x in obj_losses_en_D], 0)
+            obj_l2_ratio = ((obj_l2_en_D-obj_l2).div(obj_l2_en_D))
+            std_obj_l2_ratio = obj_l2_ratio.std()/math.sqrt(obj_l2_ratio.shape[0])
+            avg_obj_l2_ratio = obj_l2_ratio.mean()
+            avg_obj_l2 = obj_l2.mean()
+            avg_obj_l2_ctrast_en = obj_l2_en_D.mean()-avg_obj_l2
+
+            obj_cos = torch.cat(obj_cos_losses, 0)
+            obj_cos_en_D = torch.cat([x for x in obj_cos_losses_en_D], 0)
+            obj_cos_ratio = ((obj_cos_en_D-obj_cos_nodup).div(obj_cos_en_D))
+            std_obj_cos_ratio = obj_cos_ratio.std()/math.sqrt(obj_cos_ratio.shape[0])
+            avg_obj_cos_ratio = obj_cos_ratio.mean()
+            avg_obj_cos = obj_cos.mean()
+            avg_obj_cos_ctrast_en = obj_cos_nodup_en_D.mean()-avg_obj_cos
+
+            obj_acos = torch.cat(obj_acos_losses, 0)
+            obj_acos_en_D = torch.cat([x for x in obj_acos_losses_en_D], 0)
+            obj_acos_ratio = ((obj_acos_en_D-obj_acos_nodup).div(obj_acos_en_D))
+            std_obj_acos_ratio = obj_acos_ratio.std()/math.sqrt(obj_acos_ratio.shape[0])
+            avg_obj_acos_ratio = obj_acos_ratio.mean()
+            avg_obj_acos = obj_acos.mean()
+            avg_obj_acos_ctrast_en = obj_acos_en_D.mean()-avg_obj_acos
 
             logs = {
-                "avg_z_norms": avg_z_norm,
                 "avg_val_loss": avg_loss,
-                "avg_obj_loss": avg_obj_loss,
-                # "avg_obj_cos_loss": avg_obj_cos_loss,
-                # "avg_attr_loss": avg_attr_loss,
-                # "avg_obj_ratio": avg_obj_ratio,
-                # "avg_obj_ctrast": avg_obj_ctrast,
-                "avg_obj_ctrast_en": avg_obj_ctrast_en,
-                # "avg_obj_ctrast_hn":avg_obj_ctrast_hn,
-                "avg_obj_ratio_en": avg_obj_ratio_en,
-                # "avg_attr_loss_en": avg_attr_loss_en,
-                # "avg_obj_ratio_hn": avg_obj_ratio_hn,
-                # "avg_attr_loss_hn": avg_attr_loss_hn,
-                "std_obj_loss": std_obj_loss,
-                # "std_attr_loss": std_attr_loss,
+                "avg_ari_mask": avg_ari_mask,
+                "avg_z_norm": avg_z_norm.to(self.device),
+                "avg_z_angle": avg_z_angle.to(self.device),
+                "avg_scaling": avg_scaling.to(self.device),
+                "avg_angle": avg_angle.to(self.device),
+                "avg_scaling_delta": avg_scaling_delta.to(self.device),
+                "avg_angle_delta": avg_angle_delta.to(self.device),
+                "avg_scaling_ratio": avg_scaling_ratio.to(self.device),
+                "avg_angle_ratio": avg_angle_ratio.to(self.device),
+                "avg_slot_std": avg_slot_std.to(self.device),
+                "avg_obj_l2_ratio": avg_obj_l2_ratio.to(self.device),
+                "avg_obj_l2": avg_obj_l2.to(self.device),
+                "avg_obj_l2_ctrast_en": avg_obj_l2_ctrast_en.to(self.device),
+                "std_obj_l2_ratio": std_obj_l2_ratio.to(self.device),
+                "avg_obj_cos_ratio": avg_obj_cos_ratio.to(self.device),
+                "avg_obj_cos": avg_obj_cos.to(self.device),
+                "avg_obj_cos_ctrast_en": avg_obj_cos_ctrast_en.to(self.device),
+                "std_obj_cos_ratio": std_obj_cos_ratio.to(self.device),
+                "avg_obj_acos_ratio": avg_obj_acos_ratio.to(self.device),
+                "avg_obj_acos": avg_obj_acos.to(self.device),
+                "avg_obj_acos_ctrast_en": avg_obj_acos_ctrast_en.to(self.device),
+                "std_obj_acos_ratio": std_obj_acos_ratio.to(self.device),
             }
             if self.trainer.running_sanity_check:
                 self.trainer.running_sanity_check = False  # so that loggers don't skip logging

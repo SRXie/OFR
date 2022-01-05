@@ -106,15 +106,16 @@ def compute_loss(cat_zs, losses):
     loss = torch.acos((torch.square(zs_A-zs_B+zs_C).sum(-1)+torch.square(zs_D).sum(-1)-torch.square(zs_A-zs_B+zs_C-zs_D).sum(-1)).div(2*torch.norm(zs_A-zs_B+zs_C, 2, -1)*torch.norm(zs_D, 2, -1)))
     losses.append(loss)
 
-def compute_cosine_loss(cat_zs, losses):
+def compute_cosine_loss(cat_zs, cos_losses, acos_losses):
     zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
     vector_AB = (zs_A - zs_B).div(torch.norm(zs_A - zs_B, 2, -1).unsqueeze(-1).repeat(1, cat_zs.shape[1]))
     vector_DC = (zs_D - zs_C).div(torch.norm(zs_D - zs_C, 2, -1).unsqueeze(-1).repeat(1, cat_zs.shape[1]))
     cos_loss = torch.square(vector_AB-vector_DC).sum(-1)/2
+    cos_losses.append(cos_loss)
     acos_loss = torch.acos(1.0-cos_loss)
-    losses.append(acos_loss)
+    acos_losses.append(acos_loss)
 
-def compute_partition_loss(cat_zs, A_losses, D_losses):
+def compute_partition_loss(cat_zs, D_losses):
     zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
     batch_size, z_dim = zs_A.shape
 
@@ -126,10 +127,10 @@ def compute_partition_loss(cat_zs, A_losses, D_losses):
     zs_D_prime = zs_D_prime.view(batch_size, 1, z_dim).repeat(1, batch_size, 1)
     zs_D_delta = zs_D_prime - zs_D
     D_loss = -torch.acos((torch.square(zs_D).sum(-1)+torch.square(zs_D_prime).sum(-1)-torch.square(zs_D_delta).sum(-1)).div(2*torch.norm(zs_D_prime, 2, -1)*torch.norm(zs_D, 2, -1)))
-    A_losses.append(A_loss)
+    # A_losses.append(A_loss)
     D_losses.append(D_loss)
 
-def compute_partition_cosine_loss(cat_zs, A_losses, D_losses):
+def compute_partition_cosine_loss(cat_zs, cos_losses, acos_losses):
     zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
     batch_size, z_dim = zs_A.shape
 
@@ -140,11 +141,12 @@ def compute_partition_cosine_loss(cat_zs, A_losses, D_losses):
     vector_DC = (zs_D - zs_C).div(torch.norm(zs_D - zs_C, 2, -1).unsqueeze(-1).repeat(1, cat_zs.shape[1]))
     vector_AB = vector_AB.view(1, batch_size, z_dim).repeat(batch_size, 1, 1)
     vector_DC = vector_DC.view(batch_size, 1, z_dim).repeat(1, batch_size, 1)
-    delta = torch.square(vector_AB-vector_DC).sum(-1)/2
-    D_loss = -torch.acos(1.0-delta)
+    cos_loss = torch.square(vector_AB-vector_DC).sum(-1)/2
+    acos_loss = torch.acos(1.0-delta)
     # D_loss = -torch.acos((torch.square(vector_AB).sum(-1)+torch.square(vector_DC).sum(-1)-torch.square(delta).sum(-1))/2.0)
-    A_losses.append(A_loss)
-    D_losses.append(D_loss)
+
+    cos_losses.append(cos_loss.mean(1))
+    acos_losses.append(acos_loss.mean(1))
 
 def compute_partition_loss_hard(cat_zs, zs_E, zs_F, AE_losses, DF_losses):
     zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
