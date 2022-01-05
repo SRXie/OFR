@@ -268,7 +268,7 @@ def compute_cosine_loss(cat_slots_sorted, losses):
     cos_loss = torch.norm(vector_AB-vector_DC, 2, -1)/2
     losses.append(cos_loss.mean(1))
 
-def compute_shuffle_greedy_loss(cat_slots_sorted, A_losses, D_losses, cos_sim=False):
+def compute_shuffle_greedy_loss(cat_slots_sorted, D_losses, D_cos, D_acos, cos_sim=False):
     slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots_sorted, cat_slots_sorted.shape[0]//4, 0)
     slots_Aa, slots_Bb, slots_Cc, slots_Dd = torch.split(cat_slots_sorted.clone(), cat_slots_sorted.shape[0]//4, 0)
     slots_D_prime = slots_A-slots_B+slots_C
@@ -301,9 +301,6 @@ def compute_shuffle_greedy_loss(cat_slots_sorted, A_losses, D_losses, cos_sim=Fa
 
         if not cos_sim:
             greedy_criterion = torch.square(ext_AD-ext_EF).sum(-1)#torch.norm(ext_AD-ext_EF, 2, -1)
-            # norm_term = torch.stack([torch.norm(ext_A-ext_B, 2, -1), torch.norm(ext_A-ext_D, 2, -1), torch.norm(ext_C-ext_B, 2, -1), torch.norm(ext_C-ext_D, 2, -1)], dim=-1)
-            # norm_term = torch.max(norm_term, dim=-1)[0]
-            # greedy_criterion = greedy_criterion.div(norm_term+0.0001)
         else:
             unit_vector_a = (ext_AD).div(torch.norm(ext_AD, 2, -1).unsqueeze(-1).repeat(1,1,1,slot_size)+0.0001)
             unit_vector_b = (ext_EF).div(torch.norm(ext_EF, 2, -1).unsqueeze(-1).repeat(1,1,1,slot_size)+0.0001)
@@ -341,14 +338,8 @@ def compute_shuffle_greedy_loss(cat_slots_sorted, A_losses, D_losses, cos_sim=Fa
         # compute square sum
         slot_cat_c = batched_index_select(slots_cat_c, 1, index_cat_c.squeeze(1)).squeeze(1).clone()
         slot_Aa, slot_Bb, slot_Cc, slot_Dd = torch.split(slot_cat_c, batch_size*batch_size, 0)
-        # print(i)
-        # print("slot_Aa", slot_Aa)
-        # print("slot_Bb", slot_Bb)
-        # print("slot_Cc", slot_Cc)
-        # print("slot_Dd", slot_Dd)
         AB_sqsum += torch.square(slot_Aa-slot_Bb).sum(-1).view(batch_size, batch_size)
         DC_sqsum += torch.square(slot_Dd-slot_Cc).sum(-1).view(batch_size, batch_size)
-        # print("DC_delta", torch.square(slot_Dd-slot_Cc).sum(-1).view(batch_size, batch_size))
 
         replace_c = replace_c.scatter(1, index_cat_c, True)
         # batched element swap
@@ -359,14 +350,10 @@ def compute_shuffle_greedy_loss(cat_slots_sorted, A_losses, D_losses, cos_sim=Fa
         slots_cat_c = torch.where(replace_c, slots_cat_c[:,-1,:].unsqueeze(1).repeat(1, num_slots-i, 1), slots_cat_c)[:,:-1,:]
         slots_Aa, slots_Bb, slots_Cc, slots_Dd = torch.split(slots_cat_c, batch_size*batch_size, 0)
 
-    A_losses.append(-torch.sqrt(greedy_loss_A).mean(1))
-    # print("greedy_loss_D", greedy_loss_D)
-    # print("AB_sqsum", AB_sqsum)
-    # print("DC_sqsum", DC_sqsum)
-    # print((AB_sqsum+DC_sqsum-greedy_loss_D).div(2*torch.sqrt(AB_sqsum)*torch.sqrt(DC_sqsum)))
-    # print("D", ((torch.square(slots_F_norm)+torch.square(slots_D_prime_norm)-greedy_loss_D).div(2*slots_F_norm*slots_D_prime_norm)).max())
-    # D_losses.append(-torch.acos(torch.clamp((torch.square(slots_F_norm)+torch.square(slots_D_prime_norm)-greedy_loss_D).div(2*slots_F_norm*slots_D_prime_norm), max=1.0)).mean(1))
-    D_losses.append(-torch.acos(torch.clamp((AB_sqsum+DC_sqsum-greedy_loss_D).div(2*torch.sqrt(AB_sqsum)*torch.sqrt(DC_sqsum)), max=1.0)).mean(1))
+    # A_losses.append(-torch.sqrt(greedy_loss_A).mean(1))
+    D_losses.append(greedy_loss_D.mean(1))
+    D_cos.append((1.0-(AB_sqsum+DC_sqsum-greedy_loss_D).div(2*torch.sqrt(AB_sqsum)*torch.sqrt(DC_sqsum))).mean(1))
+    D_acos.append(torch.acos(torch.clamp(1.0-D_cos[-1], max=1.0)).mean(1))
 
 def compute_bipartite_greedy_loss(slots_A, slots_E, losses, cos_sim=False):
     batch_size, num_slots, slot_size = slots_A.shape
