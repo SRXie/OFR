@@ -305,8 +305,9 @@ class SlotAttentionModel(nn.Module):
             unnormalized_masks_nodup[duplicated_index[0], duplicated_index[1]] = -10000.0*torch.ones_like(masks_nodup_mass[0,0])
             masks_nodup = F.softmax(unnormalized_masks_nodup, dim=1)
             recon_combined_nodup = torch.sum(recons_nodup * masks_nodup, dim=1)
-        slots = slots.view(batch_size, num_slots, slot_size)
-        if dup_threshold:
+
+            # Here we reconstruct D'
+            batch_size = batch_size//2
             cat_indices = compute_greedy_loss(slots_nodup, []) #compute_pseudo_greedy_loss(slots, [])
             slots_nodup = batched_index_select(slots_nodup, 1, cat_indices) # batched_index_select(slots, 1, cat_indices)
             slots_D_prime=slots_nodup[:batch_size]-slots_nodup[batch_size:2*batch_size]+slots_nodup[2*batch_size:3*batch_size]
@@ -322,7 +323,6 @@ class SlotAttentionModel(nn.Module):
             out = out.view(batch_size, num_slots, num_channels + 1, height, width)
             recons_D_prime = out[:, :, :num_channels, :, :]
             masks_D_prime = out[:, :, -1:, :, :]
-            masks_D_prime = masks_D_prime[batch_size:]
 
             # Here we mask the de-duplicated slots in generation
             detect_blank_slots = slots_D_prime.view(batch_size, num_slots, -1)
@@ -337,6 +337,7 @@ class SlotAttentionModel(nn.Module):
             slots_nodup = torch.cat(list(slots_nodup.split(batch_size, 0))+[slots_D_prime], 0)
             return recon_combined, recons, masks, slots, attn, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup
         else:
+            slots = slots.view(batch_size, num_slots, slot_size)
             return recon_combined, recons, masks, slots, attn
 
     def loss_function(self, input, mask_gt=None, schema_gt=None):
