@@ -219,7 +219,7 @@ class SlotAttentionModel(nn.Module):
         self.slots_log_sigma = self.slot_attention.slots_log_sigma
         self.blank_slot = None
 
-    def forward(self, x, slots_only=False, dup_threshold=None):
+    def forward(self, x, slots_only=False, dup_threshold=None, viz=False):
         if self.empty_cache:
             torch.cuda.empty_cache()
 
@@ -306,35 +306,36 @@ class SlotAttentionModel(nn.Module):
             masks_nodup = F.softmax(unnormalized_masks_nodup, dim=1)
             recon_combined_nodup = torch.sum(recons_nodup * masks_nodup, dim=1)
 
-            # Here we reconstruct D'
-            batch_size = batch_size//2
-            cat_indices = compute_greedy_loss(slots_nodup, []) #compute_pseudo_greedy_loss(slots, [])
-            slots_nodup = batched_index_select(slots_nodup, 1, cat_indices) # batched_index_select(slots, 1, cat_indices)
-            slots_D_prime=slots_nodup[:batch_size]-slots_nodup[batch_size:2*batch_size]+slots_nodup[2*batch_size:3*batch_size]
-            slots_D_prime = slots_D_prime.view(batch_size * num_slots, slot_size, 1, 1)
+            if viz:
+                # Here we reconstruct D'
+                batch_size = batch_size//4
+                cat_indices = compute_greedy_loss(slots_nodup, []) #compute_pseudo_greedy_loss(slots, [])
+                slots_nodup = batched_index_select(slots_nodup, 1, cat_indices) # batched_index_select(slots, 1, cat_indices)
+                slots_D_prime=slots_nodup[:batch_size]-slots_nodup[batch_size:2*batch_size]+slots_nodup[2*batch_size:3*batch_size]
+                slots_D_prime = slots_D_prime.view(batch_size * num_slots, slot_size, 1, 1)
 
-            decoder_in = slots_D_prime.repeat(1, 1, self.decoder_resolution[0], self.decoder_resolution[1])
+                decoder_in = slots_D_prime.repeat(1, 1, self.decoder_resolution[0], self.decoder_resolution[1])
 
-            out = self.decoder_pos_embedding(decoder_in)
-            out = self.decoder(out)
-            # `out` has shape: [batch_size*num_slots, num_channels+1, height, width].
-            assert_shape(out.size(), (batch_size * num_slots, num_channels + 1, height, width))
+                out = self.decoder_pos_embedding(decoder_in)
+                out = self.decoder(out)
+                # `out` has shape: [batch_size*num_slots, num_channels+1, height, width].
+                assert_shape(out.size(), (batch_size * num_slots, num_channels + 1, height, width))
 
-            out = out.view(batch_size, num_slots, num_channels + 1, height, width)
-            recons_D_prime = out[:, :, :num_channels, :, :]
-            masks_D_prime = out[:, :, -1:, :, :]
+                out = out.view(batch_size, num_slots, num_channels + 1, height, width)
+                recons_D_prime = out[:, :, :num_channels, :, :]
+                masks_D_prime = out[:, :, -1:, :, :]
+                slots_D_prime = slots_D_prime.view(batch_size, num_slots, slot_size)
+                # Here we mask the de-duplicated slots in generation
+                detect_blank_slots = slots_D_prime.view(batch_size, num_slots, -1)
+                detect_blank_slots = ((detect_blank_slots - blank_slots.unsqueeze(0)).sum(-1)==0.0).nonzero(as_tuple=True)
+                masks_D_prime[detect_blank_slots[0], detect_blank_slots[1]] = -10000.0*torch.ones_like(masks_D_prime[0,0])
+                masks_D_prime = F.softmax(masks_D_prime, dim=1)
+                recon_combined_D_prime = torch.sum(recons_D_prime * masks_D_prime, dim=1)
 
-            # Here we mask the de-duplicated slots in generation
-            detect_blank_slots = slots_D_prime.view(batch_size, num_slots, -1)
-            detect_blank_slots = ((detect_blank_slots - blank_slots.unsqueeze(0)).sum(-1)==0.0).nonzero(as_tuple=True)
-            masks_D_prime[detect_blank_slots[0], detect_blank_slots[1]] = -10000.0*torch.ones_like(masks_D_prime[0,0])
-            masks_D_prime = F.softmax(masks_D_prime, dim=1)
-            recon_combined_D_prime = torch.sum(recons_D_prime * masks_D_prime, dim=1)
-
-            recon_combined_nodup = torch.cat(list(recon_combined_nodup.split(batch_size, 0))+[recon_combined_D_prime], 0)
-            recons_nodup = torch.cat(list(recons_nodup.split(batch_size, 0))+[recons_D_prime], 0)
-            masks_nodup = torch.cat(list(masks_nodup.split(batch_size, 0))+[masks_D_prime], 0)
-            slots_nodup = torch.cat(list(slots_nodup.split(batch_size, 0))+[slots_D_prime], 0)
+                recon_combined_nodup = torch.cat(list(recon_combined_nodup.split(batch_size, 0))+[recon_combined_D_prime], 0)
+                recons_nodup = torch.cat(list(recons_nodup.split(batch_size, 0))+[recons_D_prime], 0)
+                masks_nodup = torch.cat(list(masks_nodup.split(batch_size, 0))+[masks_D_prime], 0)
+                slots_nodup = torch.cat(list(slots_nodup.split(batch_size, 0))+[slots_D_prime], 0)
             return recon_combined, recons, masks, slots, attn, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup
         else:
             slots = slots.view(batch_size, num_slots, slot_size)
