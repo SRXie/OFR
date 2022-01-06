@@ -247,7 +247,7 @@ class SlotAttentionMethod(pl.LightningModule):
 
             obj_l2_nodup = torch.cat(obj_greedy_losses_nodup, 0)
             obj_l2_nodup_en_D = torch.cat([x for x in obj_greedy_losses_nodup_en_D], 0)
-            obj_l2_ratio = ((obj_l2_nodup_en_D-obj_l2_nodup).div(obj_l2_nodup_en_D-avg_l2_std))
+            obj_l2_ratio = ((obj_l2_nodup_en_D-obj_l2_nodup).div(obj_l2_nodup_en_D))
             std_obj_l2_ratio = obj_l2_ratio.std()/math.sqrt(obj_l2_ratio.shape[0])
             avg_obj_l2_ratio = obj_l2_ratio.mean()
             avg_obj_l2 = obj_l2_nodup.mean()
@@ -255,7 +255,7 @@ class SlotAttentionMethod(pl.LightningModule):
 
             obj_cos_nodup = torch.cat(obj_cos_losses_nodup, 0)
             obj_cos_nodup_en_D = torch.cat([x for x in obj_cos_losses_nodup_en_D], 0)
-            obj_cos_ratio = ((obj_cos_nodup_en_D-obj_cos_nodup).div(obj_cos_nodup_en_D-avg_cos_std))
+            obj_cos_ratio = ((obj_cos_nodup_en_D-obj_cos_nodup).div(obj_cos_nodup_en_D))
             std_obj_cos_ratio = obj_cos_ratio.std()/math.sqrt(obj_cos_ratio.shape[0])
             avg_obj_cos_ratio = obj_cos_ratio.mean()
             avg_obj_cos = obj_cos_nodup.mean()
@@ -263,7 +263,7 @@ class SlotAttentionMethod(pl.LightningModule):
 
             obj_acos_nodup = torch.cat(obj_acos_losses_nodup, 0)
             obj_acos_nodup_en_D = torch.cat([x for x in obj_acos_losses_nodup_en_D], 0)
-            obj_acos_ratio = ((obj_acos_nodup_en_D-obj_acos_nodup).div(obj_acos_nodup_en_D-avg_acos_std))
+            obj_acos_ratio = ((obj_acos_nodup_en_D-obj_acos_nodup).div(obj_acos_nodup_en_D))
             std_obj_acos_ratio = obj_acos_ratio.std()/math.sqrt(obj_acos_ratio.shape[0])
             avg_obj_acos_ratio = obj_acos_ratio.mean()
             avg_obj_acos = obj_acos_nodup.mean()
