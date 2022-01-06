@@ -110,6 +110,9 @@ parser.add_argument('--output_imgbg_dir', default=ROOT+'/bgs/',
 parser.add_argument('--output_mask_dir', default=ROOT+'/masks/',
     help="The directory where output masks will be stored. It will be " +
          "created if it does not exist.")
+parser.add_argument('--output_fgmask_dir', default=ROOT+'/fgmasks/',
+    help="The directory where output foreground masks will be stored. It will be " +
+         "created if it does not exist.")
 parser.add_argument('--output_scene_dir', default=ROOT+'/scenes/',
     help="The directory where output JSON scene structures will be stored. " +
          "It will be created if it does not exist.")
@@ -177,8 +180,6 @@ def main(args):
   num_digits = 6
   prefix = '%s_%s_' % (args.filename_prefix, args.split)
   img_template = '%s%%0%dd.png' % (prefix, num_digits)
-  bg_template = '%s%%0%dd.png' % (prefix, num_digits)
-  mask_template = '%s%%0%dd.png' % (prefix, num_digits)
   scene_template = '%s%%0%dd.json' % (prefix, num_digits)
   meta_template = '%s%%0%dd.json' % (prefix, num_digits)
   blend_template = '%s%%0%dd.blend' % (prefix, num_digits)
@@ -188,23 +189,24 @@ def main(args):
     index = -1 if scene_file else -2
     if args.obj_test:
       dir_list.insert(index, "obj_test")
-    if args.attr_test:
-      dir_list.insert(index, "attr_test")
     dir_path = "/".join(dir_list)
     return dir_path
 
-  if args.obj_test or args.attr_test:
+  if args.obj_test:
     args.output_image_dir=insert_test_to_dir(args.output_image_dir)
     args.output_imgbg_dir=insert_test_to_dir(args.output_imgbg_dir)
     args.output_mask_dir=insert_test_to_dir(args.output_mask_dir)
+    args.output_fgmask_dir=insert_test_to_dir(args.output_fgmask_dir)
     args.output_scene_dir=insert_test_to_dir(args.output_scene_dir)
     args.output_meta_dir=insert_test_to_dir(args.output_meta_dir)
     args.output_blen_dir=insert_test_to_dir(args.output_blend_dir)
     args.output_scene_file=insert_test_to_dir(args.output_scene_file, True)
 
   img_template = os.path.join(args.output_image_dir, img_template)
-  bg_template = os.path.join(args.output_imgbg_dir, bg_template)
-  mask_template = os.path.join(args.output_mask_dir, mask_template)
+  bg_template = os.path.join(args.output_imgbg_dir, img_template)
+  fgmask_template = os.path.join(args.output_mask_dir, img_template)
+  mask_template = os.path.join(args.output_mask_dir, img_template)
+  fgmask_template = os.path.join(args.output_fgmask_dir, img_template)
   scene_template = os.path.join(args.output_scene_dir, scene_template)
   meta_template = os.path.join(args.output_meta_dir, meta_template)
   blend_template = os.path.join(args.output_blend_dir, blend_template)
@@ -215,12 +217,18 @@ def main(args):
     os.makedirs(args.output_imgbg_dir)
   if not os.path.isdir(args.output_mask_dir):
     os.makedirs(args.output_mask_dir)
+  if not os.path.isdir(args.output_fgmask_dir):
+    os.makedirs(args.output_fgmask_dir)
   if not os.path.isdir(args.output_scene_dir):
     os.makedirs(args.output_scene_dir)
   if not os.path.isdir(args.output_meta_dir):
     os.makedirs(args.output_meta_dir)
   if args.save_blendfiles == 1 and not os.path.isdir(args.output_blend_dir):
     os.makedirs(args.output_blend_dir)
+  for attr in ["shape", "size", "color", "material"]
+    tmp_dir = args.output_image_dir.replace("images", attr)
+    if not os.path.isdir(tmp_dir):
+      os.makedirs(tmp_dir)
 
   # Note: currently we do attr-level test on single-obj scene
   all_scene_paths = []
@@ -234,8 +242,6 @@ def main(args):
     blend_path = None
     if args.save_blendfiles == 1:
       blend_path = blend_template % (i + args.start_idx)
-    if args.attr_test:
-      num_objects = 6
     else:
       num_objects = random.randint(args.min_objects, args.max_objects)
     render_scene(args,
@@ -245,6 +251,7 @@ def main(args):
       output_image=img_path,
       output_bg=bg_path,
       output_mask=mask_path,
+      output_fgmask=fgmask_path,
       output_scene=scene_path,
       output_meta=meta_path,
       output_blendfile=blend_path,
@@ -277,6 +284,7 @@ def render_scene(args,
     output_image='render.png',
     output_bg='render_bg.png',
     output_mask='mask.png',
+    output_fgmask='fgmask.png',
     output_scene='render_json',
     output_meta='meta_json',
     output_blendfile=None,
@@ -354,7 +362,10 @@ def render_scene(args,
     rgba = [float(c) / 255.0 for c in rgb]+[1.0]
     bg_mapping[name] = rgba
 
-  color_name, rgba = random.choice(list(bg_mapping.items())[1:])
+  while True:
+    color_name, rgba = random.choice(list(bg_mapping.items())[1:])
+    if color_name is not "white":
+      break
   bpy.data.objects["Ground"].color = rgba
   gt_mat = bpy.data.materials.new("bgcolor")
   gt_mat.use_nodes = True
@@ -383,7 +394,7 @@ def render_scene(args,
       bpy.data.objects['Lamp_Fill'].location[i] += rand(args.fill_light_jitter)
 
   # Now make some random objects
-  objects, blender_objects = add_random_objects(scene_struct, num_objects, args, camera)
+  objects, blender_objects = add_random_objects(scene_struct, num_objects, output_fgmask, args, camera)
 
   # Render the scene and dump the scene data structure
   scene_struct.objects = objects
@@ -406,10 +417,8 @@ def render_scene(args,
 
   if args.obj_test:
     # Change the background
-    while True:
-        new_color_name, new_rgba = list(bg_mapping.items())[0]
-        if not new_color_name == color_name:
-          break
+    new_color_name = "white"
+    new_rgba = bg_mapping[new_color_name]
     bpy.data.objects["Ground"].color = new_rgba
     new_gt_mat = bpy.data.materials.new("bgcolor")
     new_gt_mat.use_nodes = True
@@ -429,9 +438,6 @@ def render_scene(args,
 
     backgrounds = (rgba, gt_mat, new_rgba, new_gt_mat)
     render_subscene_obj(scene_struct, blender_objects, backgrounds, output_image, output_bg, output_mask, output_scene, output_meta, args)
-
-  if args.attr_test:
-    render_subscene_attr(scene_struct, blender_objects, output_image, output_scene, output_meta, args)
 
 
 def render_subscene_obj(scene_struct, blender_objects, backgrounds, output_image, output_bg, output_mask, output_scene, output_meta, args):
@@ -492,14 +498,16 @@ def render_subscene_obj(scene_struct, blender_objects, backgrounds, output_image
       with open(output_scene[:-5]+'_%04d' % scene_index+output_scene[-5:], 'w') as f:
         json.dump(sub_scene_struct.to_dictionary(), f, indent=2)
 
+      if args.attr_test:
+        render_subscene_attr(sub_scene_struct, blender_objects, render_args.filepath, args)
+
   # save map_objs_to_idx to json
   with open(output_meta, 'w') as f:
-        json.dump(map_objs_to_idx, f, indent=2)
+    json.dump(map_objs_to_idx, f, indent=2)
+
   return
 
-def render_subscene_attr(scene_struct, blender_objects, output_image, output_scene, output_meta, args):
-
-  map_attrs_to_idx = {}
+def render_subscene_attr(scene_struct, blender_objects, output_image, args):
 
   attr_list = list(PROPERTIES.keys())
 
@@ -511,7 +519,7 @@ def render_subscene_attr(scene_struct, blender_objects, output_image, output_sce
     sub_scene_struct.objects[scene_index] = obj
 
     render_args = bpy.context.scene.render
-    render_args.filepath = output_image[:-4]+'_'+attr+output_image[-4:]
+    render_args.filepath = output_image.replace("images", attr)
 
     for b_obj in blender_objects:
       # Note: we may not need to delete all objects in multi-obj scene
@@ -525,7 +533,6 @@ def render_subscene_attr(scene_struct, blender_objects, output_image, output_sce
       b_obj = bpy.context.object
       blender_objects.append(b_obj)
 
-    sub_scene_struct.relationships = compute_all_relationships(sub_scene_struct)
     while True:
       try:
         bpy.ops.render.render(write_still=True)
@@ -533,15 +540,7 @@ def render_subscene_attr(scene_struct, blender_objects, output_image, output_sce
       except Exception as e:
         print(e)
 
-    map_attrs_to_idx["-".join([str(obj.size), str(obj.color), str(obj.material), str(obj.shape)])] = scene_index
-
-    with open(output_scene[:-5]+'_'+attr+output_scene[-5:], 'w') as f:
-      json.dump(sub_scene_struct.to_dictionary(), f, indent=2)
-
-  with open(output_meta, 'w') as f:
-        json.dump(map_attrs_to_idx, f, indent=2)
-
-def add_random_objects(scene_struct, num_objects, args, camera):
+def add_random_objects(scene_struct, num_objects, output_mask, args, camera):
   """
   Add random objects to the current blender scene
   """
@@ -644,7 +643,7 @@ def add_random_objects(scene_struct, num_objects, args, camera):
 
   # Check that all objects are at least partially visible in the rendered image
   all_visible = check_visibility(blender_objects, args.min_pixels_per_object)
-  sufficent_occlusion = check_occlusion(blender_objects, args.min_pixels_occluded, args.output_mask_dir)
+  sufficent_occlusion = check_occlusion(blender_objects, args.min_pixels_occluded, output_mask)
   if not all_visible or not sufficent_occlusion:
     # If any of the objects are fully occluded then start over; delete all
     # objects from the scene and place them all again.
@@ -719,9 +718,10 @@ def check_occlusion(blender_objects, min_pixels_occluded, output_mask):
   Returns True if occlusion is sufficient and False otherwise
   """
   pixels = []
+  paths = []
   for i in range(len(blender_objects)):
     # f, path = tempfile.mkstemp(suffix='.png')
-    path = output_mask+'%04d.png' % i
+    path = output_mask[:-4]+'_%04d' % i+output_mask[-4:]
     render_mask(blender_objects, path=path, obj_index=i)
     img = bpy.data.images.load(path)
     p = list(img.pixels)
@@ -729,7 +729,7 @@ def check_occlusion(blender_objects, min_pixels_occluded, output_mask):
     p = np.where(p<1.0, 0.0, p)
     pixels.append(p)
     bpy.data.images.remove(img)
-    os.remove(path)
+    paths.append(path)
   overlap = np.stack(pixels).sum(0)
   overlap = np.where(overlap>1.0, 1.0, 0.0).sum()
   if overlap>min_pixels_occluded:
@@ -737,6 +737,8 @@ def check_occlusion(blender_objects, min_pixels_occluded, output_mask):
     del overlap
     return True
   else:
+    for path in paths:
+      os.remove(path)
     del pixels
     del overlap
     return False
