@@ -44,7 +44,7 @@ class SlotAttentionMethod(pl.LightningModule):
         dl = self.datamodule.obj_test_dataloader()
         random_idx = torch.randint(high=len(dl), size=(1,))
         batch = next(iter(dl))  # list of A, B, C, D, E, F -- E and F are hard negatives
-        perm = torch.randperm(self.params.test_batch_size)
+        perm = torch.randperm(self.params.val_batch_size)
         idx = perm[: self.params.n_samples]
         batch = torch.cat([b[idx] for b in batch[:4]], 0)
 
@@ -53,7 +53,7 @@ class SlotAttentionMethod(pl.LightningModule):
 
         with torch.no_grad():
 
-            recon_combined, recons, masks, slots, attns, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold, viz=True)
+            recon_combined, recons, masks, slots, attns, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold, algebra=True)
 
             # throw background slot back
             cat_indices = swap_bg_slot_back(attns)
@@ -78,13 +78,7 @@ class SlotAttentionMethod(pl.LightningModule):
             recons_perm_nodup = recons_nodup #batched_index_select(recons_nodup, 1, cat_indices_nodup)
             masks_perm_nodup = masks_nodup #batched_index_select(masks_nodup, 1, cat_indices_nodup)
             slots_perm_nodup = slots_nodup #batched_index_select(slots_nodup, 1, cat_indices_nodup)
-            attns_perm_nodup = torch.cat((attns, attns[-self.params.n_samples:]), 0)  #batched_index_select(attns, 2, cat_indices_nodup)
-            batch_list = []
-            # for attn in attns.split(4, 0):
-            #     attn = torch.cat([attn, attn[-1].unsqueeze(0)], 0)
-            #     attns_list.append(attn)
-            # attns = torch.cat(attns_list, 0)
-            batch_nodup = torch.cat((batch, batch[-self.params.n_samples:]), 0)
+            attns_perm_nodup = attns #batched_index_select(attns, 2, cat_indices_nodup)
             masked_recons_perm_nodup, masked_attn_perm_nodup, recons_perm_nodup = captioned_masked_recons(recons_perm_nodup, masks_perm_nodup, slots_perm_nodup, attns_perm_nodup)
 
             batch = split_and_interleave_stack(batch, self.params.n_samples)
@@ -93,7 +87,6 @@ class SlotAttentionMethod(pl.LightningModule):
             masks_perm = split_and_interleave_stack(masks_perm, self.params.n_samples)
             slots_perm = split_and_interleave_stack(slots_perm, self.params.n_samples)
             masked_attn_perm = split_and_interleave_stack(masked_attn_perm, self.params.n_samples)
-            batch_nodup = split_and_interleave_stack(batch_nodup, self.params.n_samples)
             recon_combined_nodup = split_and_interleave_stack(recon_combined_nodup, self.params.n_samples)
             recons_perm_nodup = split_and_interleave_stack(recons_perm_nodup, self.params.n_samples)
             masks_perm_nodup = split_and_interleave_stack(masks_perm_nodup, self.params.n_samples)
@@ -106,7 +99,7 @@ class SlotAttentionMethod(pl.LightningModule):
             out = to_rgb_from_tensor(
                 torch.cat(
                     [
-                        torch.cat([batch.unsqueeze(1), batch_nodup.unsqueeze(1)], dim=0),  # original images
+                        torch.cat([batch.unsqueeze(1), batch.unsqueeze(1)], dim=0),  # original images
                         torch.cat([recon_combined.unsqueeze(1),recon_combined_nodup.unsqueeze(1)], dim=0),  # reconstructions
                         torch.cat([masked_recons_perm, masked_recons_perm_nodup], dim=0),
                         torch.cat([recons_perm, recons_perm_nodup], dim=0),
@@ -118,7 +111,7 @@ class SlotAttentionMethod(pl.LightningModule):
 
             batch_size, num_slots, C, H, W = recons.shape
             images = vutils.make_grid(
-                out.view((2 * batch_size +batch_size//4) * out.shape[1], C, H, W).cpu(), normalize=False, nrow=out.shape[1],
+                out.view(2 * batch_size * out.shape[1], C, H, W).cpu(), normalize=False, nrow=out.shape[1],
             )
 
         return images
