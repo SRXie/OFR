@@ -193,7 +193,10 @@ class SlotAttentionMethod(pl.LightningModule):
                 obj_acos_losses_nodup_en_D.append(acos_losses_nodup_en_D)
 
                 for ind in range(4, 9):
-                    slots_D_prime = cat_slots_nodup[3*batch_size:4*batch_size] #cat_slots_nodup[ind*batch_size:(ind+1)*batch_size]
+                    if ind == 4:
+                        slots_D_prime = cat_slots_nodup[-2*batch_size:-batch_size]
+                    else:
+                        slots_D_prime = cat_slots_nodup[3*batch_size:4*batch_size] #cat_slots_nodup[ind*batch_size:(ind+1)*batch_size]
                     cat_slots = torch.cat((cat_slots[:3*batch_size], slots_D_prime), 0)
                     greedy_losses_nodup, cos_losses_nodup, acos_losses_nodup, _ = compute_all_losses(cat_slots)
                     hn_greedy_losses_list[ind-4].append(greedy_losses_nodup)

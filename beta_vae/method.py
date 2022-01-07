@@ -116,10 +116,13 @@ class BetaVAEMethod(pl.LightningModule):
                 compute_shuffle_cosine_loss(cat_zs[:4*batch_size], obj_cos_losses_en_D, obj_acos_losses_en_D)
 
                 for ind in range(4, 9):
-                    zs_D_prime = cat_zs[3*batch_size:4*batch_size] #cat_zs[ind*batch_size:(ind+1)*batch_size]
-                    cat_zs = torch.cat((cat_zs[:3*batch_size], zs_D_prime), 0)
-                    compute_loss(cat_zs[:4*batch_size], hn_losses_list[ind-4])
-                    compute_cosine_loss(cat_zs[:4*batch_size], hn_cos_losses_list[ind-4], hn_acos_losses_list[ind-4])
+                    if ind == 4:
+                        zs_D_prime = cat_zs[-batch_size:]
+                    else:
+                        zs_D_prime = cat_zs[3*batch_size:4*batch_size] #cat_zs[ind*batch_size:(ind+1)*batch_size]
+                    cat_zs_hn = torch.cat((cat_zs[:3*batch_size], zs_D_prime), 0)
+                    compute_loss(cat_zs_hn, hn_losses_list[ind-4])
+                    compute_cosine_loss(cat_zs_hn, hn_cos_losses_list[ind-4], hn_acos_losses_list[ind-4])
 
             std_obj_l2_ratio, avg_obj_l2_ratio, avg_obj_l2, avg_obj_l2_ctrast_en = summarize_losses(obj_losses, obj_losses_en_D)
             std_obj_cos_ratio, avg_obj_cos_ratio, avg_obj_cos, avg_obj_cos_ctrast_en = summarize_losses(obj_cos_losses, obj_cos_losses_en_D)
