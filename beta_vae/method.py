@@ -14,7 +14,7 @@ from beta_vae.utils import Tensor
 from beta_vae.utils import split_and_interleave_stack
 from beta_vae.utils import to_rgb_from_tensor, to_tensor_from_rgb
 from beta_vae.utils import compute_loss, compute_cosine_loss, compute_shuffle_loss, compute_shuffle_cosine_loss
-
+from slot_attention.utils import summarize_losses
 
 class BetaVAEMethod(pl.LightningModule):
     def __init__(self, model: BetaVAE, datamodule: pl.LightningDataModule, params: BetaVAEParams):
@@ -117,13 +117,13 @@ class BetaVAEMethod(pl.LightningModule):
 
                 for ind in range(4, 9):
                     zs_D_prime = cat_zs[3*batch_size:4*batch_size] #cat_zs[ind*batch_size:(ind+1)*batch_size]
-                    cat_zs = torch.cat((cat_zs[:3*batch_size], slots_D_prime), 0)
+                    cat_zs = torch.cat((cat_zs[:3*batch_size], zs_D_prime), 0)
                     compute_loss(cat_zs[:4*batch_size], hn_losses_list[ind-4])
                     compute_cosine_loss(cat_zs[:4*batch_size], hn_cos_losses_list[ind-4], hn_acos_losses_list[ind-4])
 
-            std_obj_l2_ratio, avg_obj_l2_ratio, avg_obj_l2, avg_obj_l2_ctrast_en = summarize_losses(obj_losses_nodup, obj_losses_en_D)
-            std_obj_cos_ratio, avg_obj_cos_ratio, avg_obj_cos, avg_obj_cos_ctrast_en = summarize_losses(obj_cos_losses_nodup, obj_cos_losses_en_D)
-            std_obj_acos_ratio, avg_obj_acos_ratio, avg_obj_acos, avg_obj_acos_ctrast_en = summarize_losses(obj_acos_losses_nodup, obj_acos_losses_en_D)
+            std_obj_l2_ratio, avg_obj_l2_ratio, avg_obj_l2, avg_obj_l2_ctrast_en = summarize_losses(obj_losses, obj_losses_en_D)
+            std_obj_cos_ratio, avg_obj_cos_ratio, avg_obj_cos, avg_obj_cos_ctrast_en = summarize_losses(obj_cos_losses, obj_cos_losses_en_D)
+            std_obj_acos_ratio, avg_obj_acos_ratio, avg_obj_acos, avg_obj_acos_ctrast_en = summarize_losses(obj_acos_losses, obj_acos_losses_en_D)
 
             _, avg_obj_l2_hn_ratio, _, _ = summarize_losses(obj_losses_hn, obj_losses_en_D)
             _, avg_obj_cos_hn_ratio, _, _ = summarize_losses(obj_cos_losses_hn, obj_cos_losses_en_D)
@@ -150,7 +150,6 @@ class BetaVAEMethod(pl.LightningModule):
                 "avg_obj_l2_ratio": avg_obj_l2_ratio.to(self.device),
                 "avg_obj_l2": avg_obj_l2.to(self.device),
                 "avg_obj_l2_ctrast_en": avg_obj_l2_ctrast_en.to(self.device),
-                "avg_obj_l2_std": avg_l2_std.to(self.device),
                 "std_obj_l2_ratio": std_obj_l2_ratio.to(self.device),
                 "avg_obj_l2_gap": (avg_obj_l2_hn_ratio-avg_obj_l2_ratio).to(self.device),
                 "avg_color_l2_gap": (avg_color_l2_hn_ratio-avg_obj_l2_ratio).to(self.device),
@@ -160,7 +159,6 @@ class BetaVAEMethod(pl.LightningModule):
                 "avg_obj_cos_ratio": avg_obj_cos_ratio.to(self.device),
                 "avg_obj_cos": avg_obj_cos.to(self.device),
                 "avg_obj_cos_ctrast_en": avg_obj_cos_ctrast_en.to(self.device),
-                "avg_obj_cos_std": avg_cos_std.to(self.device),
                 "std_obj_cos_ratio": std_obj_cos_ratio.to(self.device),
                 "avg_obj_cos_gap": (avg_obj_cos_hn_ratio-avg_obj_cos_ratio).to(self.device),
                 "avg_color_cos_gap": (avg_color_cos_hn_ratio-avg_obj_cos_ratio).to(self.device),
@@ -170,7 +168,6 @@ class BetaVAEMethod(pl.LightningModule):
                 "avg_obj_acos_ratio": avg_obj_acos_ratio.to(self.device),
                 "avg_obj_acos": avg_obj_acos.to(self.device),
                 "avg_obj_acos_ctrast_en": avg_obj_acos_ctrast_en.to(self.device),
-                "avg_obj_acos_std": avg_acos_std.to(self.device),
                 "std_obj_acos_ratio": std_obj_acos_ratio.to(self.device),
                 "avg_obj_acos_gap": (avg_obj_acos_hn_ratio-avg_obj_acos_ratio).to(self.device),
                 "avg_color_acos_gap": (avg_color_acos_hn_ratio-avg_obj_acos_ratio).to(self.device),

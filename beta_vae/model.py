@@ -264,7 +264,7 @@ class BetaTCVAE(nn.Module):
 
         modules = []
         if hidden_dims is None:
-            hidden_dims = [32, 32, 32, 32]
+            hidden_dims = [64, 64, 64, 64]
 
         self.decoder_resolution = decoder_resolution
         # Build Encoder
@@ -272,56 +272,29 @@ class BetaTCVAE(nn.Module):
             modules.append(
                 nn.Sequential(
                     nn.Conv2d(in_channels, out_channels=h_dim,
-                              kernel_size= 4, stride= 2, padding  = 1),
+                              kernel_size= 5, stride= 2, padding  = 2),
                     nn.LeakyReLU())
             )
             in_channels = h_dim
 
         self.encoder = nn.Sequential(*modules)
 
-        self.fc = nn.Linear(hidden_dims[-1]*16, 256)
+        self.fc = nn.Linear(hidden_dims[-1]*64, 256)
         self.fc_mu = nn.Linear(256, latent_dim)
         self.fc_var = nn.Linear(256, latent_dim)
 
         # Build Decoder
-        if decoder_type == 'deconv':
-            modules = []
 
-            self.decoder_input = nn.Linear(latent_dim, 256 *  2)
+        modules = []
 
-            hidden_dims.reverse()
+        self.out_features = hidden_dims[-1]
 
-            for i in range(len(hidden_dims) - 1):
-                modules.append(
-                    nn.Sequential(
-                            nn.ConvTranspose2d(hidden_dims[i],
-                                           hidden_dims[i + 1],
-                                           kernel_size=3,
-                                           stride = 2,
-                                           padding=1,
-                                           output_padding=1),
-                    nn.LeakyReLU())
-                )
+        if self.decoder_type == 'deconv':
+            self.decoder_input = nn.Linear(latent_dim, self.out_features*self.decoder_resolution[0]*self.decoder_resolution[1])
+        else:
+            self.decoder_input = nn.Linear(latent_dim, self.out_features)
 
-            self.decoder = nn.Sequential(*modules)
-
-            self.final_layer = nn.Sequential(
-                                    nn.ConvTranspose2d(hidden_dims[-1],
-                                                       hidden_dims[-1],
-                                                       kernel_size=3,
-                                                       stride=2,
-                                                       padding=1,
-                                                       output_padding=1),
-                                    nn.LeakyReLU(),
-                                    nn.Conv2d(hidden_dims[-1], out_channels= 3,
-                                              kernel_size= 3, padding= 1),
-                                    nn.Tanh())
-
-        elif decoder_type == 'sbd':
-            hidden_dims = [64, 64, 64]
-            self.out_features = hidden_dims[-1]
-            modules = []
-
+        if True:
             in_size = self.decoder_resolution[0]
             out_size = in_size
 
@@ -342,7 +315,7 @@ class BetaTCVAE(nn.Module):
                 out_size = conv_transpose_out_shape(out_size, 2, 2, 5, 1)
 
             assert_shape(
-                (64, 64),
+                (128, 128),
                 (out_size, out_size),
                 message="Output shape of decoder did not match input resolution. Try changing `decoder_resolution`.",
             )
@@ -358,8 +331,6 @@ class BetaTCVAE(nn.Module):
                 )
             )
 
-            assert_shape((64, 64), (out_size, out_size), message="")
-
             self.decoder = nn.Sequential(*modules)
             self.decoder_pos_embedding = SoftPositionEmbed(3, self.out_features, self.decoder_resolution)
 
@@ -371,7 +342,6 @@ class BetaTCVAE(nn.Module):
         :return: (Tensor) List of latent codes
         """
         result = self.encoder(input)
-
         result = torch.flatten(result, start_dim=1)
         result = self.fc(result)
         # Split the result into mu and var components
@@ -388,14 +358,13 @@ class BetaTCVAE(nn.Module):
         :param z: (Tensor) [B x D]
         :return: (Tensor) [B x C x H x W]
         """
+        result = self.decoder_input(z)
         if self.decoder_type == 'deconv':
-            result = self.decoder_input(z)
-            result = result.view(-1, 32, 4, 4)
+            result = result.view(-1, self.out_features, self.decoder_resolution[0], self.decoder_resolution[1])
             result = self.decoder(result)
-            result = self.final_layer(result)
         elif self.decoder_type == 'sbd':
-            decoder_in = z.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, self.decoder_resolution[0], self.decoder_resolution[1])
-            result = self.decoder_pos_embedding(decoder_in)
+            result = result.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, self.decoder_resolution[0], self.decoder_resolution[1])
+            result = self.decoder_pos_embedding(result)
             result = self.decoder(result)
         return result
 
