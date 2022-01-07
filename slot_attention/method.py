@@ -143,10 +143,16 @@ class SlotAttentionMethod(pl.LightningModule):
 
         obj_greedy_losses_nodup_hn, color_greedy_losses_nodup_hn, mat_greedy_losses_nodup_hn, shape_greedy_losses_nodup_hn, size_greedy_losses_nodup_hn = [], [], [], [], []
         hn_greedy_losses_list = [obj_greedy_losses_nodup_hn, color_greedy_losses_nodup_hn, mat_greedy_losses_nodup_hn, shape_greedy_losses_nodup_hn, size_greedy_losses_nodup_hn]
+        obj_greedy_shuffle_losses_nodup_hn, color_greedy_shuffle_losses_nodup_hn, mat_greedy_shuffle_losses_nodup_hn, shape_greedy_shuffle_losses_nodup_hn, size_greedy_shuffle_losses_nodup_hn = [], [], [], [], []
+        hn_greedy_shuffle_losses_list = [obj_greedy_shuffle_losses_nodup_hn, color_greedy_shuffle_losses_nodup_hn, mat_greedy_shuffle_losses_nodup_hn, shape_greedy_shuffle_losses_nodup_hn, size_greedy_shuffle_losses_nodup_hn]
         obj_cos_losses_nodup_hn, color_cos_losses_nodup_hn, mat_cos_losses_nodup_hn, shape_cos_losses_nodup_hn, size_cos_losses_nodup_hn = [], [], [], [], []
         hn_cos_losses_list = [obj_cos_losses_nodup_hn, color_cos_losses_nodup_hn, mat_cos_losses_nodup_hn, shape_cos_losses_nodup_hn, size_cos_losses_nodup_hn]
+        obj_cos_shuffle_losses_nodup_hn, color_cos_shuffle_losses_nodup_hn, mat_cos_shuffle_losses_nodup_hn, shape_cos_shuffle_losses_nodup_hn, size_cos_shuffle_losses_nodup_hn = [], [], [], [], []
+        hn_cos_shuffle_losses_list = [obj_cos_shuffle_losses_nodup_hn, color_cos_shuffle_losses_nodup_hn, mat_cos_shuffle_losses_nodup_hn, shape_cos_shuffle_losses_nodup_hn, size_cos_shuffle_losses_nodup_hn]
         obj_acos_losses_nodup_hn, color_acos_losses_nodup_hn, mat_acos_losses_nodup_hn, shape_acos_losses_nodup_hn, size_acos_losses_nodup_hn = [], [], [], [], []
         hn_acos_losses_list = [obj_acos_losses_nodup_hn, color_acos_losses_nodup_hn, mat_acos_losses_nodup_hn, shape_acos_losses_nodup_hn, size_acos_losses_nodup_hn]
+        obj_acos_shuffle_losses_nodup_hn, color_acos_shuffle_losses_nodup_hn, mat_acos_shuffle_losses_nodup_hn, shape_acos_shuffle_losses_nodup_hn, size_acos_shuffle_losses_nodup_hn = [], [], [], [], []
+        hn_acos_shuffle_losses_list = [obj_acos_shuffle_losses_nodup_hn, color_acos_shuffle_losses_nodup_hn, mat_acos_shuffle_losses_nodup_hn, shape_acos_shuffle_losses_nodup_hn, size_acos_shuffle_losses_nodup_hn]
 
         with torch.no_grad():
             slots_nodup_list = []
@@ -203,6 +209,11 @@ class SlotAttentionMethod(pl.LightningModule):
                     hn_cos_losses_list[ind-4].append(cos_losses_nodup)
                     hn_acos_losses_list[ind-4].append(acos_losses_nodup)
 
+                    greedy_losses_nodup_shuffle, cos_losses_nodup_shuffle, acos_losses_nodup_shuffle = compute_shuffle_greedy_loss(cat_slots)
+                    hn_greedy_shuffle_losses_list[ind-4].append(greedy_losses_nodup_shuffle)
+                    hn_cos_shuffle_losses_list[ind-4].append(cos_losses_nodup_shuffle)
+                    hn_acos_shuffle_losses_list[ind-4].append(acos_losses_nodup_shuffle)
+
             l2_std = torch.cat(obj_greedy_std_nodup, 0)
             cos_std = torch.cat(obj_cos_std_nodup, 0)
             acos_std = torch.cat(obj_acos_std_nodup, 0)
@@ -214,25 +225,25 @@ class SlotAttentionMethod(pl.LightningModule):
             std_obj_cos_ratio, avg_obj_cos_ratio, avg_obj_cos, avg_obj_cos_ctrast_en = summarize_losses(obj_cos_losses_nodup, obj_cos_losses_nodup_en_D)
             std_obj_acos_ratio, avg_obj_acos_ratio, avg_obj_acos, avg_obj_acos_ctrast_en = summarize_losses(obj_acos_losses_nodup, obj_acos_losses_nodup_en_D)
 
-            _, avg_obj_l2_hn_ratio, _, _ = summarize_losses(obj_greedy_losses_nodup_hn, obj_greedy_losses_nodup_en_D)
-            _, avg_obj_cos_hn_ratio, _, _ = summarize_losses(obj_cos_losses_nodup_hn, obj_cos_losses_nodup_en_D)
-            _, avg_obj_acos_hn_ratio, _, _ = summarize_losses(obj_acos_losses_nodup_hn, obj_acos_losses_nodup_en_D)
+            _, avg_obj_l2_hn_ratio, _, _ = summarize_losses(obj_greedy_losses_nodup_hn, obj_greedy_shuffle_losses_nodup_hn)
+            _, avg_obj_cos_hn_ratio, _, _ = summarize_losses(obj_cos_losses_nodup_hn, obj_cos_shuffle_losses_nodup_hn)
+            _, avg_obj_acos_hn_ratio, _, _ = summarize_losses(obj_acos_losses_nodup_hn, obj_acos_shuffle_losses_nodup_hn)
 
-            _, avg_color_l2_hn_ratio, _, _ = summarize_losses(color_greedy_losses_nodup_hn, obj_greedy_losses_nodup_en_D)
-            _, avg_color_cos_hn_ratio, _, _ = summarize_losses(color_cos_losses_nodup_hn, obj_cos_losses_nodup_en_D)
-            _, avg_color_acos_hn_ratio, _, _ = summarize_losses(color_acos_losses_nodup_hn, obj_acos_losses_nodup_en_D)
+            _, avg_color_l2_hn_ratio, _, _ = summarize_losses(color_greedy_losses_nodup_hn, color_greedy_shuffle_losses_nodup_hn)
+            _, avg_color_cos_hn_ratio, _, _ = summarize_losses(color_cos_losses_nodup_hn, color_cos_shuffle_losses_nodup_hn)
+            _, avg_color_acos_hn_ratio, _, _ = summarize_losses(color_acos_losses_nodup_hn, color_acos_shuffle_losses_nodup_hn)
 
-            _, avg_mat_l2_hn_ratio, _, _ = summarize_losses(mat_greedy_losses_nodup_hn, obj_greedy_losses_nodup_en_D)
-            _, avg_mat_cos_hn_ratio, _, _ = summarize_losses(mat_cos_losses_nodup_hn, obj_cos_losses_nodup_en_D)
-            _, avg_mat_acos_hn_ratio, _, _ = summarize_losses(mat_acos_losses_nodup_hn, obj_acos_losses_nodup_en_D)
+            _, avg_mat_l2_hn_ratio, _, _ = summarize_losses(mat_greedy_losses_nodup_hn, mat_greedy_shuffle_losses_nodup_hn)
+            _, avg_mat_cos_hn_ratio, _, _ = summarize_losses(mat_cos_losses_nodup_hn, mat_cos_shuffle_losses_nodup_hn)
+            _, avg_mat_acos_hn_ratio, _, _ = summarize_losses(mat_acos_losses_nodup_hn, mat_acos_shuffle_losses_nodup_hn)
 
-            _, avg_shape_l2_hn_ratio, _, _ = summarize_losses(shape_greedy_losses_nodup_hn, obj_greedy_losses_nodup_en_D)
-            _, avg_shape_cos_hn_ratio, _, _ = summarize_losses(shape_cos_losses_nodup_hn, obj_cos_losses_nodup_en_D)
-            _, avg_shape_acos_hn_ratio, _, _ = summarize_losses(shape_acos_losses_nodup_hn, obj_acos_losses_nodup_en_D)
+            _, avg_shape_l2_hn_ratio, _, _ = summarize_losses(shape_greedy_losses_nodup_hn, shape_greedy_shuffle_losses_nodup_hn)
+            _, avg_shape_cos_hn_ratio, _, _ = summarize_losses(shape_cos_losses_nodup_hn, shape_cos_shuffle_losses_nodup_hn)
+            _, avg_shape_acos_hn_ratio, _, _ = summarize_losses(shape_acos_losses_nodup_hn, shape_acos_shuffle_losses_nodup_hn)
 
-            _, avg_size_l2_hn_ratio, _, _ = summarize_losses(size_greedy_losses_nodup_hn, obj_greedy_losses_nodup_en_D)
-            _, avg_size_cos_hn_ratio, _, _ = summarize_losses(size_cos_losses_nodup_hn, obj_cos_losses_nodup_en_D)
-            _, avg_size_acos_hn_ratio, _, _ = summarize_losses(size_acos_losses_nodup_hn, obj_acos_losses_nodup_en_D)
+            _, avg_size_l2_hn_ratio, _, _ = summarize_losses(size_greedy_losses_nodup_hn, size_greedy_shuffle_losses_nodup_hn)
+            _, avg_size_cos_hn_ratio, _, _ = summarize_losses(size_cos_losses_nodup_hn, size_cos_shuffle_losses_nodup_hn)
+            _, avg_size_acos_hn_ratio, _, _ = summarize_losses(size_acos_losses_nodup_hn, size_acos_shuffle_losses_nodup_hn)
 
             logs = {
                 "avg_val_loss": avg_loss,
@@ -242,31 +253,31 @@ class SlotAttentionMethod(pl.LightningModule):
                 "avg_obj_l2_ctrast_en": avg_obj_l2_ctrast_en.to(self.device),
                 "avg_obj_l2_std": avg_l2_std.to(self.device),
                 "std_obj_l2_ratio": std_obj_l2_ratio.to(self.device),
-                "avg_obj_l2_gap": (avg_obj_l2_hn_ratio-avg_obj_l2_ratio).to(self.device),
-                "avg_color_l2_gap": (avg_color_l2_hn_ratio-avg_obj_l2_ratio).to(self.device),
-                "avg_mat_l2_gap": (avg_mat_l2_hn_ratio-avg_obj_l2_ratio).to(self.device),
-                "avg_shape_l2_gap": (avg_shape_l2_hn_ratio-avg_obj_l2_ratio).to(self.device),
-                "avg_size_l2_gap": (avg_size_l2_hn_ratio-avg_obj_l2_ratio).to(self.device),
+                "avg_obj_l2_gap": (avg_obj_l2_ratio-avg_obj_l2_hn_ratio).to(self.device),
+                "avg_color_l2_gap": (avg_obj_l2_ratio-avg_color_l2_hn_ratio).to(self.device),
+                "avg_mat_l2_gap": (avg_obj_l2_ratio-avg_mat_l2_hn_ratio).to(self.device),
+                "avg_shape_l2_gap": (avg_obj_l2_ratio-avg_shape_l2_hn_ratio).to(self.device),
+                "avg_size_l2_gap": (avg_obj_l2_ratio-avg_size_l2_hn_ratio).to(self.device),
                 "avg_obj_cos_ratio": avg_obj_cos_ratio.to(self.device),
                 "avg_obj_cos": avg_obj_cos.to(self.device),
                 "avg_obj_cos_ctrast_en": avg_obj_cos_ctrast_en.to(self.device),
                 "avg_obj_cos_std": avg_cos_std.to(self.device),
                 "std_obj_cos_ratio": std_obj_cos_ratio.to(self.device),
-                "avg_obj_cos_gap": (avg_obj_cos_hn_ratio-avg_obj_cos_ratio).to(self.device),
-                "avg_color_cos_gap": (avg_color_cos_hn_ratio-avg_obj_cos_ratio).to(self.device),
-                "avg_mat_cos_gap": (avg_mat_cos_hn_ratio-avg_obj_cos_ratio).to(self.device),
-                "avg_shape_cos_gap": (avg_shape_cos_hn_ratio-avg_obj_cos_ratio).to(self.device),
-                "avg_size_cos_gap": (avg_size_cos_hn_ratio-avg_obj_cos_ratio).to(self.device),
+                "avg_obj_cos_gap": (avg_obj_cos_ratio-avg_obj_cos_hn_ratio).to(self.device),
+                "avg_color_cos_gap": (avg_obj_cos_ratio-avg_color_cos_hn_ratio).to(self.device),
+                "avg_mat_cos_gap": (avg_obj_cos_ratio-avg_mat_cos_hn_ratio).to(self.device),
+                "avg_shape_cos_gap": (avg_obj_cos_ratio-avg_shape_cos_hn_ratio).to(self.device),
+                "avg_size_cos_gap": (avg_obj_cos_ratio-avg_size_cos_hn_ratio).to(self.device),
                 "avg_obj_acos_ratio": avg_obj_acos_ratio.to(self.device),
                 "avg_obj_acos": avg_obj_acos.to(self.device),
                 "avg_obj_acos_ctrast_en": avg_obj_acos_ctrast_en.to(self.device),
                 "avg_obj_acos_std": avg_acos_std.to(self.device),
                 "std_obj_acos_ratio": std_obj_acos_ratio.to(self.device),
-                "avg_obj_acos_gap": (avg_obj_acos_hn_ratio-avg_obj_acos_ratio).to(self.device),
-                "avg_color_acos_gap": (avg_color_acos_hn_ratio-avg_obj_acos_ratio).to(self.device),
-                "avg_mat_acos_gap": (avg_mat_acos_hn_ratio-avg_obj_acos_ratio).to(self.device),
-                "avg_shape_acos_gap": (avg_shape_acos_hn_ratio-avg_obj_acos_ratio).to(self.device),
-                "avg_size_acos_gap": (avg_size_acos_hn_ratio-avg_obj_acos_ratio).to(self.device),
+                "avg_obj_acos_gap": (avg_obj_acos_ratio-avg_obj_acos_hn_ratio).to(self.device),
+                "avg_color_acos_gap": (avg_obj_acos_ratio-avg_color_acos_hn_ratio).to(self.device),
+                "avg_mat_acos_gap": (avg_obj_acos_ratio-avg_mat_acos_hn_ratio).to(self.device),
+                "avg_shape_acos_gap": (avg_obj_acos_ratio-avg_shape_acos_hn_ratio).to(self.device),
+                "avg_size_acos_gap": (avg_obj_acos_ratio-avg_size_acos_hn_ratio).to(self.device),
             }
 
             if self.trainer.running_sanity_check:
