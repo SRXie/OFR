@@ -152,7 +152,7 @@ def compute_aggregated_loss(cat_slots, losses):
 
     losses.append(loss)
 
-def compute_pseudo_greedy_loss(cat_slots, losses, easy_neg=False, cos_sim=False):
+def compute_pseudo_greedy_loss(cat_slots, easy_neg=False, cos_sim=False):
     slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
     batch_size, num_slots, slot_size = slots_A.shape
     indices_A = torch.arange(0, num_slots, dtype=int).unsqueeze(0).repeat(batch_size, 1).to(cat_slots.device)
@@ -169,34 +169,9 @@ def compute_pseudo_greedy_loss(cat_slots, losses, easy_neg=False, cos_sim=False)
     _, indices_C = greedy_criterion_DC.min(-1)
     slots_C = batched_index_select(slots_C, 1, indices_C)
 
-    losses.append(torch.norm(slots_A-slots_B+slots_C-slots_D, 2, -1).sum(-1))
+    return torch.norm(slots_A-slots_B+slots_C-slots_D, 2, -1).sum(-1), torch.cat([indices_A, indices_B, indices_C, indices_D], 0)
 
-    return torch.cat([indices_A, indices_B, indices_C, indices_D], 0)
-
-    # # greedy assignment regardless of re-assignment
-    # # TODO: check if there is a trivial solution to this assignment
-    # ext_A = slots_A.view(batch_size, num_slots, 1, 1, 1, slot_size).expand(-1, -1, num_slots, num_slots, num_slots, -1)
-    # ext_B = slots_B.view(batch_size, 1, num_slots, 1, 1, slot_size).expand(-1, num_slots, -1, num_slots, num_slots, -1)
-    # ext_C = slots_C.view(batch_size, 1, 1, num_slots, 1, slot_size).expand(-1, num_slots, num_slots, -1, num_slots, -1)
-    # ext_D = slots_D.view(batch_size, 1, 1, 1, num_slots, slot_size).expand(-1, num_slots, num_slots, num_slots, -1, -1)
-    # if not cos_sim:
-    #     greedy_criterion = torch.norm(ext_A-ext_B+ext_C-ext_D, 2, -1)
-    #     norm_term = torch.stack([torch.norm(ext_A-ext_B, 2, -1), torch.norm(ext_A-ext_D, 2, -1), torch.norm(ext_C-ext_B, 2, -1), torch.norm(ext_C-ext_D, 2, -1)], dim=-1)
-    #     norm_term = torch.max(norm_term, dim=-1)[0]
-    #     greedy_criterion = greedy_criterion.div(norm_term+0.0001)
-    # else:
-    #     vector_a = (ext_A-ext_B).div(torch.norm(ext_A-ext_B, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size)+0.0001)
-    #     vector_b = (ext_D-ext_C).div(torch.norm(ext_D-ext_C, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size)+0.0001)
-    #     greedy_criterion = torch.norm(vector_a-vector_b, 2, -1)/2
-    # # backtrace for greedy matching (3 times)
-    # greedy_criterion, _ = greedy_criterion.min(-1)
-    # greedy_criterion, _ = greedy_criterion.min(-1)
-    # greedy_criterion, _ = greedy_criterion.min(-1)
-
-    # greedy_loss = greedy_criterion.sum(dim=-1)/num_slots
-    # losses.append(greedy_loss)
-
-def compute_greedy_loss(cat_slots, losses, cos_sim=False):
+def compute_greedy_loss(cat_slots, cos_sim=False):
     slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots, cat_slots.shape[0]//4, 0)
     batch_size, num_slots, slot_size = slots_A.shape
     # greedy assignment without multi-assignment
@@ -210,9 +185,6 @@ def compute_greedy_loss(cat_slots, losses, cos_sim=False):
         ext_D = slots_D.view(batch_size, 1, 1, 1, num_slots-i, slot_size).expand(-1, num_slots-i, num_slots-i, num_slots-i, -1, -1)
         if not cos_sim:
             greedy_criterion = torch.square(ext_A-ext_B+ext_C-ext_D).sum(-1)
-            # norm_term = torch.stack([torch.norm(ext_A-ext_B, 2, -1), torch.norm(ext_A-ext_D, 2, -1), torch.norm(ext_C-ext_B, 2, -1), torch.norm(ext_C-ext_D, 2, -1)], dim=-1)
-            # norm_term = torch.max(norm_term, dim=-1)[0]
-            # greedy_criterion = greedy_criterion.div(norm_term+0.0001)
         else:
             vector_a = (ext_A-ext_B+ext_C).div(torch.norm(ext_A-ext_B+ext_C, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size)+0.0001)
             vector_b = (ext_D).div(torch.norm(ext_D, 2, -1).unsqueeze(-1).repeat(1,1,1,1,1,slot_size)+0.0001)
@@ -223,11 +195,6 @@ def compute_greedy_loss(cat_slots, losses, cos_sim=False):
         greedy_criterion, indices_B = greedy_criterion.min(-1)
         greedy_criterion, indices_A = greedy_criterion.min(-1)
         greedy_loss+=greedy_criterion
-
-        # print(indices_A[1])
-        # print(indices_B[1, indices_A[1]])
-        # print(indices_C[1 , indices_A[1], indices_B[1, indices_A[1]]])
-        # print(indices_D[1, indices_A[1], indices_B[1, indices_A[1]], indices_C[1 , indices_A[1], indices_B[1, indices_A[1]]]])
 
         index_A = indices_A.view(indices_A.shape[0],1)
 
@@ -257,18 +224,16 @@ def compute_greedy_loss(cat_slots, losses, cos_sim=False):
         slots_cat = torch.where(replace, slots_cat[:,-1,:].unsqueeze(1).repeat(1, num_slots-i, 1), slots_cat)[:,:-1,:]
         slots_A, slots_B, slots_C, slots_D = torch.split(slots_cat, batch_size, 0)
 
-    # greedy_loss = greedy_loss/num_slots
-    losses.append((greedy_loss))
-    return cat_indices_holder
+    return greedy_loss, cat_indices_holder
 
-def compute_cosine_loss(cat_slots_sorted, losses):
+def compute_cosine_loss(cat_slots_sorted):
     slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots_sorted, cat_slots_sorted.shape[0]//4, 0)
     vector_AB = (slots_A - slots_B).div(torch.norm(slots_A - slots_B, 2, -1).unsqueeze(-1).repeat(1, 1, cat_slots.shape[2])+0.0001)
     vector_DC = (slots_D - slots_C).div(torch.norm(slots_D - slots_C, 2, -1).unsqueeze(-1).repeat(1, 1, cat_slots.shape[2])+0.0001)
     cos_loss = torch.norm(vector_AB-vector_DC, 2, -1)/2
-    losses.append(cos_loss.mean(1))
+    return cos_loss.mean(1)
 
-def compute_shuffle_greedy_loss(cat_slots_sorted, D_losses, D_cos, D_acos, cos_sim=False):
+def compute_shuffle_greedy_loss(cat_slots_sorted, cos_sim=False):
     slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots_sorted, cat_slots_sorted.shape[0]//4, 0)
     slots_Aa, slots_Bb, slots_Cc, slots_Dd = torch.split(cat_slots_sorted.clone(), cat_slots_sorted.shape[0]//4, 0)
     slots_D_prime = slots_A-slots_B+slots_C
@@ -350,12 +315,9 @@ def compute_shuffle_greedy_loss(cat_slots_sorted, D_losses, D_cos, D_acos, cos_s
         slots_cat_c = torch.where(replace_c, slots_cat_c[:,-1,:].unsqueeze(1).repeat(1, num_slots-i, 1), slots_cat_c)[:,:-1,:]
         slots_Aa, slots_Bb, slots_Cc, slots_Dd = torch.split(slots_cat_c, batch_size*batch_size, 0)
 
-    # A_losses.append(-torch.sqrt(greedy_loss_A).mean(1))
-    D_losses.append(greedy_loss_D.mean(1))
-    D_cos.append((1.0-(AB_sqsum+DC_sqsum-greedy_loss_D).div(2*torch.sqrt(AB_sqsum)*torch.sqrt(DC_sqsum))).mean(1))
-    D_acos.append(torch.acos(torch.clamp((AB_sqsum+DC_sqsum-greedy_loss_D).div(2*torch.sqrt(AB_sqsum)*torch.sqrt(DC_sqsum)), max=1.0)).mean(1))
+    return greedy_loss_D.mean(1), (1.0-(AB_sqsum+DC_sqsum-greedy_loss_D).div(2*torch.sqrt(AB_sqsum)*torch.sqrt(DC_sqsum))).mean(1), torch.acos(torch.clamp((AB_sqsum+DC_sqsum-greedy_loss_D).div(2*torch.sqrt(AB_sqsum)*torch.sqrt(DC_sqsum)), max=1.0)).mean(1)
 
-def compute_bipartite_greedy_loss(slots_A, slots_E, losses, cos_sim=False):
+def compute_bipartite_greedy_loss(slots_A, slots_E, cos_sim=False):
     batch_size, num_slots, slot_size = slots_A.shape
     slots_A_norm = torch.norm(slots_A.view(batch_size, -1), 2, -1)
     slots_E_norm = torch.norm(slots_E.view(batch_size, -1), 2, -1)
@@ -399,7 +361,27 @@ def compute_bipartite_greedy_loss(slots_A, slots_E, losses, cos_sim=False):
         slots_cat = torch.where(replace, slots_cat[:,-1,:].unsqueeze(1).repeat(1, num_slots-i, 1), slots_cat)[:,:-1,:]
         slots_A, slots_E = torch.split(slots_cat, batch_size, 0)
 
-    losses.append(torch.acos(torch.clamp((torch.square(slots_A_norm)+torch.square(slots_E_norm)-greedy_loss).div(2*slots_A_norm*slots_E_norm), max=1.0)))
+    return greedy_loss
+
+def get_all_losses(cat_slots):
+    greedy_losses, cat_indices = compute_greedy_loss(cat_slots)
+    cat_slots = batched_index_select(cat_slots, 1, cat_indices)
+    slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots.view(4*batch_size, -1), batch_size, 0)
+    DC_norm = torch.norm(slots_D-slots_C, 2, -1)
+    AB_norm = torch.norm(slots_A-slots_B, 2, -1)
+    cos_losses = 1.0-(torch.square(AB_norm)+torch.square(DC_norm)-greedy_losses).div(2*AB_norm*DC_norm)
+    acos_losses = torch.acos(torch.clamp(1.0-cos_losses, max=1.0))
+
+    return greedy_losses, cos_losses, acos_losses, cat_slots
+
+def summerize_losses(losses, losses_en):
+    cat_losses = torch.cat(losses, 0)
+    cat_losses_en = torch.cat([x for x in losses_en], 0)
+    ratio = ((cat_losses_en-cat_losses).div(cat_losses_en))
+    std_ratio = ratio.std()/math.sqrt(ratio.shape[0])
+    avg_ratio = ratio.mean()
+    avg_loss = cat_losses.mean()
+    avg_ctrast_en = cat_losses_en.mean()-avg_loss
 
 def compute_ari(table):
     """

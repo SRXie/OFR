@@ -16,6 +16,7 @@ from slot_attention.utils import compute_cos_distance, compute_rank_correlation
 from slot_attention.utils import batched_index_select
 from slot_attention.utils import compute_greedy_loss, compute_cosine_loss
 from slot_attention.utils import compute_shuffle_greedy_loss, compute_bipartite_greedy_loss
+from slot_attention.utils import compute_all_losses, summarize_losses
 from slot_attention.utils import swap_bg_slot_back
 from slot_attention.utils import captioned_masked_recons
 from slot_attention.utils import split_and_interleave_stack
@@ -66,7 +67,7 @@ class SlotAttentionMethod(pl.LightningModule):
             # slots_nodup = batched_index_select(slots_nodup, 1, cat_indices)
 
             # reorder with matching
-            cat_indices = compute_greedy_loss(slots, [])
+            _, cat_indices = compute_greedy_loss(slots)
             recons_perm = batched_index_select(recons, 1, cat_indices)
             masks_perm = batched_index_select(masks, 1, cat_indices)
             slots_perm = batched_index_select(slots, 1, cat_indices)
@@ -80,10 +81,6 @@ class SlotAttentionMethod(pl.LightningModule):
             slots_perm_nodup = slots_nodup #batched_index_select(slots_nodup, 1, cat_indices_nodup)
             attns_perm_nodup = torch.cat((attns, attns[-self.params.n_samples:]), 0)  #batched_index_select(attns, 2, cat_indices_nodup)
             batch_list = []
-            # for attn in attns.split(4, 0):
-            #     attn = torch.cat([attn, attn[-1].unsqueeze(0)], 0)
-            #     attns_list.append(attn)
-            # attns = torch.cat(attns_list, 0)
             batch_nodup = torch.cat((batch, batch[-self.params.n_samples:]), 0)
             masked_recons_perm_nodup, masked_attn_perm_nodup, recons_perm_nodup = captioned_masked_recons(recons_perm_nodup, masks_perm_nodup, slots_perm_nodup, attns_perm_nodup)
 
@@ -134,8 +131,8 @@ class SlotAttentionMethod(pl.LightningModule):
         avg_ari_mask = np.stack([x["mask_ari"] for x in outputs]).mean()
 
         # Algebra Test starts here
-        odl = self.datamodule.obj_test_dataloader()
-        adl = self.datamodule.attr_test_dataloader()
+        dl = self.datamodule.obj_test_dataloader()
+        dup_threshold = self.params.dup_threshold
 
         obj_greedy_losses_nodup, obj_greedy_std_nodup = [], []
         obj_greedy_losses_nodup_en_A, obj_greedy_losses_nodup_en_D, attr_greedy_losses_nodup_en = [], [], []
@@ -144,21 +141,21 @@ class SlotAttentionMethod(pl.LightningModule):
         obj_acos_losses_nodup, obj_acos_std_nodup = [], []
         obj_acos_losses_nodup_en_A, obj_acos_losses_nodup_en_D, attr_acos_losses_nodup_en = [], [], []
 
-        cos = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
-        z_norm, z_angle = [], []
-        scalings, angles, scaling_deltas, angle_deltas, scaling_ratios, angle_ratios = [], [], [], [], [], []
+        obj_greedy_losses_nodup_hn, color_greedy_losses_nodup_hn, mat_greedy_losses_nodup_hn, shape_greedy_losses_nodup_hn, size_greedy_losses_nodup_hn = [], [], [], [], []
+        hn_greedy_losses_list = [obj_greedy_losses_nodup_hn, color_greedy_losses_nodup_hn, mat_greedy_losses_nodup_hn, shape_greedy_losses_nodup_hn, size_greedy_losses_nodup_hn]
+        obj_cos_losses_nodup_hn, color_cos_losses_nodup_hn, mat_cos_losses_nodup_hn, shape_cos_losses_nodup_hn, size_cos_losses_nodup_hn = [], [], [], []
+        hn_cos_losses_list = [obj_cos_losses_nodup_hn, color_cos_losses_nodup_hn, mat_cos_losses_nodup_hn, shape_cos_losses_nodup_hn, size_cos_losses_nodup_hn]
+        obj_acos_losses_nodup_hn, color_acos_losses_nodup_hn, mat_acos_losses_nodup_hn, shape_acos_losses_nodup_hn, size_acos_losses_nodup_hn = [], [], [], []
+        hn_acos_losses_list = [obj_acos_losses_nodup_hn, color_acos_losses_nodup_hn, mat_acos_losses_nodup_hn, shape_acos_losses_nodup_hn, size_acos_losses_nodup_hn]
 
-        def compute_test_losses(dataloader, losses_nodup, losses_nodup_en_D, std_nodup, cos_nodup, cos_nodup_en_D, cos_std_nodup, acos_nodup, acos_nodup_en_D, acos_std_nodup, dup_threshold=None):
-            # b_prev = datetime.now()
+        with torch.no_grad():
             slots_nodup_list = []
             i = 0
-            for batch in dataloader:
-                # print("load data:", datetime.now()-b_prev)
-                # sample_losses = []
-                # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
+            for batch in dl:
+                # batch is a length-9 list, each element is a tensor of shape (batch_size, 3, width, height)
                 i += 0.01
                 batch_size = batch[0].shape[0]
-                cat_batch = torch.cat(batch[:4]+[batch[3]], 0)
+                cat_batch = torch.cat(batch+[batch[3]], 0)
                 if self.params.gpus > 0:
                     cat_batch = cat_batch.to(self.device)
                 _, _, _, slots, _, _, _, _, slots_nodup = self.model.forward(cat_batch, slots_only=False, dup_threshold=dup_threshold, viz=False)
@@ -171,73 +168,38 @@ class SlotAttentionMethod(pl.LightningModule):
                     slots_nodup_list = []
                 else:
                     continue
-                # compute_bipartite_greedy_loss(cat_slots_nodup[3*batch_size:4*batch_size], cat_slots_nodup[4*batch_size:], std_nodup)
                 # Here we compute the angle between DC and D'C
                 batch_size*=8
-                cat_slots_two_fwd = torch.cat([cat_slots_nodup[3*batch_size:4*batch_size], cat_slots_nodup[2*batch_size:3*batch_size], cat_slots_nodup[2*batch_size:3*batch_size], cat_slots_nodup[4*batch_size:]], 0)
-                cat_indices = compute_greedy_loss(cat_slots_two_fwd, std_nodup)
+                cat_slots_two_fwd = torch.cat([cat_slots_nodup[3*batch_size:4*batch_size], cat_slots_nodup[2*batch_size:3*batch_size], cat_slots_nodup[2*batch_size:3*batch_size], cat_slots_nodup[-batch_size:]], 0)
+                greedy_std_nodup, cat_indices = compute_greedy_loss(cat_slots_two_fwd)
+                obj_greedy_std_nodup.append(greedy_std_nodup)
                 cat_slots_two_fwd = batched_index_select(cat_slots_two_fwd, 1, cat_indices)
                 CD_prime = (cat_slots_two_fwd[3*batch_size: 4*batch_size]-cat_slots_two_fwd[2*batch_size: 3*batch_size]).view(batch_size, -1)
                 CD = (cat_slots_two_fwd[: batch_size]-cat_slots_two_fwd[1*batch_size: 2*batch_size]).view(batch_size, -1)
                 CD_norm = torch.norm(CD, 2, -1)
                 CD_prime_norm = torch.norm(CD_prime, 2, -1)
-                # losses_nodup[-1]=torch.acos(torch.clamp((torch.square(slots_D_norm)+torch.square(slots_D_prime_norm)-losses_nodup[-1]).div(2*slots_D_norm*slots_D_prime_norm), max=1.0))
-                slots_D = cat_slots_two_fwd[:batch_size].view(batch_size, -1)
-                slots_D_prime = cat_slots_two_fwd[3*batch_size:].view(batch_size, -1)
-                z_angle.append(torch.acos(torch.clamp(cos(slots_D, slots_D_prime), max=1.0)))
                 cos_std_nodup.append(1.0-(torch.square(CD_norm)+torch.square(CD_prime_norm)-std_nodup[-1]).div(2*CD_norm*CD_prime_norm))
                 acos_std_nodup.append(torch.acos(torch.clamp(1.0-cos_std_nodup[-1], max=1.0)))
 
-                cat_slots_nodup = cat_slots_nodup[:4*batch_size]
-                cat_indices = compute_greedy_loss(cat_slots_nodup, losses_nodup)
+                cat_slots = cat_slots_nodup[:4*batch_size]
+                greedy_losses_nodup, cos_losses_nodup, acos_losses_nodup, cat_slots = compute_all_losses(cat_slots)
+                obj_greedy_losses_nodup.append(greedy_losses_nodup)
+                obj_cos_losses_nodup.append(cos_losses_nodup)
+                obj_acos_losses_nodup.append(acos_losses_nodup)
 
-                # starting here we want to use the cat_indices and match A' and D' to it A' = batch[4], D' = batch[5]
-                # cat_batch_hn = torch.cat(batch[:3]+[batch[-1]], 0)
-                # if self.params.gpus > 0:
-                #     cat_batch_hn = cat_batch_hn.to(self.device)
-                # cat_slots_hn, cat_attns_hn, cat_slots_nodup_hn = self.model.forward(cat_batch_hn, slots_only=True, dup_threshold=dup_threshold)
+                greedy_losses_nodup_en_D, cos_losses_nodup_en_D, acos_losses_nodup_en_D = compute_shuffle_greedy_loss(cat_slots)
+                obj_greedy_losses_nodup_en_D.append(greedy_losses_nodup_en_D)
+                obj_cos_losses_nodup_en_D.append(cos_losses_nodup_en_D)
+                obj_acos_losses_nodup_en_D.append(acos_losses_nodup_en_D)
 
-                cat_slots_nodup_sorted = batched_index_select(cat_slots_nodup, 1, cat_indices)
+                for ind in range(4, 9):
+                    slots_D_prime = cat_slots_nodup[ind*batch_size:(ind+1)*batch_size]
+                    cat_slots = torch.cat((slots_A, slots_B, slots_C, slots_D_prime), 0)
+                    greedy_losses_nodup, cos_losses_nodup, acos_losses_nodup = compute_all_losses(cat_slots)
+                    hn_greedy_losses_list[ind-4].append(greedy_losses_nodup)
+                    hn_cos_losses_list[ind-4].append(cos_losses_nodup)
+                    hn_acos_losses_list[ind-4].append(acos_losses_nodup)
 
-                slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots_nodup_sorted.view(4*batch_size, -1), batch_size, 0)
-                slots_A_norm = torch.norm(slots_A, 2, -1)
-                slots_B_norm = torch.norm(slots_B, 2, -1)
-                slots_C_norm = torch.norm(slots_C, 2, -1)
-                slots_D_norm = torch.norm(slots_D, 2, -1)
-                scaling_AB = slots_A_norm.div(slots_B_norm)
-                scaling_DC = slots_D_norm.div(slots_C_norm)
-                angle_AB = torch.acos(torch.clamp(cos(slots_A, slots_B), max=1.0))
-                angle_DC = torch.acos(torch.clamp(cos(slots_D, slots_C), max=1.0))
-
-                z_norm.append(torch.cat([slots_A_norm, slots_B_norm, slots_C_norm, slots_D_norm], 0))
-                scalings.append(torch.cat([scaling_AB, scaling_DC], 0))
-                angles.append(torch.cat([angle_AB, angle_DC], 0))
-                scaling_deltas.append(torch.abs(scaling_AB - scaling_DC))
-                angle_deltas.append(torch.abs(angle_AB - angle_DC))
-                scaling_ratios.append(torch.maximum(scaling_AB, scaling_DC).div(torch.minimum(scaling_AB, scaling_DC)))
-                angle_ratios.append(torch.maximum(angle_AB, angle_DC).div(torch.minimum(angle_AB, angle_DC)))
-
-                DC_norm = torch.norm(slots_D-slots_C, 2, -1)
-                AB_norm = torch.norm((cat_slots_nodup_sorted[: batch_size]-cat_slots_nodup_sorted[1*batch_size: 2*batch_size]).view(batch_size, -1), 2, -1)
-                cos_nodup.append(1.0-(torch.square(AB_norm)+torch.square(DC_norm)-losses_nodup[-1]).div(2*AB_norm*DC_norm))
-                acos_nodup.append(torch.acos(torch.clamp(1.0-cos_nodup[-1], max=1.0)))
-                compute_shuffle_greedy_loss(cat_slots_nodup_sorted, losses_nodup_en_D, cos_nodup_en_D, acos_nodup_en_D)
-
-
-        with torch.no_grad():
-            compute_test_losses(odl, obj_greedy_losses_nodup, obj_greedy_losses_nodup_en_D, obj_greedy_std_nodup, obj_cos_losses_nodup, obj_cos_losses_nodup_en_D, obj_cos_std_nodup,
-                    obj_acos_losses_nodup, obj_acos_losses_nodup_en_D, obj_acos_std_nodup, dup_threshold=self.params.dup_threshold)
-            # compute_test_losses(adl, attr_pd_greedy_losses, attr_pd_greedy_losses_en, attr_pd_greedy_losses_hn, attr_greedy_losses_nodup, attr_greedy_losses_nodup_en, attr_greedy_losses_nodup_hn,
-            #     attr_pd_greedy_cos_losses, attr_pd_greedy_cos_losses_en, attr_pd_greedy_cos_losses_hn, attr_greedy_cos_losses_nodup, attr_greedy_cos_losses_nodup_en, attr_greedy_cos_losses_nodup_hn, dup_threshold=self.params.dup_threshold)
-
-            avg_z_norm = torch.cat(z_norm, 0).mean()
-            avg_z_angle = torch.cat(z_angle, 0).mean()
-            avg_scaling = torch.cat(scalings, 0).mean()
-            avg_angle = torch.cat(angles, 0).mean()
-            avg_scaling_delta = torch.cat(scaling_deltas, 0).mean()
-            avg_angle_delta = torch.cat(angle_deltas, 0).mean()
-            avg_scaling_ratio = torch.cat(scaling_ratios, 0).mean()
-            avg_angle_ratio = torch.cat(angle_ratios, 0).mean()
             l2_std = torch.cat(obj_greedy_std_nodup, 0)
             cos_std = torch.cat(obj_cos_std_nodup, 0)
             acos_std = torch.cat(obj_acos_std_nodup, 0)
@@ -245,56 +207,63 @@ class SlotAttentionMethod(pl.LightningModule):
             avg_cos_std = cos_std.mean()
             avg_acos_std = acos_std.mean()
 
-            obj_l2_nodup = torch.cat(obj_greedy_losses_nodup, 0)
-            obj_l2_nodup_en_D = torch.cat([x for x in obj_greedy_losses_nodup_en_D], 0)
-            obj_l2_ratio = ((obj_l2_nodup_en_D-obj_l2_nodup).div(obj_l2_nodup_en_D))
-            std_obj_l2_ratio = obj_l2_ratio.std()/math.sqrt(obj_l2_ratio.shape[0])
-            avg_obj_l2_ratio = obj_l2_ratio.mean()
-            avg_obj_l2 = obj_l2_nodup.mean()
-            avg_obj_l2_ctrast_en = obj_l2_nodup_en_D.mean()-avg_obj_l2
+            std_obj_l2_ratio, avg_obj_l2_ratio, avg_obj_l2, avg_obj_l2_ctrast_en = summarize_losses(obj_greedy_losses_nodup, obj_greedy_losses_nodup_en_D)
+            std_obj_cos_ratio, avg_obj_cos_ratio, avg_obj_cos, avg_obj_cos_ctrast_en = summarize_losses(obj_cos_losses_nodup, obj_cos_losses_nodup_en_D)
+            std_obj_acos_ratio, avg_obj_acos_ratio, avg_obj_acos, avg_obj_acos_ctrast_en = summarize_losses(obj_acos_losses_nodup, obj_acos_losses_nodup_en_D)
 
-            obj_cos_nodup = torch.cat(obj_cos_losses_nodup, 0)
-            obj_cos_nodup_en_D = torch.cat([x for x in obj_cos_losses_nodup_en_D], 0)
-            obj_cos_ratio = ((obj_cos_nodup_en_D-obj_cos_nodup).div(obj_cos_nodup_en_D))
-            std_obj_cos_ratio = obj_cos_ratio.std()/math.sqrt(obj_cos_ratio.shape[0])
-            avg_obj_cos_ratio = obj_cos_ratio.mean()
-            avg_obj_cos = obj_cos_nodup.mean()
-            avg_obj_cos_ctrast_en = obj_cos_nodup_en_D.mean()-avg_obj_cos
+            _, avg_obj_l2_hn_ratio, _, _ = summarize_losses(obj_greedy_losses_nodup_hn, obj_greedy_losses_nodup_en_D)
+            _, avg_obj_cos_hn_ratio, _, _ = summarize_losses(obj_cos_losses_nodup_hn, obj_cos_losses_nodup_en_D)
+            _, avg_obj_acos_hn_ratio, _, _ = summarize_losses(obj_acos_losses_nodup_hn, obj_acos_losses_nodup_en_D)
 
-            obj_acos_nodup = torch.cat(obj_acos_losses_nodup, 0)
-            obj_acos_nodup_en_D = torch.cat([x for x in obj_acos_losses_nodup_en_D], 0)
-            obj_acos_ratio = ((obj_acos_nodup_en_D-obj_acos_nodup).div(obj_acos_nodup_en_D))
-            std_obj_acos_ratio = obj_acos_ratio.std()/math.sqrt(obj_acos_ratio.shape[0])
-            avg_obj_acos_ratio = obj_acos_ratio.mean()
-            avg_obj_acos = obj_acos_nodup.mean()
-            avg_obj_acos_ctrast_en = obj_acos_nodup_en_D.mean()-avg_obj_acos
+            _, avg_color_l2_hn_ratio, _, _ = summarize_losses(color_greedy_losses_nodup_hn, obj_greedy_losses_nodup_en_D)
+            _, avg_color_cos_hn_ratio, _, _ = summarize_losses(color_cos_losses_nodup_hn, obj_cos_losses_nodup_en_D)
+            _, avg_color_acos_hn_ratio, _, _ = summarize_losses(color_acos_losses_nodup_hn, obj_acos_losses_nodup_en_D)
+
+            _, avg_mat_l2_hn_ratio, _, _ = summarize_losses(mat_greedy_losses_nodup_hn, obj_greedy_losses_nodup_en_D)
+            _, avg_mat_cos_hn_ratio, _, _ = summarize_losses(mat_cos_losses_nodup_hn, obj_cos_losses_nodup_en_D)
+            _, avg_mat_acos_hn_ratio, _, _ = summarize_losses(mat_acos_losses_nodup_hn, obj_acos_losses_nodup_en_D)
+
+            _, avg_shape_l2_hn_ratio, _, _ = summarize_losses(shape_greedy_losses_nodup_hn, obj_greedy_losses_nodup_en_D)
+            _, avg_shape_cos_hn_ratio, _, _ = summarize_losses(shape_cos_losses_nodup_hn, obj_cos_losses_nodup_en_D)
+            _, avg_shape_acos_hn_ratio, _, _ = summarize_losses(shape_acos_losses_nodup_hn, obj_acos_losses_nodup_en_D)
+
+            _, avg_size_l2_hn_ratio, _, _ = summarize_losses(size_greedy_losses_nodup_hn, obj_greedy_losses_nodup_en_D)
+            _, avg_size_cos_hn_ratio, _, _ = summarize_losses(size_cos_losses_nodup_hn, obj_cos_losses_nodup_en_D)
+            _, avg_size_acos_hn_ratio, _, _ = summarize_losses(size_acos_losses_nodup_hn, obj_acos_losses_nodup_en_D)
 
             logs = {
                 "avg_val_loss": avg_loss,
                 "avg_ari_mask": avg_ari_mask,
-                "avg_z_norm": avg_z_norm.to(self.device),
-                "avg_z_angle": avg_z_angle.to(self.device),
-                "avg_scaling": avg_scaling.to(self.device),
-                "avg_angle": avg_angle.to(self.device),
-                "avg_scaling_delta": avg_scaling_delta.to(self.device),
-                "avg_angle_delta": avg_angle_delta.to(self.device),
-                "avg_scaling_ratio": avg_scaling_ratio.to(self.device),
-                "avg_angle_ratio": avg_angle_ratio.to(self.device),
                 "avg_obj_l2_ratio": avg_obj_l2_ratio.to(self.device),
                 "avg_obj_l2": avg_obj_l2.to(self.device),
                 "avg_obj_l2_ctrast_en": avg_obj_l2_ctrast_en.to(self.device),
                 "avg_obj_l2_std": avg_l2_std.to(self.device),
                 "std_obj_l2_ratio": std_obj_l2_ratio.to(self.device),
+                "avg_obj_l2_gap": (avg_obj_l2_hn_ratio-avg_obj_l2_ratio).to(self.device),
+                "avg_color_l2_gap": (avg_color_l2_hn_ratio-avg_obj_l2_ratio).to(self.device),
+                "avg_mat_l2_gap": (avg_mat_l2_hn_ratio-avg_obj_l2_ratio).to(self.device),
+                "avg_shape_l2_gap": (avg_shape_l2_hn_ratio-avg_obj_l2_ratio).to(self.device),
+                "avg_size_l2_gap": (avg_size_l2_hn_ratio-avg_obj_l2_ratio).to(self.device),
                 "avg_obj_cos_ratio": avg_obj_cos_ratio.to(self.device),
                 "avg_obj_cos": avg_obj_cos.to(self.device),
                 "avg_obj_cos_ctrast_en": avg_obj_cos_ctrast_en.to(self.device),
                 "avg_obj_cos_std": avg_cos_std.to(self.device),
                 "std_obj_cos_ratio": std_obj_cos_ratio.to(self.device),
+                "avg_obj_cos_gap": (avg_obj_cos_hn_ratio-avg_obj_cos_ratio).to(self.device),
+                "avg_color_cos_gap": (avg_color_cos_hn_ratio-avg_obj_cos_ratio).to(self.device),
+                "avg_mat_cos_gap": (avg_mat_cos_hn_ratio-avg_obj_cos_ratio).to(self.device),
+                "avg_shape_cos_gap": (avg_shape_cos_hn_ratio-avg_obj_cos_ratio).to(self.device),
+                "avg_size_cos_gap": (avg_size_cos_hn_ratio-avg_obj_cos_ratio).to(self.device),
                 "avg_obj_acos_ratio": avg_obj_acos_ratio.to(self.device),
                 "avg_obj_acos": avg_obj_acos.to(self.device),
                 "avg_obj_acos_ctrast_en": avg_obj_acos_ctrast_en.to(self.device),
                 "avg_obj_acos_std": avg_acos_std.to(self.device),
                 "std_obj_acos_ratio": std_obj_acos_ratio.to(self.device),
+                "avg_obj_acos_gap": (avg_obj_acos_hn_ratio-avg_obj_acos_ratio).to(self.device),
+                "avg_color_acos_gap": (avg_color_acos_hn_ratio-avg_obj_acos_ratio).to(self.device),
+                "avg_mat_acos_gap": (avg_mat_acos_hn_ratio-avg_obj_acos_ratio).to(self.device),
+                "avg_shape_acos_gap": (avg_shape_acos_hn_ratio-avg_obj_acos_ratio).to(self.device),
+                "avg_size_acos_gap": (avg_size_acos_hn_ratio-avg_obj_acos_ratio).to(self.device),
             }
 
             if self.trainer.running_sanity_check:
