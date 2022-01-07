@@ -143,9 +143,9 @@ class SlotAttentionMethod(pl.LightningModule):
 
         obj_greedy_losses_nodup_hn, color_greedy_losses_nodup_hn, mat_greedy_losses_nodup_hn, shape_greedy_losses_nodup_hn, size_greedy_losses_nodup_hn = [], [], [], [], []
         hn_greedy_losses_list = [obj_greedy_losses_nodup_hn, color_greedy_losses_nodup_hn, mat_greedy_losses_nodup_hn, shape_greedy_losses_nodup_hn, size_greedy_losses_nodup_hn]
-        obj_cos_losses_nodup_hn, color_cos_losses_nodup_hn, mat_cos_losses_nodup_hn, shape_cos_losses_nodup_hn, size_cos_losses_nodup_hn = [], [], [], []
+        obj_cos_losses_nodup_hn, color_cos_losses_nodup_hn, mat_cos_losses_nodup_hn, shape_cos_losses_nodup_hn, size_cos_losses_nodup_hn = [], [], [], [], []
         hn_cos_losses_list = [obj_cos_losses_nodup_hn, color_cos_losses_nodup_hn, mat_cos_losses_nodup_hn, shape_cos_losses_nodup_hn, size_cos_losses_nodup_hn]
-        obj_acos_losses_nodup_hn, color_acos_losses_nodup_hn, mat_acos_losses_nodup_hn, shape_acos_losses_nodup_hn, size_acos_losses_nodup_hn = [], [], [], []
+        obj_acos_losses_nodup_hn, color_acos_losses_nodup_hn, mat_acos_losses_nodup_hn, shape_acos_losses_nodup_hn, size_acos_losses_nodup_hn = [], [], [], [], []
         hn_acos_losses_list = [obj_acos_losses_nodup_hn, color_acos_losses_nodup_hn, mat_acos_losses_nodup_hn, shape_acos_losses_nodup_hn, size_acos_losses_nodup_hn]
 
         with torch.no_grad():
@@ -178,8 +178,8 @@ class SlotAttentionMethod(pl.LightningModule):
                 CD = (cat_slots_two_fwd[: batch_size]-cat_slots_two_fwd[1*batch_size: 2*batch_size]).view(batch_size, -1)
                 CD_norm = torch.norm(CD, 2, -1)
                 CD_prime_norm = torch.norm(CD_prime, 2, -1)
-                cos_std_nodup.append(1.0-(torch.square(CD_norm)+torch.square(CD_prime_norm)-std_nodup[-1]).div(2*CD_norm*CD_prime_norm))
-                acos_std_nodup.append(torch.acos(torch.clamp(1.0-cos_std_nodup[-1], max=1.0)))
+                obj_cos_std_nodup.append(1.0-(torch.square(CD_norm)+torch.square(CD_prime_norm)-obj_greedy_std_nodup[-1]).div(2*CD_norm*CD_prime_norm))
+                obj_acos_std_nodup.append(torch.acos(torch.clamp(1.0-obj_cos_std_nodup[-1], max=1.0)))
 
                 cat_slots = cat_slots_nodup[:4*batch_size]
                 greedy_losses_nodup, cos_losses_nodup, acos_losses_nodup, cat_slots = compute_all_losses(cat_slots)
@@ -193,9 +193,9 @@ class SlotAttentionMethod(pl.LightningModule):
                 obj_acos_losses_nodup_en_D.append(acos_losses_nodup_en_D)
 
                 for ind in range(4, 9):
-                    slots_D_prime = cat_slots_nodup[ind*batch_size:(ind+1)*batch_size]
-                    cat_slots = torch.cat((slots_A, slots_B, slots_C, slots_D_prime), 0)
-                    greedy_losses_nodup, cos_losses_nodup, acos_losses_nodup = compute_all_losses(cat_slots)
+                    slots_D_prime = cat_slots_nodup[3*batch_size:4*batch_size] #cat_slots_nodup[ind*batch_size:(ind+1)*batch_size]
+                    cat_slots = torch.cat((cat_slots[:3*batch_size], slots_D_prime), 0)
+                    greedy_losses_nodup, cos_losses_nodup, acos_losses_nodup, _ = compute_all_losses(cat_slots)
                     hn_greedy_losses_list[ind-4].append(greedy_losses_nodup)
                     hn_cos_losses_list[ind-4].append(cos_losses_nodup)
                     hn_acos_losses_list[ind-4].append(acos_losses_nodup)

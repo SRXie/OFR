@@ -161,7 +161,7 @@ class CLEVRAlgebraTestset(Dataset):
         if test_type == "obj":
             self.test_root =  os.path.join(data_root, "obj_test_occ")
         else:
-            self.test_root =  os.path.join(data_root, f"{test_type}_test")
+            raise NotImplemented
         self.data_path = os.path.join(self.test_root, "images")
         self.max_n_objects = max_n_objects
         self.test_type = test_type
@@ -275,15 +275,6 @@ class CLEVRDataModule(pl.LightningDataModule):
             test_cases = obj_algebra_test_cases,
         )
 
-        self.attr_test_dataset = CLEVRAlgebraTestset(
-            data_root = self.test_root,
-            max_num_images=self.num_test_images,
-            clevr_transforms = self.clevr_transforms,
-            max_n_objects = self.max_n_objects,
-            test_type = "attr",
-            test_cases = attr_algebra_test_cases,
-        )
-
     def train_dataloader(self):
         def seed_worker(worker_id):
             worker_seed = torch.initial_seed() % 2**32
@@ -331,26 +322,6 @@ class CLEVRDataModule(pl.LightningDataModule):
         rand_sampler = RandomSampler(self.obj_test_dataset)
         return DataLoader(
             self.obj_test_dataset,
-            batch_size=self.test_batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-            pin_memory=True,
-            sampler=rand_sampler,
-            worker_init_fn=seed_worker,
-            generator=g,
-        )
-
-    def attr_test_dataloader(self):
-        def seed_worker(worker_id):
-            worker_seed = torch.initial_seed() % 2**32
-            numpy.random.seed(worker_seed)
-            random.seed(worker_seed)
-
-        g = torch.Generator()
-        g.manual_seed(0)
-        rand_sampler = RandomSampler(self.attr_test_dataset)
-        return DataLoader(
-            self.attr_test_dataset,
             batch_size=self.test_batch_size,
             shuffle=False,
             num_workers=self.num_workers,

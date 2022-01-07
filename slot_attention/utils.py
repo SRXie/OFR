@@ -5,6 +5,7 @@ from typing import Union
 
 import torch
 import random
+import math
 import numpy as np
 from scipy.special import comb
 from pytorch_lightning import Callback
@@ -363,10 +364,10 @@ def compute_bipartite_greedy_loss(slots_A, slots_E, cos_sim=False):
 
     return greedy_loss
 
-def get_all_losses(cat_slots):
+def compute_all_losses(cat_slots):
     greedy_losses, cat_indices = compute_greedy_loss(cat_slots)
     cat_slots = batched_index_select(cat_slots, 1, cat_indices)
-    slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots.view(4*batch_size, -1), batch_size, 0)
+    slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots.view(cat_slots.shape[0], -1), cat_slots.shape[0]//4, 0)
     DC_norm = torch.norm(slots_D-slots_C, 2, -1)
     AB_norm = torch.norm(slots_A-slots_B, 2, -1)
     cos_losses = 1.0-(torch.square(AB_norm)+torch.square(DC_norm)-greedy_losses).div(2*AB_norm*DC_norm)
@@ -374,7 +375,7 @@ def get_all_losses(cat_slots):
 
     return greedy_losses, cos_losses, acos_losses, cat_slots
 
-def summerize_losses(losses, losses_en):
+def summarize_losses(losses, losses_en):
     cat_losses = torch.cat(losses, 0)
     cat_losses_en = torch.cat([x for x in losses_en], 0)
     ratio = ((cat_losses_en-cat_losses).div(cat_losses_en))
@@ -382,6 +383,8 @@ def summerize_losses(losses, losses_en):
     avg_ratio = ratio.mean()
     avg_loss = cat_losses.mean()
     avg_ctrast_en = cat_losses_en.mean()-avg_loss
+    
+    return std_ratio, avg_ratio, avg_loss, avg_ctrast_en
 
 def compute_ari(table):
     """

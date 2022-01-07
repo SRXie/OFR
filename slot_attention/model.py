@@ -310,7 +310,7 @@ class SlotAttentionModel(nn.Module):
             if viz:
                 # Here we reconstruct D'
                 batch_size = batch_size//4
-                cat_indices = compute_greedy_loss(slots_nodup, []) #compute_pseudo_greedy_loss(slots, [])
+                _, cat_indices = compute_greedy_loss(slots_nodup) #compute_pseudo_greedy_loss(slots, [])
                 slots_nodup = batched_index_select(slots_nodup, 1, cat_indices) # batched_index_select(slots, 1, cat_indices)
                 recons_nodup = batched_index_select(recons_nodup, 1, cat_indices)
                 masks_nodup = batched_index_select(masks_nodup, 1, cat_indices)
