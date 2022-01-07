@@ -43,7 +43,7 @@ if INSIDE_BLENDER:
     print("$VERSION is your Blender version (such as 2.78).")
     sys.exit(1)
 
-ROOT = '/checkpoint/siruixie/clevr_obj_test/output/obj_test_occ_prep/12'
+ROOT = '/checkpoint/siruixie/clevr_obj_test/output/obj_test_occ_prep/8'
 parser = argparse.ArgumentParser()
 
 # Input options
@@ -180,6 +180,9 @@ def main(args):
   num_digits = 6
   prefix = '%s_%s_' % (args.filename_prefix, args.split)
   img_template = '%s%%0%dd.png' % (prefix, num_digits)
+  bg_template = '%s%%0%dd.png' % (prefix, num_digits)
+  mask_template = '%s%%0%dd.png' % (prefix, num_digits)
+  fgmask_template = '%s%%0%dd.png' % (prefix, num_digits)
   scene_template = '%s%%0%dd.json' % (prefix, num_digits)
   meta_template = '%s%%0%dd.json' % (prefix, num_digits)
   blend_template = '%s%%0%dd.blend' % (prefix, num_digits)
@@ -203,10 +206,9 @@ def main(args):
     args.output_scene_file=insert_test_to_dir(args.output_scene_file, True)
 
   img_template = os.path.join(args.output_image_dir, img_template)
-  bg_template = os.path.join(args.output_imgbg_dir, img_template)
-  fgmask_template = os.path.join(args.output_mask_dir, img_template)
-  mask_template = os.path.join(args.output_mask_dir, img_template)
-  fgmask_template = os.path.join(args.output_fgmask_dir, img_template)
+  bg_template = os.path.join(args.output_imgbg_dir, bg_template)
+  mask_template = os.path.join(args.output_mask_dir, mask_template)
+  fgmask_template = os.path.join(args.output_fgmask_dir, fgmask_template)
   scene_template = os.path.join(args.output_scene_dir, scene_template)
   meta_template = os.path.join(args.output_meta_dir, meta_template)
   blend_template = os.path.join(args.output_blend_dir, blend_template)
@@ -225,7 +227,7 @@ def main(args):
     os.makedirs(args.output_meta_dir)
   if args.save_blendfiles == 1 and not os.path.isdir(args.output_blend_dir):
     os.makedirs(args.output_blend_dir)
-  for attr in ["shape", "size", "color", "material"]
+  for attr in ["shape", "size", "color", "material"]:
     tmp_dir = args.output_image_dir.replace("images", attr)
     if not os.path.isdir(tmp_dir):
       os.makedirs(tmp_dir)
@@ -236,6 +238,7 @@ def main(args):
     img_path = img_template % (i + args.start_idx)
     bg_path = bg_template % (i + args.start_idx)
     mask_path = mask_template % (i + args.start_idx)
+    fgmask_path = fgmask_template % (i + args.start_idx)
     scene_path = scene_template % (i + args.start_idx)
     meta_path = meta_template % (i + args.start_idx)
     all_scene_paths.append(scene_path)
@@ -455,7 +458,8 @@ def render_subscene_obj(scene_struct, blender_objects, backgrounds, output_image
       scene_index += 1
 
       render_args = bpy.context.scene.render
-      render_args.filepath = output_image[:-4]+'_%04d' % scene_index+output_image[-4:]
+      curr_output_image =  output_image[:-4]+'_%04d' % scene_index+output_image[-4:]
+      render_args.filepath = curr_output_image
       mask_path = output_mask[:-4]+'_%04d' % scene_index+output_mask[-4:]
 
       for obj in blender_objects:
@@ -498,8 +502,8 @@ def render_subscene_obj(scene_struct, blender_objects, backgrounds, output_image
       with open(output_scene[:-5]+'_%04d' % scene_index+output_scene[-5:], 'w') as f:
         json.dump(sub_scene_struct.to_dictionary(), f, indent=2)
 
-      if args.attr_test:
-        render_subscene_attr(sub_scene_struct, blender_objects, render_args.filepath, args)
+      if args.attr_test and k >=4:
+        render_subscene_attr(sub_scene_struct, blender_objects, curr_output_image, args)
 
   # save map_objs_to_idx to json
   with open(output_meta, 'w') as f:
@@ -520,7 +524,6 @@ def render_subscene_attr(scene_struct, blender_objects, output_image, args):
 
     render_args = bpy.context.scene.render
     render_args.filepath = output_image.replace("images", attr)
-
     for b_obj in blender_objects:
       # Note: we may not need to delete all objects in multi-obj scene
       utils.delete_object(b_obj)
@@ -576,7 +579,7 @@ def add_random_objects(scene_struct, num_objects, output_mask, args, camera):
       if num_tries > args.max_retries:
         for obj in blender_objects:
           utils.delete_object(obj)
-        return add_random_objects(scene_struct, num_objects, args, camera)
+        return add_random_objects(scene_struct, num_objects, output_mask, args, camera)
       x = random.uniform(-3, 3)
       y = random.uniform(-3, 3)
       # Check to make sure the new object is further than min_dist from all
@@ -650,7 +653,7 @@ def add_random_objects(scene_struct, num_objects, output_mask, args, camera):
     print('Some objects are over occluded or not sufficiently occluded; replacing objects')
     for obj in blender_objects:
       utils.delete_object(obj)
-    return add_random_objects(scene_struct, num_objects, args, camera)
+    return add_random_objects(scene_struct, num_objects, output_mask, args, camera)
 
   return objects, blender_objects
 
