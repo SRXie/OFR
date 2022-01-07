@@ -115,7 +115,7 @@ def compute_cosine_loss(cat_zs, cos_losses, acos_losses):
     acos_loss = torch.acos(1.0-cos_loss)
     acos_losses.append(acos_loss)
 
-def compute_partition_loss(cat_zs, D_losses):
+def compute_shuffle_loss(cat_zs, D_losses):
     zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
     batch_size, z_dim = zs_A.shape
 
@@ -130,7 +130,7 @@ def compute_partition_loss(cat_zs, D_losses):
     # A_losses.append(A_loss)
     D_losses.append(D_loss.mean(1))
 
-def compute_partition_cosine_loss(cat_zs, cos_losses, acos_losses):
+def compute_shuffle_cosine_loss(cat_zs, cos_losses, acos_losses):
     zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
     batch_size, z_dim = zs_A.shape
 
@@ -147,19 +147,3 @@ def compute_partition_cosine_loss(cat_zs, cos_losses, acos_losses):
 
     cos_losses.append(cos_loss.mean(1))
     acos_losses.append(acos_loss.mean(1))
-
-def compute_partition_loss_hard(cat_zs, zs_E, zs_F, AE_losses, DF_losses):
-    zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
-    batch_size, z_dim = zs_A.shape
-    zs_D_prime = zs_A-zs_B+zs_C
-
-    zs_AD = torch.cat([zs_A, zs_D_prime], 0)
-    zs_EF = torch.cat([zs_E, zs_F], 0)
-
-    zs_delta = zs_AD - zs_EF
-    loss = -torch.norm(zs_delta, 2, -1)
-
-    AE_loss, DF_loss = torch.split(loss, batch_size, 0)
-
-    AE_losses.append(AE_loss)
-    DF_losses.append(DF_loss)

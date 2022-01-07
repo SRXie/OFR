@@ -13,7 +13,7 @@ from beta_vae.params import BetaVAEParams
 from beta_vae.utils import Tensor
 from beta_vae.utils import split_and_interleave_stack
 from beta_vae.utils import to_rgb_from_tensor, to_tensor_from_rgb
-from beta_vae.utils import compute_loss, compute_cosine_loss, compute_partition_loss, compute_partition_cosine_loss
+from beta_vae.utils import compute_loss, compute_cosine_loss, compute_shuffle_loss, compute_shuffle_cosine_loss
 
 
 class BetaVAEMethod(pl.LightningModule):
@@ -86,112 +86,97 @@ class BetaVAEMethod(pl.LightningModule):
         avg_loss = torch.stack([x["loss"] for x in outputs]).mean()
 
         # Algebra Test starts here
-        odl = self.datamodule.obj_test_dataloader()
-        adl = self.datamodule.attr_test_dataloader()
+        dl = self.datamodule.obj_test_dataloader()
 
-        z_norm = []
-        obj_losses, obj_cos_losses, obj_acos_losses, attr_losses = [], [], [], []
+        obj_losses, obj_cos_losses, obj_acos_losses = [], [], []
         obj_losses_en_D, obj_cos_losses_en_D,  obj_acos_losses_en_D, attr_losses_en = [], [], [], []
 
-        def compute_test_losses(dataloader, losses, cos_losses, acos_losses, losses_en_D, cos_losses_en_D, acos_losses_en_D):
-            b_prev = datetime.now()
-            for batch in dataloader:
-                # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
-                batch_size = batch[0].shape[0]
-                cat_batch = torch.cat(batch[:4], 0)
-                if self.params.gpus > 0:
-                    cat_batch = cat_batch.to(self.device)
-                if self.trainer.running_sanity_check:
-                    cat_zs = cat_batch.view(batch_size*2, -1)
-                else:
-                    mu, log_var = self.model.encode(cat_batch)
-                    cat_zs = mu #self.model.reparameterize(mu, log_var).detach()
-
-                if dataloader is odl:
-                    znorm = torch.norm(cat_zs, 2, -1)
-                    znorm = torch.stack(torch.split(znorm, znorm.shape[0]//4, 0), 1).mean(1)
-                    z_norm.append(znorm)
-
-                cat_batch_EF = torch.cat(batch[4:], 0)
-                if self.params.gpus > 0:
-                    cat_batch_EF = cat_batch_EF.to(self.device)
-                if self.trainer.running_sanity_check:
-                    cat_zs_EF = cat_batch_EF.view(batch_size*2, -1)
-                else:
-                    EF_mu, EF_log_var = self.model.encode(cat_batch_EF)
-                    cat_zs_EF = EF_mu # self.model.reparameterize(EF_mu, EF_log_var).detach()
-                zs_E, zs_F = torch.split(cat_zs_EF, batch_size, 0)
-
-                zs_A = cat_zs[:batch_size]
-                compute_loss(cat_zs, losses)
-                compute_cosine_loss(cat_zs, cos_losses, acos_losses)
-
-                compute_partition_loss(cat_zs, losses_en_D)
-                compute_partition_cosine_loss(cat_zs, cos_losses_en_D, acos_losses_en_D)
-                # compute_partition_loss_hard(cat_zs, zs_E, zs_F, losses_hn_A, losses_hn_D)
+        obj_losses_hn, color_losses_hn, mat_losses_hn, shape_losses_hn, size_losses_hn = [], [], [], [], []
+        hn_losses_list = [obj_losses_hn, color_losses_hn, mat_losses_hn, shape_losses_hn, size_losses_hn]
+        obj_cos_losses_hn, color_cos_losses_hn, mat_cos_losses_hn, shape_cos_losses_hn, size_cos_losses_hn = [], [], [], [], []
+        hn_cos_losses_list = [obj_cos_losses_hn, color_cos_losses_hn, mat_cos_losses_hn, shape_cos_losses_hn, size_cos_losses_hn]
+        obj_acos_losses_hn, color_acos_losses_hn, mat_acos_losses_hn, shape_acos_losses_hn, size_acos_losses_hn = [], [], [], [], []
+        hn_acos_losses_list = [obj_acos_losses_hn, color_acos_losses_hn, mat_acos_losses_hn, shape_acos_losses_hn, size_acos_losses_hn]
 
         with torch.no_grad():
-            compute_test_losses(odl, obj_losses, obj_cos_losses, obj_acos_losses, obj_losses_en_D, obj_cos_losses_en_D, obj_acos_losses_en_D)
-            # compute_test_losses(adl, attr_losses, attr_losses_en, attr_losses_hn)
+            for batch in dl:
+                # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
+                batch_size = batch[0].shape[0]
+                cat_batch = torch.cat(batch, 0)
+                if self.params.gpus > 0:
+                    cat_batch = cat_batch.to(self.device)
 
-            avg_z_norm = torch.cat(z_norm, 0).mean()
-            # avg_z_angle = torch.cat(z_angle, 0).mean()
-            # avg_scaling = torch.cat(scalings, 0).mean()
-            # avg_angle = torch.cat(angles, 0).mean()
-            # avg_scaling_delta = torch.cat(scaling_deltas, 0).mean()
-            # avg_angle_delta = torch.cat(angle_deltas, 0).mean()
-            # avg_scaling_ratio = torch.cat(scaling_ratios, 0).mean()
-            # avg_angle_ratio = torch.cat(angle_ratios, 0).mean()
-            # slot_std = torch.cat(obj_greedy_std_nodup, 0)
-            # avg_slot_std = slot_std.mean()
+                mu, log_var = self.model.encode(cat_batch)
+                cat_zs = mu #self.model.reparameterize(mu, log_var).detach()
 
-            obj_l2 = torch.cat(obj_losses, 0)
-            obj_l2_en_D = torch.cat([x for x in obj_losses_en_D], 0)
-            obj_l2_ratio = ((obj_l2_en_D-obj_l2).div(obj_l2_en_D))
-            std_obj_l2_ratio = obj_l2_ratio.std()/math.sqrt(obj_l2_ratio.shape[0])
-            avg_obj_l2_ratio = obj_l2_ratio.mean()
-            avg_obj_l2 = obj_l2.mean()
-            avg_obj_l2_ctrast_en = obj_l2_en_D.mean()-avg_obj_l2
+                compute_loss(cat_zs[:4*batch_size], obj_losses)
+                compute_cosine_loss(cat_zs[:4*batch_size], obj_cos_losses, obj_acos_losses)
 
-            obj_cos = torch.cat(obj_cos_losses, 0)
-            obj_cos_en_D = torch.cat([x for x in obj_cos_losses_en_D], 0)
-            obj_cos_ratio = ((obj_cos_en_D-obj_cos).div(obj_cos_en_D))
-            std_obj_cos_ratio = obj_cos_ratio.std()/math.sqrt(obj_cos_ratio.shape[0])
-            avg_obj_cos_ratio = obj_cos_ratio.mean()
-            avg_obj_cos = obj_cos.mean()
-            avg_obj_cos_ctrast_en = obj_cos_en_D.mean()-avg_obj_cos
+                compute_shuffle_loss(cat_zs[:4*batch_size], obj_losses_en_D)
+                compute_shuffle_cosine_loss(cat_zs[:4*batch_size], obj_cos_losses_en_D, obj_acos_losses_en_D)
 
-            obj_acos = torch.cat(obj_acos_losses, 0)
-            obj_acos_en_D = torch.cat([x for x in obj_acos_losses_en_D], 0)
-            obj_acos_ratio = ((obj_acos_en_D-obj_acos).div(obj_acos_en_D))
-            std_obj_acos_ratio = obj_acos_ratio.std()/math.sqrt(obj_acos_ratio.shape[0])
-            avg_obj_acos_ratio = obj_acos_ratio.mean()
-            avg_obj_acos = obj_acos.mean()
-            avg_obj_acos_ctrast_en = obj_acos_en_D.mean()-avg_obj_acos
+                for ind in range(4, 9):
+                    zs_D_prime = cat_zs[3*batch_size:4*batch_size] #cat_zs[ind*batch_size:(ind+1)*batch_size]
+                    cat_zs = torch.cat((cat_zs[:3*batch_size], slots_D_prime), 0)
+                    compute_loss(cat_zs[:4*batch_size], hn_losses_list[ind-4])
+                    compute_cosine_loss(cat_zs[:4*batch_size], hn_cos_losses_list[ind-4], hn_acos_losses_list[ind-4])
+
+            std_obj_l2_ratio, avg_obj_l2_ratio, avg_obj_l2, avg_obj_l2_ctrast_en = summarize_losses(obj_losses_nodup, obj_losses_en_D)
+            std_obj_cos_ratio, avg_obj_cos_ratio, avg_obj_cos, avg_obj_cos_ctrast_en = summarize_losses(obj_cos_losses_nodup, obj_cos_losses_en_D)
+            std_obj_acos_ratio, avg_obj_acos_ratio, avg_obj_acos, avg_obj_acos_ctrast_en = summarize_losses(obj_acos_losses_nodup, obj_acos_losses_en_D)
+
+            _, avg_obj_l2_hn_ratio, _, _ = summarize_losses(obj_losses_hn, obj_losses_en_D)
+            _, avg_obj_cos_hn_ratio, _, _ = summarize_losses(obj_cos_losses_hn, obj_cos_losses_en_D)
+            _, avg_obj_acos_hn_ratio, _, _ = summarize_losses(obj_acos_losses_hn, obj_acos_losses_en_D)
+
+            _, avg_color_l2_hn_ratio, _, _ = summarize_losses(color_losses_hn, obj_losses_en_D)
+            _, avg_color_cos_hn_ratio, _, _ = summarize_losses(color_cos_losses_hn, obj_cos_losses_en_D)
+            _, avg_color_acos_hn_ratio, _, _ = summarize_losses(color_acos_losses_hn, obj_acos_losses_en_D)
+
+            _, avg_mat_l2_hn_ratio, _, _ = summarize_losses(mat_losses_hn, obj_losses_en_D)
+            _, avg_mat_cos_hn_ratio, _, _ = summarize_losses(mat_cos_losses_hn, obj_cos_losses_en_D)
+            _, avg_mat_acos_hn_ratio, _, _ = summarize_losses(mat_acos_losses_hn, obj_acos_losses_en_D)
+
+            _, avg_shape_l2_hn_ratio, _, _ = summarize_losses(shape_losses_hn, obj_losses_en_D)
+            _, avg_shape_cos_hn_ratio, _, _ = summarize_losses(shape_cos_losses_hn, obj_cos_losses_en_D)
+            _, avg_shape_acos_hn_ratio, _, _ = summarize_losses(shape_acos_losses_hn, obj_acos_losses_en_D)
+
+            _, avg_size_l2_hn_ratio, _, _ = summarize_losses(size_losses_hn, obj_losses_en_D)
+            _, avg_size_cos_hn_ratio, _, _ = summarize_losses(size_cos_losses_hn, obj_cos_losses_en_D)
+            _, avg_size_acos_hn_ratio, _, _ = summarize_losses(size_acos_losses_hn, obj_acos_losses_en_D)
 
             logs = {
                 "avg_val_loss": avg_loss,
-                "avg_z_norm": avg_z_norm.to(self.device),
-                # "avg_z_angle": avg_z_angle.to(self.device),
-                # "avg_scaling": avg_scaling.to(self.device),
-                # "avg_angle": avg_angle.to(self.device),
-                # "avg_scaling_delta": avg_scaling_delta.to(self.device),
-                # "avg_angle_delta": avg_angle_delta.to(self.device),
-                # "avg_scaling_ratio": avg_scaling_ratio.to(self.device),
-                # "avg_angle_ratio": avg_angle_ratio.to(self.device),
-                # "avg_slot_std": avg_slot_std.to(self.device),
                 "avg_obj_l2_ratio": avg_obj_l2_ratio.to(self.device),
                 "avg_obj_l2": avg_obj_l2.to(self.device),
                 "avg_obj_l2_ctrast_en": avg_obj_l2_ctrast_en.to(self.device),
+                "avg_obj_l2_std": avg_l2_std.to(self.device),
                 "std_obj_l2_ratio": std_obj_l2_ratio.to(self.device),
+                "avg_obj_l2_gap": (avg_obj_l2_hn_ratio-avg_obj_l2_ratio).to(self.device),
+                "avg_color_l2_gap": (avg_color_l2_hn_ratio-avg_obj_l2_ratio).to(self.device),
+                "avg_mat_l2_gap": (avg_mat_l2_hn_ratio-avg_obj_l2_ratio).to(self.device),
+                "avg_shape_l2_gap": (avg_shape_l2_hn_ratio-avg_obj_l2_ratio).to(self.device),
+                "avg_size_l2_gap": (avg_size_l2_hn_ratio-avg_obj_l2_ratio).to(self.device),
                 "avg_obj_cos_ratio": avg_obj_cos_ratio.to(self.device),
                 "avg_obj_cos": avg_obj_cos.to(self.device),
                 "avg_obj_cos_ctrast_en": avg_obj_cos_ctrast_en.to(self.device),
+                "avg_obj_cos_std": avg_cos_std.to(self.device),
                 "std_obj_cos_ratio": std_obj_cos_ratio.to(self.device),
+                "avg_obj_cos_gap": (avg_obj_cos_hn_ratio-avg_obj_cos_ratio).to(self.device),
+                "avg_color_cos_gap": (avg_color_cos_hn_ratio-avg_obj_cos_ratio).to(self.device),
+                "avg_mat_cos_gap": (avg_mat_cos_hn_ratio-avg_obj_cos_ratio).to(self.device),
+                "avg_shape_cos_gap": (avg_shape_cos_hn_ratio-avg_obj_cos_ratio).to(self.device),
+                "avg_size_cos_gap": (avg_size_cos_hn_ratio-avg_obj_cos_ratio).to(self.device),
                 "avg_obj_acos_ratio": avg_obj_acos_ratio.to(self.device),
                 "avg_obj_acos": avg_obj_acos.to(self.device),
                 "avg_obj_acos_ctrast_en": avg_obj_acos_ctrast_en.to(self.device),
+                "avg_obj_acos_std": avg_acos_std.to(self.device),
                 "std_obj_acos_ratio": std_obj_acos_ratio.to(self.device),
+                "avg_obj_acos_gap": (avg_obj_acos_hn_ratio-avg_obj_acos_ratio).to(self.device),
+                "avg_color_acos_gap": (avg_color_acos_hn_ratio-avg_obj_acos_ratio).to(self.device),
+                "avg_mat_acos_gap": (avg_mat_acos_hn_ratio-avg_obj_acos_ratio).to(self.device),
+                "avg_shape_acos_gap": (avg_shape_acos_hn_ratio-avg_obj_acos_ratio).to(self.device),
+                "avg_size_acos_gap": (avg_size_acos_hn_ratio-avg_obj_acos_ratio).to(self.device),
             }
             if self.trainer.running_sanity_check:
                 self.trainer.running_sanity_check = False  # so that loggers don't skip logging

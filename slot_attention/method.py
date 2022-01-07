@@ -135,11 +135,11 @@ class SlotAttentionMethod(pl.LightningModule):
         dup_threshold = self.params.dup_threshold
 
         obj_greedy_losses_nodup, obj_greedy_std_nodup = [], []
-        obj_greedy_losses_nodup_en_A, obj_greedy_losses_nodup_en_D, attr_greedy_losses_nodup_en = [], [], []
+        obj_greedy_losses_nodup_en_A, obj_greedy_losses_nodup_en_D = [], []
         obj_cos_losses_nodup, obj_cos_std_nodup = [], []
-        obj_cos_losses_nodup_en_A, obj_cos_losses_nodup_en_D, attr_greedy_losses_nodup_en = [], [], []
+        obj_cos_losses_nodup_en_A, obj_cos_losses_nodup_en_D = [], []
         obj_acos_losses_nodup, obj_acos_std_nodup = [], []
-        obj_acos_losses_nodup_en_A, obj_acos_losses_nodup_en_D, attr_acos_losses_nodup_en = [], [], []
+        obj_acos_losses_nodup_en_A, obj_acos_losses_nodup_en_D = [], []
 
         obj_greedy_losses_nodup_hn, color_greedy_losses_nodup_hn, mat_greedy_losses_nodup_hn, shape_greedy_losses_nodup_hn, size_greedy_losses_nodup_hn = [], [], [], [], []
         hn_greedy_losses_list = [obj_greedy_losses_nodup_hn, color_greedy_losses_nodup_hn, mat_greedy_losses_nodup_hn, shape_greedy_losses_nodup_hn, size_greedy_losses_nodup_hn]
