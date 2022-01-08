@@ -194,7 +194,7 @@ class SlotAttentionMethod(pl.LightningModule):
 
                 for ind in range(4, 9):
                     if ind == 4:
-                        slots_D_prime = cat_slots_nodup[-3*batch_size:-2*batch_size]
+                        slots_D_prime = cat_slots_nodup[-2*batch_size:-batch_size]
                     else:
                         slots_D_prime = cat_slots_nodup[3*batch_size:4*batch_size] #cat_slots_nodup[ind*batch_size:(ind+1)*batch_size]
                     cat_slots = torch.cat((cat_slots[:3*batch_size], slots_D_prime), 0)
@@ -242,7 +242,7 @@ class SlotAttentionMethod(pl.LightningModule):
                 "avg_obj_l2_ctrast_en": avg_obj_l2_ctrast_en.to(self.device),
                 "avg_obj_l2_std": avg_l2_std.to(self.device),
                 "std_obj_l2_ratio": std_obj_l2_ratio.to(self.device),
-                "avg_obj_l2_gap": torch.sum(avg_obj_l2_hn_ratio<avg_obj_l2_ratio).to(self.device),
+                "avg_obj_l2_gap": torch.sum(avg_obj_l2_hn_ratio-avg_obj_l2_ratio).mean().to(self.device),
                 "avg_color_l2_gap":torch.sum(avg_color_l2_hn_ratio<avg_obj_l2_ratio).to(self.device),
                 "avg_mat_l2_gap": torch.sum(avg_mat_l2_hn_ratio<avg_obj_l2_ratio).to(self.device),
                 "avg_shape_l2_gap": torch.sum(avg_shape_l2_hn_ratio<avg_obj_l2_ratio).to(self.device),
@@ -252,7 +252,7 @@ class SlotAttentionMethod(pl.LightningModule):
                 "avg_obj_cos_ctrast_en": avg_obj_cos_ctrast_en.to(self.device),
                 "avg_obj_cos_std": avg_cos_std.to(self.device),
                 "std_obj_cos_ratio": std_obj_cos_ratio.to(self.device),
-                "avg_obj_cos_gap": torch.sum(avg_obj_cos_hn_ratio<avg_obj_cos_ratio).to(self.device),
+                "avg_obj_cos_gap": torch.sum(avg_obj_cos_hn_ratio-avg_obj_cos_ratio).mean().to(self.device),
                 "avg_color_cos_gap": torch.sum(avg_color_cos_hn_ratio<avg_obj_cos_ratio).to(self.device),
                 "avg_mat_cos_gap": torch.sum(avg_mat_cos_hn_ratio<avg_obj_cos_ratio).to(self.device),
                 "avg_shape_cos_gap": torch.sum(avg_shape_cos_hn_ratio<avg_obj_cos_ratio).to(self.device),
@@ -262,7 +262,7 @@ class SlotAttentionMethod(pl.LightningModule):
                 "avg_obj_acos_ctrast_en": avg_obj_acos_ctrast_en.to(self.device),
                 "avg_obj_acos_std": avg_acos_std.to(self.device),
                 "std_obj_acos_ratio": std_obj_acos_ratio.to(self.device),
-                "avg_obj_acos_gap": torch.sum(avg_obj_acos_hn_ratio<avg_obj_acos_ratio).to(self.device),
+                "avg_obj_acos_gap": torch.sum(avg_obj_acos_hn_ratio-avg_obj_acos_ratio).mean().to(self.device),
                 "avg_color_acos_gap": torch.sum(avg_color_acos_hn_ratio<avg_obj_acos_ratio).to(self.device),
                 "avg_mat_acos_gap": torch.sum(avg_mat_acos_hn_ratio<avg_obj_acos_ratio).to(self.device),
                 "avg_shape_acos_gap": torch.sum(avg_shape_acos_hn_ratio<avg_obj_acos_ratio).to(self.device),
