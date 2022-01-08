@@ -19,8 +19,8 @@ from torch.utils.data import Dataset
 from torch.utils.data import RandomSampler
 from torchvision.transforms import transforms
 
-from slot_attention.utils import compact
-from clevr_obj_test.test_generation import obj_algebra_test, attr_algebra_test
+from utils import compact
+from clevr_obj_test.test_generation import obj_algebra_test
 
 
 class CLEVRDataset(Dataset):
@@ -150,7 +150,7 @@ class CLEVRAlgebraTestset(Dataset):
         max_num_images: Optional[int],
         clevr_transforms: Callable,
         max_n_objects: int = 10,
-        test_type: str = "obj", # or "attr"
+        test_type: str = "obj",
         test_cases: List[List[Optional[str]]] = None,
         num_test_cases: int = 50000,
     ):
@@ -166,7 +166,7 @@ class CLEVRAlgebraTestset(Dataset):
         self.max_n_objects = max_n_objects
         self.test_type = test_type
         assert os.path.exists(self.data_root), f"Path {self.data_root} does not exist"
-        assert self.test_type == "obj" or self.test_type == "attr"
+        assert self.test_type == "obj"
         assert os.path.exists(self.data_path), f"Path {self.data_path} does not exist"
         if test_cases:
             self.img_files = test_cases
@@ -195,11 +195,9 @@ class CLEVRAlgebraTestset(Dataset):
         while (self.max_num_main_scenes is None or i < self.max_num_main_scenes) and i < total_num_main_scenes:
             num_objects_in_scene = len(scene["scenes"][i]["objects"])
             # if num_objects_in_scene <= self.max_n_objects:
-            # First, call obj_algebra_test or attr_algebra_test with this scene to generate path tuples for A-B+C=D
+            # First, call obj_algebra_test with this scene to generate path tuples for A-B+C=D
             if self.test_type == 'obj':
                 image_paths = obj_algebra_test(self.test_root, i)
-            elif self.test_type == 'attr':
-                image_paths = attr_algebra_test(self.test_root, i)
             else:
                 raise NotImplementedError
             # Then, assert the existence of these paths
@@ -234,7 +232,6 @@ class CLEVRDataModule(pl.LightningDataModule):
         data_weights: Dict=None,
         val_list: List[List[Optional[str]]] = None,
         obj_algebra_test_cases: List[List[Optional[str]]] = None,
-        attr_algebra_test_cases: List[List[Optional[str]]] = None,
     ):
         super().__init__()
         self.data_root = data_root
@@ -326,9 +323,9 @@ class CLEVRDataModule(pl.LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=True,
-            sampler=rand_sampler,
+            # sampler=rand_sampler,
             worker_init_fn=seed_worker,
-            generator=g,
+            # generator=g,
         )
 
 

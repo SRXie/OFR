@@ -227,13 +227,6 @@ def compute_greedy_loss(cat_slots, cos_sim=False):
 
     return greedy_loss, cat_indices_holder
 
-def compute_cosine_loss(cat_slots_sorted):
-    slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots_sorted, cat_slots_sorted.shape[0]//4, 0)
-    vector_AB = (slots_A - slots_B).div(torch.norm(slots_A - slots_B, 2, -1).unsqueeze(-1).repeat(1, 1, cat_slots.shape[2])+0.0001)
-    vector_DC = (slots_D - slots_C).div(torch.norm(slots_D - slots_C, 2, -1).unsqueeze(-1).repeat(1, 1, cat_slots.shape[2])+0.0001)
-    cos_loss = torch.norm(vector_AB-vector_DC, 2, -1)/2
-    return cos_loss.mean(1)
-
 def compute_shuffle_greedy_loss(cat_slots_sorted, cos_sim=False):
     slots_A, slots_B, slots_C, slots_D = torch.split(cat_slots_sorted, cat_slots_sorted.shape[0]//4, 0)
     slots_Aa, slots_Bb, slots_Cc, slots_Dd = torch.split(cat_slots_sorted.clone(), cat_slots_sorted.shape[0]//4, 0)
@@ -385,6 +378,59 @@ def summarize_losses(losses, losses_en):
     avg_ctrast_en = cat_losses_en.mean()-avg_loss
 
     return std_ratio, avg_ratio, avg_loss, avg_ctrast_en
+
+def compute_loss(cat_zs, losses):
+    zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
+    # print(torch.cat([zs_A.unsqueeze(-1), zs_B.unsqueeze(-1), zs_C.unsqueeze(-1), zs_D.unsqueeze(-1)], -1))
+    batch_size, z_dim = zs_A.shape
+    # vector_ABC = (zs_A - zs_B+zs_C).div(torch.norm(zs_A - zs_B+zs_C, 2, -1).unsqueeze(-1).repeat(1, cat_zs.shape[1]))
+    # vector_D = (zs_D).div(torch.norm(zs_D, 2, -1).unsqueeze(-1).repeat(1, cat_zs.shape[1]))
+    # cos_loss = torch.square(vector_ABC-vector_D).sum(-1)/2
+    # loss = torch.acos(1.0-cos_loss)
+    loss = torch.square(zs_A-zs_B+zs_C-zs_D).sum(-1)
+    losses.append(loss)
+
+def compute_cosine_loss(cat_zs, cos_losses, acos_losses):
+    zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
+    vector_AB = (zs_A - zs_B).div(torch.norm(zs_A - zs_B, 2, -1).unsqueeze(-1).repeat(1, cat_zs.shape[1]))
+    vector_DC = (zs_D - zs_C).div(torch.norm(zs_D - zs_C, 2, -1).unsqueeze(-1).repeat(1, cat_zs.shape[1]))
+    cos_loss = torch.square(vector_AB-vector_DC).sum(-1)/2
+    cos_losses.append(cos_loss)
+    acos_loss = torch.acos(1.0-cos_loss)
+    acos_losses.append(acos_loss)
+
+def compute_shuffle_loss(cat_zs, D_losses):
+    zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
+    batch_size, z_dim = zs_A.shape
+
+    zs_A_delta = zs_A.view(batch_size, 1, z_dim) - zs_A.view(1, batch_size, z_dim)
+    A_loss = -torch.norm(zs_A_delta, 2, -1)
+
+    zs_D_prime = zs_A-zs_B+zs_C
+    zs_D = zs_D.view(1, batch_size, z_dim).repeat(batch_size, 1, 1)
+    zs_D_prime = zs_D_prime.view(batch_size, 1, z_dim).repeat(1, batch_size, 1)
+    zs_D_delta = zs_D_prime - zs_D
+    D_loss = torch.square(zs_D_delta).sum(-1)
+    # A_losses.append(A_loss)
+    D_losses.append(D_loss.mean(1))
+
+def compute_shuffle_cosine_loss(cat_zs, cos_losses, acos_losses):
+    zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
+    batch_size, z_dim = zs_A.shape
+
+    zs_A_delta = zs_A.view(batch_size, 1, z_dim) - zs_A.view(1, batch_size, z_dim)
+    A_loss = -torch.norm(zs_A_delta, 2, -1)
+
+    vector_AB = (zs_A - zs_B).div(torch.norm(zs_A - zs_B, 2, -1).unsqueeze(-1).repeat(1, cat_zs.shape[1]))
+    vector_DC = (zs_D - zs_C).div(torch.norm(zs_D - zs_C, 2, -1).unsqueeze(-1).repeat(1, cat_zs.shape[1]))
+    vector_AB = vector_AB.view(1, batch_size, z_dim).repeat(batch_size, 1, 1)
+    vector_DC = vector_DC.view(batch_size, 1, z_dim).repeat(1, batch_size, 1)
+    cos_loss = torch.square(vector_AB-vector_DC).sum(-1)/2
+    acos_loss = torch.acos(1.0-cos_loss)
+    # D_loss = -torch.acos((torch.square(vector_AB).sum(-1)+torch.square(vector_DC).sum(-1)-torch.square(delta).sum(-1))/2.0)
+
+    cos_losses.append(cos_loss.mean(1))
+    acos_losses.append(acos_loss.mean(1))
 
 def compute_ari(table):
     """

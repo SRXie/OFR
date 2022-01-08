@@ -14,12 +14,11 @@ from pytorch_lightning.utilities.seed import seed_everything
 from torchvision import transforms
 import pandas as pd
 
-from slot_attention.data import CLEVRDataModule
-from slot_attention.method import SlotAttentionMethod
-from slot_attention.model import SlotAttentionModel
-# from slot_attention.params import SlotAttentionParams
-from slot_attention.utils import ImageLogCallback
-from slot_attention.utils import rescale
+from data import CLEVRDataModule
+from method import SlotAttentionMethod
+from models.slot_attention import SlotAttentionModel
+from utils import ImageLogCallback
+from utils import rescale
 
 
 # def main(params: Optional[SlotAttentionParams] = None):
