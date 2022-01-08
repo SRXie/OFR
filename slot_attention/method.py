@@ -237,7 +237,7 @@ class SlotAttentionMethod(pl.LightningModule):
             logs = {
                 "avg_val_loss": avg_loss,
                 "avg_ari_mask": avg_ari_mask,
-                "avg_obj_l2_ratio": avg_obj_l2_ratio.to(self.device).,
+                "avg_obj_l2_ratio": avg_obj_l2_ratio.to(self.device),
                 "avg_obj_l2": avg_obj_l2.to(self.device),
                 "avg_obj_l2_ctrast_en": avg_obj_l2_ctrast_en.to(self.device),
                 "avg_obj_l2_std": avg_l2_std.to(self.device),
