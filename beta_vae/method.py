@@ -109,11 +109,19 @@ class BetaVAEMethod(pl.LightningModule):
                 mu, log_var = self.model.encode(cat_batch)
                 cat_zs = mu #self.model.reparameterize(mu, log_var).detach()
 
-                compute_loss(cat_zs[:4*batch_size], obj_losses)
-                compute_cosine_loss(cat_zs[:4*batch_size], obj_cos_losses, obj_acos_losses)
+                if self.trainer.running_sanity_check:
+                    compute_loss(cat_batch[:4*batch_size].view(4*batch_size, -1), obj_losses)
+                    compute_cosine_loss(cat_batch[:4*batch_size].view(4*batch_size, -1), obj_cos_losses, obj_acos_losses)
 
-                compute_shuffle_loss(cat_zs[:4*batch_size], obj_losses_en_D)
-                compute_shuffle_cosine_loss(cat_zs[:4*batch_size], obj_cos_losses_en_D, obj_acos_losses_en_D)
+                    compute_shuffle_loss(cat_batch[:4*batch_size].view(4*batch_size, -1), obj_losses_en_D)
+                    compute_shuffle_cosine_loss(cat_batch[:4*batch_size].view(4*batch_size, -1), obj_cos_losses_en_D, obj_acos_losses_en_D)
+                
+                else:
+                    compute_loss(cat_zs[:4*batch_size], obj_losses)
+                    compute_cosine_loss(cat_zs[:4*batch_size], obj_cos_losses, obj_acos_losses)
+
+                    compute_shuffle_loss(cat_zs[:4*batch_size], obj_losses_en_D)
+                    compute_shuffle_cosine_loss(cat_zs[:4*batch_size], obj_cos_losses_en_D, obj_acos_losses_en_D)
 
                 for ind in range(4, 9):
                     if ind == 4:
