@@ -11,8 +11,8 @@ from utils import Tensor
 from utils import to_rgb_from_tensor, to_tensor_from_rgb
 from utils import compute_cos_distance, compute_rank_correlation
 from utils import batched_index_select
-from utils import compute_greedy_loss, compute_cosine_loss
-from utils import compute_shuffle_greedy_loss, compute_bipartite_greedy_loss
+from utils import compute_greedy_loss, compute_loss, compute_cosine_loss
+from utils import compute_shuffle_greedy_loss, compute_shuffle_loss, compute_shuffle_cosine_loss
 from utils import compute_all_losses, summarize_losses
 from utils import swap_bg_slot_back
 from utils import captioned_masked_recons
@@ -167,7 +167,8 @@ class ObjTestMethod(pl.LightningModule):
 
     def validation_epoch_end(self, outputs):
         avg_loss = torch.stack([x["loss"] for x in outputs]).mean()
-        avg_ari_mask = np.stack([x["mask_ari"] for x in outputs]).mean()
+        if self.params.model == "slot-attn":
+            avg_ari_mask = np.stack([x["mask_ari"] for x in outputs]).mean()
 
         # Algebra Test starts here
         dl = self.datamodule.obj_test_dataloader()
@@ -247,7 +248,7 @@ class ObjTestMethod(pl.LightningModule):
                     obj_cos_losses.append(cos_losses)
                     obj_acos_losses.append(acos_losses)
 
-                    losses_en_D, cos_losses_en_D, acos_losses_en_D = compute_shuffle_loss(cat_slots)
+                    losses_en_D, cos_losses_en_D, acos_losses_en_D = compute_shuffle_greedy_loss(cat_slots)
                     obj_losses_en_D.append(losses_en_D)
                     obj_cos_losses_en_D.append(cos_losses_en_D)
                     obj_acos_losses_en_D.append(acos_losses_en_D)

@@ -12,6 +12,7 @@ from pytorch_lightning.utilities.seed import seed_everything
 from torchvision import transforms
 import pandas as pd
 import numpy as np
+import torch
 
 from data import CLEVRDataModule
 from method import ObjTestMethod
@@ -56,13 +57,13 @@ class _Workplace(object):
             ]
         )
 
-        if os.path.exists(os.path.join(cfg.test_root, "obj_test_occ", "CLEVR_test_cases_tmp.csv")):
-            with open(os.path.join(cfg.test_root, "obj_test_occ", "CLEVR_test_cases_tmp.csv"), "r") as f:
+        if os.path.exists(os.path.join(cfg.test_root, "obj_test_occ_w", "CLEVR_test_cases.csv")):
+            with open(os.path.join(cfg.test_root, "obj_test_occ_w", "CLEVR_test_cases.csv"), "r") as f:
                 csv_reader = reader(f)
                 self.obj_algebra_test_cases = list(csv_reader)
         else:
             self.obj_algebra_test_cases = None
-            print(os.path.join(cfg.test_root, "obj_test_occ", "CLEVR_test_cases_tmp.csv")+" does not exist.")
+            print(os.path.join(cfg.test_root, "obj_test_occ_w", "CLEVR_test_cases.csv")+" does not exist.")
 
         if os.path.exists(os.path.join(cfg.val_root, "CLEVR_val_list.csv")):
             with open(os.path.join(cfg.val_root, "CLEVR_val_list.csv"), "r") as f:
@@ -128,10 +129,15 @@ class _Workplace(object):
         #     state_dict[key.replace('model.', '')] = state_dict.pop(key)
         # model.load_state_dict(state_dict)
 
+        # ckpt = torch.load("/private/home/siruixie/Sirui/OFR/outputs/objectness-test-occ/3ffr137j/checkpoints/epoch=243-step=87839.ckpt")
+        # state_dict = ckpt['state_dict']
+        # for key in list(state_dict.keys()):
+        #     state_dict[key.replace('model.', '')] = state_dict.pop(key)
+        # model.load_state_dict(state_dict)
         self.method = ObjTestMethod(model=model, datamodule=clevr_datamodule, params=cfg)
 
-        logger_name = cfg.model+"/"+self.dataset+"/s-" + str(seed)+"-dup-"+str(cfg.dup_threshold)
-        logger = pl_loggers.WandbLogger(project="objectness-test-occ", name=logger_name)
+        logger_name = cfg.model+"/"+self.dataset+"/s-" + str(seed)
+        logger = pl_loggers.WandbLogger(project="objectness-test-metric", name=logger_name)
 
         self.trainer = Trainer(
             logger=logger if cfg.is_logger_enabled else False,
