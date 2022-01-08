@@ -380,7 +380,7 @@ def summarize_losses(losses, losses_en):
     cat_losses_en = torch.cat([x for x in losses_en], 0)
     ratio = ((cat_losses_en-cat_losses).div(cat_losses_en))
     std_ratio = ratio.std()/math.sqrt(ratio.shape[0])
-    avg_ratio = ratio.mean()
+    avg_ratio = ratio
     avg_loss = cat_losses.mean()
     avg_ctrast_en = cat_losses_en.mean()-avg_loss
 

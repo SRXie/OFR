@@ -122,10 +122,12 @@ def obj_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0, decomposed=No
 
                         if np.abs(mask_A-mask_B+mask_C-mask_D).sum() > 1200.0: # 800 is the minimum number of visible pixels
                             # hard negative
-                            drop_idx = random.randint(0, len(subset_idx_list_A)-1)
+                            drop_idx_b = random.randint(0, len(subset_idx_list_B)-1)
 
-                            drop_idx = random.randint(0, len(subset_idx_list_D)-1)
-                            subset_idx_E = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_D[:drop_idx]+subset_idx_list_D[drop_idx+1:])]
+                            drop_idx_d = random.randint(0, len(subset_idx_list_D)-1)
+                            subset_idx_list_D[drop_idx_d] =  subset_idx_list_B[drop_idx_b]
+                            subset_idx_list_D = sorted(subset_idx_list_D)
+                            subset_idx_E = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_D)]
                             image_E_path = create_path(test_root, main_scene_idx, subset_idx_E, subset_idx_C, file_type="bgs")
 
                             image_F_path = image_D_path.replace("/images/", "/color/")
