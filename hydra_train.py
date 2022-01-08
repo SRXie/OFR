@@ -21,7 +21,6 @@ from utils import ImageLogCallback
 from utils import rescale
 
 
-# def main(params: Optional[SlotAttentionParams] = None):
 class _Workplace(object):
     def __init__(self, cfg):
 

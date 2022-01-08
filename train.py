@@ -11,15 +11,15 @@ from torchvision import transforms
 from slot_attention.data import CLEVRDataModule
 from slot_attention.method import SlotAttentionMethod
 from slot_attention.model import SlotAttentionModel
-from slot_attention.params import SlotAttentionParams
+from slot_attention.params import Params
 from slot_attention.utils import ImageLogCallback
 from slot_attention.utils import rescale
 from slot_attention.utils import set_seed_everywhere
 
 
-def main(params: Optional[SlotAttentionParams] = None):
+def main(params: Optional[Params] = None):
     if params is None:
-        params = SlotAttentionParams()
+        params = Params()
 
     assert params.num_slots > 1, "Must have at least 2 slots."
 

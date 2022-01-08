@@ -6,10 +6,7 @@ from torch import optim
 from torchvision import utils as vutils
 from torchvision.transforms import transforms
 
-
-from models.slot_attention import SlotAttentionModel
-from models.beta_vae import BetaTCVAE
-from params import SlotAttentionParams, BetaVAEParams
+from params import Params
 from utils import Tensor
 from utils import to_rgb_from_tensor, to_tensor_from_rgb
 from utils import compute_cos_distance, compute_rank_correlation
@@ -24,7 +21,7 @@ from utils import compute_corr_coef
 
 
 class ObjTestMethod(pl.LightningModule):
-    def __init__(self, model: SlotAttentionModel, datamodule: pl.LightningDataModule, params: SlotAttentionParams):
+    def __init__(self, model, datamodule: pl.LightningDataModule, params: Params):
         super().__init__()
         self.model = model
         self.datamodule = datamodule
@@ -36,7 +33,7 @@ class ObjTestMethod(pl.LightningModule):
         return self.model(input, **kwargs)
 
     def training_step(self, batch, batch_idx, optimizer_idx=0):
-        if self.model is BetaTCVAE:
+        if self.params.model == "btc-vae":
             results = self.forward(batch)
             train_loss = self.model.loss_function(*results,
                                             M_N = self.datamodule.train_batch_size/self.datamodule.num_train_images,
@@ -44,10 +41,12 @@ class ObjTestMethod(pl.LightningModule):
                                             batch_idx = batch_idx)
             logs = {key: val.item() for key, val in train_loss.items()}
             self.log_dict(logs, sync_dist=True)
-        elif self.model is SlotAttentionModel:
+        elif self.params.model == "slot-attn":
             train_loss = self.model.loss_function(batch)
             logs = {key: val.item() for key, val in train_loss.items()}
             self.log_dict(logs, sync_dist=True)
+        else:
+            raise NotImplementedError
         return train_loss
 
     def sample_images(self):
@@ -63,7 +62,7 @@ class ObjTestMethod(pl.LightningModule):
 
         with torch.no_grad():
 
-            if self.model is BetaTCVAE:
+            if self.params.model == "btc-vae":
                 recons = self.model.generate(batch)
                 batch = split_and_interleave_stack(batch, self.params.n_samples)
                 recons = split_and_interleave_stack(recons, self.params.n_samples)
@@ -154,13 +153,13 @@ class ObjTestMethod(pl.LightningModule):
     def validation_step(self, batch, batch_idx, optimizer_idx=0):
         # batch is a list of lengthn num_slots+1
         with torch.no_grad():
-            if self.model is BetaTCVAE:
+            if self.params.model == "btc-vae":
                 results = self.forward(batch[0])
                 val_loss = self.model.loss_function(*results,
                                                 M_N = self.datamodule.val_batch_size/self.datamodule.num_val_images,
                                                 optimizer_idx = optimizer_idx,
                                                 batch_idx = batch_idx)
-            elif self.model is SlotAttentionModel:
+            elif self.params.model == "slot-attn":
                 val_loss = self.model.loss_function(batch[0], batch[1:-1], batch[-1])
             else:
                 raise NotImplementedError
@@ -185,7 +184,7 @@ class ObjTestMethod(pl.LightningModule):
         hn_acos_losses_list = [obj_acos_losses_hn, color_acos_losses_hn, mat_acos_losses_hn, shape_acos_losses_hn, size_acos_losses_hn, snd_acos_losses_hn]
 
         with torch.no_grad():
-            if self.model is BetaTCVAE:
+            if self.params.model == "btc-vae":
                 for batch in dl:
                     # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
                     batch_size = batch[0].shape[0]
@@ -318,7 +317,7 @@ class ObjTestMethod(pl.LightningModule):
                 "avg_shape_acos_gap": (avg_obj_acos_ratio-avg_shape_acos_hn_ratio).to(self.device),
                 "avg_size_acos_gap": torch.sum(avg_obj_acos_ratio-avg_size_acos_hn_ratio).to(self.device),
             }
-            if self.model is SlotAttentionModel:
+            if self.params.model == "slot-attn":
                 logs["avg_ari_mask"] = avg_ari_mask
             if self.trainer.running_sanity_check:
                 self.trainer.running_sanity_check = False  # so that loggers don't skip logging
