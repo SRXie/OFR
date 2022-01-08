@@ -3,10 +3,10 @@ import math
 from torch import nn
 from torch.nn import functional as F
 from typing import List, Tuple
-from beta_vae.utils import Tensor
-from beta_vae.utils import conv_transpose_out_shape
-from beta_vae.utils import assert_shape
-from beta_vae.utils import build_grid
+from utils import Tensor
+from utils import conv_transpose_out_shape
+from utils import assert_shape
+from utils import build_grid
 
 
 class BetaVAE(nn.Module):

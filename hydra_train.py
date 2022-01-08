@@ -16,7 +16,7 @@ import numpy as np
 from data import CLEVRDataModule
 from method import ObjTestMethod
 from models.slot_attention import SlotAttentionModel
-from models.beta_vae.model import BetaVAE, BetaTCVAE
+from models.beta_vae import BetaVAE, BetaTCVAE
 from utils import ImageLogCallback
 from utils import rescale
 
@@ -100,7 +100,7 @@ class _Workplace(object):
                 num_iterations=cfg.num_iterations,
                 empty_cache=cfg.empty_cache,
             )
-        elif cfg.model == "btc-vae"
+        elif cfg.model == "btc-vae":
             if cfg.beta == 0.:
                 cfg.gamma =0.
 
@@ -112,13 +112,15 @@ class _Workplace(object):
                 beta=cfg.beta,
                 gamma=cfg.gamma,
             )
-        elif cfg.model == "bvae"
+        elif cfg.model == "bvae":
             model = BetaVAE(
                 latent_dim=cfg.latent_dim,
                 decoder_type=cfg.decoder_type,
                 beta=cfg.beta,
                 gamma=cfg.gamma,
             )
+        else:
+            raise NotImplementedError
 
         # The following code is for loading a saved checkpoint
         # ckpt = torch.load("path_to_checkpoint")

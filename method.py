@@ -5,11 +5,10 @@ import numpy as np
 from torch import optim
 from torchvision import utils as vutils
 from torchvision.transforms import transforms
-from datetime import datetime
 
 
-from model.slot_attention import SlotAttentionModel
-from model.beta_vae import BetaTCVAE
+from models.slot_attention import SlotAttentionModel
+from models.beta_vae import BetaTCVAE
 from params import SlotAttentionParams, BetaVAEParams
 from utils import Tensor
 from utils import to_rgb_from_tensor, to_tensor_from_rgb
@@ -163,6 +162,8 @@ class ObjTestMethod(pl.LightningModule):
                                                 batch_idx = batch_idx)
             elif self.model is SlotAttentionModel:
                 val_loss = self.model.loss_function(batch[0], batch[1:-1], batch[-1])
+            else:
+                raise NotImplementedError
         return val_loss
 
     def validation_epoch_end(self, outputs):
