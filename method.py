@@ -83,15 +83,20 @@ class ObjTestMethod(pl.LightningModule):
                 )
 
             else:
-
-                recon_combined, recons, masks, slots, attns, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold, viz=True)
+                if self.params.model == "slot-attn":
+                    recon_combined, recons, masks, slots, attns, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold, viz=True)
+                elif self.params.model == "iodine":
+                    recon_combined, recons, masks, slots, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold, viz=True)
+                else:
+                    raise NotImplementedError
 
                 # throw background slot back
                 cat_indices = swap_bg_slot_back(attns)
                 recons = batched_index_select(recons, 1, cat_indices)
                 masks = batched_index_select(masks, 1, cat_indices)
                 slots = batched_index_select(slots, 1, cat_indices)
-                attns = batched_index_select(attns, 2, cat_indices)
+                if self.params.model == "slot-attn":
+                    attns = batched_index_select(attns, 2, cat_indices)
                 # recons_nodup = batched_index_select(recons_nodup, 1, cat_indices)
                 # masks_nodup = batched_index_select(masks_nodup, 1, cat_indices)
                 # slots_nodup = batched_index_select(slots_nodup, 1, cat_indices)
@@ -101,19 +106,24 @@ class ObjTestMethod(pl.LightningModule):
                 recons_perm = batched_index_select(recons, 1, cat_indices)
                 masks_perm = batched_index_select(masks, 1, cat_indices)
                 slots_perm = batched_index_select(slots, 1, cat_indices)
-                attns_perm = batched_index_select(attns, 2, cat_indices)
-                masked_recons_perm, masked_attn_perm, recons_perm = captioned_masked_recons(recons_perm, masks_perm, slots_perm, attns_perm)
+                if self.params.model == "slot-attn":
+                    attns_perm = batched_index_select(attns, 2, cat_indices)
+                    masked_recons_perm, masked_attn_perm, recons_perm = captioned_masked_recons(recons_perm, masks_perm, slots_perm, attns_perm)
 
                 # No need to match again
                 # cat_indices_nodup = compute_greedy_loss(slots_nodup, [])
+                batch_list = []
+                batch_nodup = torch.cat((batch, batch[-self.params.n_samples:]), 0)
                 recons_perm_nodup = recons_nodup #batched_index_select(recons_nodup, 1, cat_indices_nodup)
                 masks_perm_nodup = masks_nodup #batched_index_select(masks_nodup, 1, cat_indices_nodup)
                 slots_perm_nodup = slots_nodup #batched_index_select(slots_nodup, 1, cat_indices_nodup)
-                attns_perm_nodup = torch.cat((attns, attns[-self.params.n_samples:]), 0)  #batched_index_select(attns, 2, cat_indices_nodup)
-                batch_list = []
-                batch_nodup = torch.cat((batch, batch[-self.params.n_samples:]), 0)
-                masked_recons_perm_nodup, masked_attn_perm_nodup, recons_perm_nodup = captioned_masked_recons(recons_perm_nodup, masks_perm_nodup, slots_perm_nodup, attns_perm_nodup)
-
+                if self.params.model == "slot-attn":
+                    attns_perm_nodup = torch.cat((attns, attns[-self.params.n_samples:]), 0)  #batched_index_select(attns, 2, cat_indices_nodup)
+                    masked_recons_perm_nodup, masked_attn_perm_nodup, recons_perm_nodup = captioned_masked_recons(recons_perm_nodup, masks_perm_nodup, slots_perm_nodup, attns_perm_nodup)
+                elif self.params.model == "iodine":
+                    masked_recons_perm_nodup, masked_attn_perm_nodup, recons_perm_nodup = captioned_masked_recons(recons_perm_nodup, masks_perm_nodup, slots_perm_nodup)
+                else:
+                    raise NotImplementedError
                 batch = split_and_interleave_stack(batch, self.params.n_samples)
                 recon_combined = split_and_interleave_stack(recon_combined, self.params.n_samples)
                 recons_perm = split_and_interleave_stack(recons_perm, self.params.n_samples)
@@ -229,7 +239,13 @@ class ObjTestMethod(pl.LightningModule):
                     cat_batch = torch.cat(batch+[batch[3]], 0)
                     if self.params.gpus > 0:
                         cat_batch = cat_batch.to(self.device)
-                    _, _, _, slots, _, _, _, _, slots_nodup = self.model.forward(cat_batch, slots_only=False, dup_threshold=dup_threshold, viz=False)
+
+                    if self.params.model == "slot-attn":
+                        _, _, _, slots, _, _, _, _, slots_nodup = self.model.forward(cat_batch, slots_only=False, dup_threshold=dup_threshold, viz=False)
+                    elif self.params.model == "iodine":
+                        _, _, _, slots, _, _, _, slots_nodup = self.model.forward(cat_batch, slots_only=False, dup_threshold=dup_threshold, viz=False)
+                    else:
+                        raise NotImplementedError
 
                     slots_nodup = slots_nodup.cpu()
                     slots_nodup_list.append(slots_nodup)
@@ -350,7 +366,12 @@ class ObjTestMethod(pl.LightningModule):
 
         scheduler = optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=warm_and_decay_lr_scheduler)
 
-        return (
-            [optimizer],
-            [{"scheduler": scheduler, "interval": "step",}],
-        )
+        if self.params.model == "slot-attn":
+            return (
+                [optimizer],
+                [{"scheduler": scheduler, "interval": "step",}],
+            )
+        else:
+            return (
+                [optimizer],
+            )
