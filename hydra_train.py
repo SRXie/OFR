@@ -128,7 +128,7 @@ class _Workplace(object):
                 resolution = cfg.resolution,
                 sigma = cfg.sigma,
                 use_layernorm=cfg.use_layernorm,
-                ):
+            )
         else:
             raise NotImplementedError
 

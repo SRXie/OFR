@@ -2,6 +2,19 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 import numpy as np
+import math
+import itertools
+
+from utils import Tensor
+from utils import assert_shape
+from utils import build_grid
+from utils import conv_transpose_out_shape
+from utils import compute_cos_distance
+from utils import batched_index_select
+from utils import compute_mask_ari
+from utils import to_rgb_from_tensor
+from utils import compute_corr_coef
+from utils import compute_greedy_loss, compute_pseudo_greedy_loss
 
 class IODINE(nn.Module):
     def __init__(self,
@@ -67,14 +80,12 @@ class IODINE(nn.Module):
 
         # these states are necessary for input encoding
         self.z = None
-        # output mean
-        self.mean = None
         # mask logits
         self.mask_logits = None
         # mask
-        self.mask = None
+        self.masks = None
         # output mean
-        self.mean = None
+        self.recons = None
         # p(x|z_k), dimension-wise
         self.log_likelihood = None
         # kl divergence KL(p(z_k|x)||p(z_k))
@@ -97,8 +108,9 @@ class IODINE(nn.Module):
 
         recon_combined = torch.sum(masks * recons, dim=1)
 
-        return recon_combined, masks, recons
+        return recon_combined, masks, recons, mask_logits
 
+    @torch.enable_grad()
     def encode(self, x):
         """
         Get z from images
@@ -133,7 +145,7 @@ class IODINE(nn.Module):
 
         return z
 
-    def forward(self, x):
+    def forward(self, x, dup_threshold=None, viz=False):
 
         slots = self.encode(x)
         batch_size, num_slots, slot_size = slots.shape
@@ -147,23 +159,24 @@ class IODINE(nn.Module):
             duplicated = torch.sum(duplicated, dim=1)
             duplicated_index = torch.nonzero(duplicated, as_tuple=True)
             # get blank slots
-            blank_slots = self.prior.sample()
+            blank_slots = self.prior.sample().to(slots_nodup.device)
             # fill in deuplicated slots with blank slots
             slots_nodup[duplicated_index[0], duplicated_index[1]] = blank_slots
 
-        recon_combined, masks, recons = self.decode(slots)
+        recon_combined, masks, recons, mask_logits = self.decode(slots)
 
         if dup_threshold:
             slots = slots.view(batch_size, num_slots, slot_size)
 
             masks_mass = masks.view(batch_size, num_slots, -1)
-            masks_mass = torch.where(masks_mass>=masks_nodup_mass.max(dim=1)[0].unsqueeze(1).repeat(1,recons.shape[1],1), masks_mass, torch.zeros_like(masks_mass)).sum(-1)
+            masks_mass = torch.where(masks_mass>=masks_mass.max(dim=1)[0].unsqueeze(1).repeat(1,recons.shape[1],1), masks_mass, torch.zeros_like(masks_mass)).sum(-1)
             invisible_index = torch.nonzero(masks_mass==0.0, as_tuple=True)
             slots_nodup[invisible_index[0], invisible_index[1]] = blank_slots
 
-            unnormalized_masks[duplicated_index[0], duplicated_index[1]] = -1000000.0*torch.ones_like(masks_nodup_mass[0,0])
-            masks_nodup = F.softmax(unnormalized_masks, dim=1)
-            recon_combined_nodup = torch.sum(recons_nodup * masks_nodup, dim=1)
+            mask_logits[duplicated_index[0], duplicated_index[1]] = -1000000.0*torch.ones_like(masks_mass[0,0])
+            masks_nodup = F.softmax(mask_logits, dim=1)
+            recons_nodup = recons
+            recon_combined_nodup = torch.sum(recons * masks_nodup, dim=1)
 
             if viz:
                 # Here we reconstruct D'
@@ -179,19 +192,21 @@ class IODINE(nn.Module):
                 # Here we mask the de-duplicated slots in generation
                 detect_blank_slots = slots_D_prime.clone()
                 detect_blank_slots = ((detect_blank_slots - blank_slots.unsqueeze(0)).sum(-1)==0.0).nonzero(as_tuple=True)
-                masks_D_prime[detect_blank_slots[0], detect_blank_slots[1]] = -10000.0*torch.ones_like(masks_D_prime[0,0])
                 masks_D_prime = F.softmax(mask_logits_D_prime, dim=1)
+                masks_D_prime[detect_blank_slots[0], detect_blank_slots[1]] = -10000.0*torch.ones_like(masks_D_prime[0,0])
                 recon_combined_D_prime = torch.sum(recons_D_prime * masks_D_prime, dim=1)
 
                 recon_combined_nodup = torch.cat(list(recon_combined_nodup.split(batch_size, 0))+[recon_combined_D_prime], 0)
                 recons_nodup = torch.cat(list(recons_nodup.split(batch_size, 0))+[recons_D_prime], 0)
                 masks_nodup = torch.cat(list(masks_nodup.split(batch_size, 0))+[masks_D_prime], 0)
                 slots_nodup = torch.cat(list(slots_nodup.split(batch_size, 0))+[slots_D_prime], 0)
+
             return recon_combined, recons, masks, slots, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup
 
         return recon_combined, masks, recons, slots
 
-    def loss_function(self, input, mask_gt=None, schema_gt=None):
+    @torch.enable_grad()
+    def loss_function(self, x, mask_gt=None, schema_gt=None):
         """
         :param x: (B, 3, H, W)
         :return: loss
@@ -223,10 +238,7 @@ class IODINE(nn.Module):
             self.posterior.update(mean_delta, logvar_delta)
 
         # final elbo
-        if mask_gt:
-            elbo, masks = self.elbo(x, return_masks=True)
-        else:
-            elbo = self.elbo(x)
+        elbo = self.elbo(x)
         elbos.append(elbo)
 
         elbo = 0
@@ -240,7 +252,7 @@ class IODINE(nn.Module):
         else:
             # compute ARI with mask gt
             # (batch_size, num_slots, 1, H, W) to (batch_size, num_slots, H, W)
-            pred_mask = torch.stack(masks.items(), 1)
+            pred_mask = self.masks.squeeze(2)
 
             batch_size, num_slots, H, W = pred_mask.size()
             mask_gt = to_rgb_from_tensor(torch.stack(mask_gt, 1)[:,:,0,:,:])
@@ -265,8 +277,8 @@ class IODINE(nn.Module):
                 "mask_ari": mask_ari,
             }
 
-
-    def elbo(self, x, return_masks=False):
+    @torch.enable_grad()
+    def elbo(self, x):
         """
         Single pass ELBO computation
         :param x: input, (B, 3, H, W)
@@ -319,7 +331,7 @@ class IODINE(nn.Module):
         # refer to the formula to see why this is the case
         # (B, 3, H, W)
         self.log_likelihood = torch.logsumexp(
-            torch.log(self.mask + 1e-12) + self.K_log_likelihood,
+            torch.log(self.masks + 1e-12) + self.K_log_likelihood,
             dim=1
         )
 
@@ -336,19 +348,17 @@ class IODINE(nn.Module):
         # logger.update(kl=kl)
         # logger.update(likelihood=log_likelihood)
 
-        masks = {}
-        for i in range(self.K):
-            masks['mask_{}'.format(i)] = self.masks[0, i, 0]
-        preds = {}
-        for i in range(self.K):
-            preds['pred_{}'.format(i)] = self.recons[0, i]
+        # masks = {}
+        # for i in range(self.K):
+        #     masks['mask_{}'.format(i)] = self.masks[0, i, 0]
+        # preds = {}
+        # for i in range(self.K):
+        #     preds['pred_{}'.format(i)] = self.recons[0, i]
 
         # logger.update(**masks)
         # logger.update(**preds)
-        if return_masks:
-            return elbo, masks
-        else:
-            return elbo
+        
+        return elbo
 
     def get_input_encoding(self, x):
         """
@@ -388,9 +398,9 @@ class IODINE(nn.Module):
             # (B, K, 3, H, W)
             encoding = x[:, None].repeat(1, self.K, 1, 1, 1)
         if 'means' in self.encodings:
-            encoding = torch.cat([encoding, self.mean], dim=2) if encoding is not None else self.mean
+            encoding = torch.cat([encoding, self.recons], dim=2) if encoding is not None else self.recons
         if 'mask' in self.encodings:
-            encoding = torch.cat([encoding, self.mask], dim=2) if encoding is not None else self.mask
+            encoding = torch.cat([encoding, self.masks], dim=2) if encoding is not None else self.masks
         if 'mask_logits' in self.encodings:
             encoding = torch.cat([encoding, self.mask_logits], dim=2) if encoding is not None else self.mask_logits
         if 'mask_posterior' in self.encodings:
@@ -403,12 +413,12 @@ class IODINE(nn.Module):
             encoding = torch.cat([encoding, K_likelihood], dim=2) if encoding is not None else K_likelihood
 
         if 'grad_means' in self.encodings:
-            mean_grad = self.mean.grad.detach()
+            mean_grad = self.recons.grad.detach()
             if self.use_layernorm:
                 mean_grad = self.layernorm(mean_grad)
             encoding = torch.cat([encoding, mean_grad], dim=2) if encoding is not None else mean_grad
         if 'grad_mask' in self.encodings:
-            mask_grad = self.mask.grad.detach()
+            mask_grad = self.masks.grad.detach()
             if self.use_layernorm:
                 mask_grad = self.layernorm(mask_grad)
             encoding = torch.cat([encoding, mask_grad], dim=2) if encoding is not None else mask_grad
@@ -431,11 +441,11 @@ class IODINE(nn.Module):
             K_log_likelihood = self.K_log_likelihood.sum(dim=2, keepdim=True)
             K_likelihood = torch.exp(K_log_likelihood)
             # likelihood = (B, 1, 1, H, W), self.mask (B, K, 1, H, W)
-            likelihood = (self.mask * K_likelihood).sum(dim=1, keepdim=True)
+            likelihood = (self.masks * K_likelihood).sum(dim=1, keepdim=True)
             # leave_one_out (B, K, 1, H, W)
-            leave_one_out = likelihood - self.mask * K_likelihood
+            leave_one_out = likelihood - self.masks * K_likelihood
             # finally, normalize
-            leave_one_out = leave_one_out / (1 - self.mask + 1e-5)
+            leave_one_out = leave_one_out / (1 - self.masks + 1e-5)
             if self.use_layernorm:
                 leave_one_out = self.layernorm(leave_one_out)
             encoding = torch.cat([encoding, leave_one_out], dim=2) if encoding is not None else leave_one_out
@@ -714,6 +724,7 @@ class Gaussian(nn.Module):
         self.init_logvar = nn.Parameter(data=torch.zeros(dim_latent))
 
     # def init_unit(self, size, device):
+    @torch.enable_grad()
     def init_unit(self, B, K):
         """
         Initialize to be a unit gaussian
@@ -727,6 +738,7 @@ class Gaussian(nn.Module):
         self.mean.retain_grad()
         self.logvar.retain_grad()
 
+    @torch.enable_grad()
     def sample(self):
         """
         Sample from current mean and dev
@@ -743,6 +755,7 @@ class Gaussian(nn.Module):
 
         return self.mean + dev * epsilon
 
+    @torch.enable_grad()
     def update(self, mean_delta, logvar_delta):
         """
         :param mean_delta: (B, L)

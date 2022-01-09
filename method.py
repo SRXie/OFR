@@ -41,7 +41,7 @@ class ObjTestMethod(pl.LightningModule):
                                             batch_idx = batch_idx)
             logs = {key: val.item() for key, val in train_loss.items()}
             self.log_dict(logs, sync_dist=True)
-        elif self.params.model == "slot-attn":
+        elif self.params.model == "slot-attn" or self.params.model == "iodine":
             train_loss = self.model.loss_function(batch)
             logs = {key: val.item() for key, val in train_loss.items()}
             self.log_dict(logs, sync_dist=True)
@@ -60,7 +60,7 @@ class ObjTestMethod(pl.LightningModule):
         if self.params.gpus > 0:
             batch = batch.to(self.device)
 
-        with torch.no_grad():
+        if True:
 
             if self.params.model == "btc-vae":
                 recons = self.model.generate(batch)
@@ -91,11 +91,11 @@ class ObjTestMethod(pl.LightningModule):
                     raise NotImplementedError
 
                 # throw background slot back
-                cat_indices = swap_bg_slot_back(attns)
-                recons = batched_index_select(recons, 1, cat_indices)
-                masks = batched_index_select(masks, 1, cat_indices)
-                slots = batched_index_select(slots, 1, cat_indices)
                 if self.params.model == "slot-attn":
+                    cat_indices = swap_bg_slot_back(attns)
+                    recons = batched_index_select(recons, 1, cat_indices)
+                    masks = batched_index_select(masks, 1, cat_indices)
+                    slots = batched_index_select(slots, 1, cat_indices)
                     attns = batched_index_select(attns, 2, cat_indices)
                 # recons_nodup = batched_index_select(recons_nodup, 1, cat_indices)
                 # masks_nodup = batched_index_select(masks_nodup, 1, cat_indices)
@@ -109,7 +109,10 @@ class ObjTestMethod(pl.LightningModule):
                 if self.params.model == "slot-attn":
                     attns_perm = batched_index_select(attns, 2, cat_indices)
                     masked_recons_perm, masked_attn_perm, recons_perm = captioned_masked_recons(recons_perm, masks_perm, slots_perm, attns_perm)
-
+                elif self.params.model == "iodine":
+                    masked_recons_perm, masked_attn_perm, recons_perm = captioned_masked_recons(recons_perm, masks_perm, slots_perm)
+                else:
+                    raise NotImplementedError
                 # No need to match again
                 # cat_indices_nodup = compute_greedy_loss(slots_nodup, [])
                 batch_list = []
@@ -162,14 +165,14 @@ class ObjTestMethod(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx, optimizer_idx=0):
         # batch is a list of lengthn num_slots+1
-        with torch.no_grad():
+        if True:
             if self.params.model == "btc-vae":
                 results = self.forward(batch[0])
                 val_loss = self.model.loss_function(*results,
                                                 M_N = self.datamodule.val_batch_size/self.datamodule.num_val_images,
                                                 optimizer_idx = optimizer_idx,
                                                 batch_idx = batch_idx)
-            elif self.params.model == "slot-attn":
+            elif self.params.model == "slot-attn" or self.params.model == "iodine":
                 val_loss = self.model.loss_function(batch[0], batch[1:-1], batch[-1])
             else:
                 raise NotImplementedError
@@ -177,7 +180,7 @@ class ObjTestMethod(pl.LightningModule):
 
     def validation_epoch_end(self, outputs):
         avg_loss = torch.stack([x["loss"] for x in outputs]).mean()
-        if self.params.model == "slot-attn":
+        if self.params.model == "slot-attn" or self.params.model == "iodine":
             avg_ari_mask = np.stack([x["mask_ari"] for x in outputs]).mean()
 
         # Algebra Test starts here
@@ -194,7 +197,7 @@ class ObjTestMethod(pl.LightningModule):
         obj_acos_losses_hn, color_acos_losses_hn, mat_acos_losses_hn, shape_acos_losses_hn, size_acos_losses_hn, snd_acos_losses_hn = [], [], [], [], [], []
         hn_acos_losses_list = [obj_acos_losses_hn, color_acos_losses_hn, mat_acos_losses_hn, shape_acos_losses_hn, size_acos_losses_hn, snd_acos_losses_hn]
 
-        with torch.no_grad():
+        if True:
             if self.params.model == "btc-vae":
                 for batch in dl:
                     # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
@@ -243,7 +246,7 @@ class ObjTestMethod(pl.LightningModule):
                     if self.params.model == "slot-attn":
                         _, _, _, slots, _, _, _, _, slots_nodup = self.model.forward(cat_batch, slots_only=False, dup_threshold=dup_threshold, viz=False)
                     elif self.params.model == "iodine":
-                        _, _, _, slots, _, _, _, slots_nodup = self.model.forward(cat_batch, slots_only=False, dup_threshold=dup_threshold, viz=False)
+                        _, _, _, slots, _, _, _, slots_nodup = self.model.forward(cat_batch, dup_threshold=dup_threshold, viz=False)
                     else:
                         raise NotImplementedError
 
@@ -334,7 +337,7 @@ class ObjTestMethod(pl.LightningModule):
                 "avg_shape_acos_gap": (avg_obj_acos_ratio-avg_shape_acos_hn_ratio).to(self.device),
                 "avg_size_acos_gap": torch.sum(avg_obj_acos_ratio-avg_size_acos_hn_ratio).to(self.device),
             }
-            if self.params.model == "slot-attn":
+            if self.params.model == "slot-attn" or self.params.model == "iodine":
                 logs["avg_ari_mask"] = avg_ari_mask
             if self.trainer.running_sanity_check:
                 self.trainer.running_sanity_check = False  # so that loggers don't skip logging
@@ -372,6 +375,4 @@ class ObjTestMethod(pl.LightningModule):
                 [{"scheduler": scheduler, "interval": "step",}],
             )
         else:
-            return (
-                [optimizer],
-            )
+            return optimizer

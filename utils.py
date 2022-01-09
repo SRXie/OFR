@@ -504,11 +504,6 @@ def swap_bg_slot_back(cat_attns):#, cat_slots, cat_slots_nodup):
     return cat_indices_holder
 
 def captioned_masked_recons(recons, masks, slots, attns=None):
-    cos_dis_pixel = compute_cos_distance(attns.permute(0,2,1)) # to have shape (batch_size, num_slot, emb_size)
-    pixel_dup_sim, pixel_dup_idx = torch.sort(cos_dis_pixel, dim=-1)
-    pixel_dup_sim = pixel_dup_sim[:,:,1]
-    pixel_dup_idx = pixel_dup_idx[:,:,1]
-
     cos_dis_feature = compute_cos_distance(slots)
     feature_dup_sim, feature_dup_idx = torch.sort(cos_dis_feature, dim=-1)
     feature_dup_sim = feature_dup_sim[:,:,1]
@@ -539,15 +534,6 @@ def captioned_masked_recons(recons, masks, slots, attns=None):
             img = transforms.ToTensor()(img)
             img = to_tensor_from_rgb(img)
             masked_recons[i,j] = img
-        for j in range(masked_recons.shape[1]):
-            img = transforms.ToPILImage()(masked_attns[i,j])
-            draw = ImageDraw.Draw(img)
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 8)
-            pixel_text = "attn: "+str(pixel_dup_idx[i,j].item())+" - {:.4f}".format(pixel_dup_sim[i,j].item())
-            draw.text((4,0), pixel_text, (0, 0, 0), font=font)
-            img = transforms.ToTensor()(img)
-            img = to_tensor_from_rgb(img)
-            masked_attns[i,j] = img
         for j in range(masked_recons.shape[1]):
             img = transforms.ToPILImage()(recons[i,j])
             draw = ImageDraw.Draw(img)

@@ -4,7 +4,7 @@ __pycache__/
 *.pyc
 outputs/
 multirun/
-core/
+core
 figures/
 generate_spreadsheet.py
 violin_plot.py
