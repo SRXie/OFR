@@ -18,7 +18,7 @@ from data import CLEVRDataModule
 from method import ObjTestMethod
 from models.slot_attention import SlotAttentionModel
 from models.beta_vae import BetaVAE, BetaTCVAE
-from models.iodine import IODINE
+from models.iodine_v2 import IODINE
 from utils import ImageLogCallback
 from utils import rescale
 
@@ -121,13 +121,19 @@ class _Workplace(object):
                 gamma=cfg.gamma,
             )
         elif cfg.model == "iodine":
+            # model = IODINE(
+            #     latent_dim = cfg.latent_dim,
+            #     num_iterations = cfg.num_iterations,
+            #     num_slots = cfg.num_slots,
+            #     resolution = cfg.resolution,
+            #     sigma = cfg.sigma,
+            #     use_layernorm=cfg.use_layernorm,
+            # )
             model = IODINE(
-                latent_dim = cfg.latent_dim,
-                num_iterations = cfg.num_iterations,
+                z_size= cfg.latent_dim,
+                resolution= cfg.resolution,
                 num_slots = cfg.num_slots,
-                resolution = cfg.resolution,
-                sigma = cfg.sigma,
-                use_layernorm=cfg.use_layernorm,
+                num_iters= cfg.num_iterations,
             )
         else:
             raise NotImplementedError
