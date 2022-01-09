@@ -503,7 +503,7 @@ def swap_bg_slot_back(cat_attns):#, cat_slots, cat_slots_nodup):
 
     return cat_indices_holder
 
-def captioned_masked_recons(recons, masks, slots, attns):
+def captioned_masked_recons(recons, masks, slots, attns=None):
     cos_dis_pixel = compute_cos_distance(attns.permute(0,2,1)) # to have shape (batch_size, num_slot, emb_size)
     pixel_dup_sim, pixel_dup_idx = torch.sort(cos_dis_pixel, dim=-1)
     pixel_dup_sim = pixel_dup_sim[:,:,1]
@@ -514,13 +514,14 @@ def captioned_masked_recons(recons, masks, slots, attns):
     feature_dup_sim = feature_dup_sim[:,:,1]
     feature_dup_idx = feature_dup_idx[:,:,1]
 
-    attn = attns.permute(0, 2, 1).view(recons.shape[0], recons.shape[1], recons.shape[3], recons.shape[4])
     masked_recons = recons * masks - (1 - masks)
     masked_recons = to_rgb_from_tensor(masked_recons)
     recons = to_rgb_from_tensor(recons)
     masked_attns = torch.zeros_like(recons)
     masked_attns[:,:,2,:,:] = masked_attns[:,:,2,:,:]+masks.squeeze(2)
-    masked_attns[:,:,0,:,:] = masked_attns[:,:,0,:,:]+attn
+    if not attns is None:
+        attn = attns.permute(0, 2, 1).view(recons.shape[0], recons.shape[1], recons.shape[3], recons.shape[4])
+        masked_attns[:,:,0,:,:] = masked_attns[:,:,0,:,:]+attn
     masked_attns = to_rgb_from_tensor(masked_attns)
 
     # TODO: We keep this mass instead of attn mass for now
