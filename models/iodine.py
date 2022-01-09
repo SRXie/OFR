@@ -111,7 +111,7 @@ class IODINE(nn.Module):
         return recon_combined, masks, recons, mask_logits
 
     @torch.enable_grad()
-    def encode(self, x):
+    def encode(self, x, training=False):
         """
         Get z from images
         :param x: (B, 3, H, W)
@@ -121,6 +121,7 @@ class IODINE(nn.Module):
         # self.posterior.init_unit((B, self.K, self.dim_latent), device=x.device)
         self.posterior.init_unit(B, self.K)
         self.lstm_hidden = None
+        elbos = []
         for i in range(self.n_iters):
             # compute ELBO
             elbo = self.elbo(x)
@@ -129,6 +130,8 @@ class IODINE(nn.Module):
             # this ensures that inference is invariant to batch size
 
             (B * elbo).backward(retain_graph=False)
+            if training:
+                elbos.append(elbo)
             # get inputs to the refinement network
             # (B, K, D, H, W), D depends on encoding
             input, latent = self.get_input_encoding(x)
@@ -143,11 +146,23 @@ class IODINE(nn.Module):
         # finally, sample z
         z = self.posterior.sample()
 
+        if training:
+            elbo = self.elbo(x)
+            elbos.append(elbo)
+
+            elbo = 0
+            for i, e in enumerate(elbos):
+                elbo = elbo + (i + 1) / len(elbos) * e
+            return z, elbo
+
         return z
 
-    def forward(self, x, dup_threshold=None, viz=False):
+    def forward(self, x, training=False, dup_threshold=None, viz=False):
 
-        slots = self.encode(x)
+        if training:
+            slots, elbo = self.encode(x, training)
+        else:
+            slots = self.encode(x)
         batch_size, num_slots, slot_size = slots.shape
 
         slots_nodup = slots.clone()
@@ -203,53 +218,22 @@ class IODINE(nn.Module):
 
             return recon_combined, recons, masks, slots, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup
 
-        return recon_combined, masks, recons, slots
+        return recon_combined, masks, recons, slots, elbo
 
-    @torch.enable_grad()
     def loss_function(self, x, mask_gt=None, schema_gt=None):
         """
         :param x: (B, 3, H, W)
         :return: loss
         """
         B, _, H, W = x.size()
-        # self.posterior.init_unit((B, self.K, self.dim_latent), device=x.device)
-        self.posterior.init_unit(B, self.K)
-        self.lstm_hidden = None
-        elbos = []
-        for i in range(self.n_iters):
-            # zero grad
-            # for param in self.decoder.parameters():
-            #     if param.grad is not None:
-            #         param.grad.data.zero_()
-            # compute ELBO
-
-            elbo = self.elbo(x)
-            # note this ELBO is averaged over batch, so way multiply
-            # by batch size to get a summed-over-batch version of elbo
-            # this ensures that inference is invariant to batch size
-            (B * elbo).backward(retain_graph=True)
-            elbos.append(elbo)
-
-            # get inputs to the refinement network
-            # (B, K, D, H, W), D depends on encoding
-            input, latent = self.get_input_encoding(x)
-
-            mean_delta, logvar_delta, self.lstm_hidden = self.refine(input, latent, self.lstm_hidden)
-            self.posterior.update(mean_delta, logvar_delta)
-
-        # final elbo
-        elbo = self.elbo(x)
-        elbos.append(elbo)
-
-        elbo = 0
-        for i, e in enumerate(elbos):
-            elbo = elbo + (i + 1) / len(elbos) * e
 
         if not mask_gt:
+            recon_combined, masks, recons, slots, elbo = self.forward(x, training=True)
             return {
                 "loss": -elbo,
             }
         else:
+            recon_combined, masks, recons, slots = self.forward(x, training=False)
             # compute ARI with mask gt
             # (batch_size, num_slots, 1, H, W) to (batch_size, num_slots, H, W)
             pred_mask = self.masks.squeeze(2)
@@ -357,7 +341,7 @@ class IODINE(nn.Module):
 
         # logger.update(**masks)
         # logger.update(**preds)
-        
+
         return elbo
 
     def get_input_encoding(self, x):
