@@ -41,7 +41,7 @@ class ObjTestMethod(pl.LightningModule):
                                             batch_idx = batch_idx)
             logs = {key: val.item() for key, val in train_loss.items()}
             self.log_dict(logs, sync_dist=True)
-        elif self.params.model == "slot-attn" or self.params.model == "iodine":
+        elif self.params.model == "slot-attn" or "iodine" in self.params.model:
             train_loss = self.model.loss_function(batch)
             logs = {key: val.item() for key, val in train_loss.items()}
             self.log_dict(logs, sync_dist=True)
@@ -85,7 +85,7 @@ class ObjTestMethod(pl.LightningModule):
             else:
                 if self.params.model == "slot-attn":
                     recon_combined, recons, masks, slots, attns, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold, viz=True)
-                elif self.params.model == "iodine":
+                elif "iodine" in self.params.model:
                     recon_combined, recons, masks, slots, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold, viz=True)
                 else:
                     raise NotImplementedError
@@ -109,7 +109,7 @@ class ObjTestMethod(pl.LightningModule):
                 if self.params.model == "slot-attn":
                     attns_perm = batched_index_select(attns, 2, cat_indices)
                     masked_recons_perm, masked_attn_perm, recons_perm = captioned_masked_recons(recons_perm, masks_perm, slots_perm, attns_perm)
-                elif self.params.model == "iodine":
+                elif "iodine" in self.params.model:
                     masked_recons_perm, masked_attn_perm, recons_perm = captioned_masked_recons(recons_perm, masks_perm, slots_perm)
                 else:
                     raise NotImplementedError
@@ -123,7 +123,7 @@ class ObjTestMethod(pl.LightningModule):
                 if self.params.model == "slot-attn":
                     attns_perm_nodup = torch.cat((attns, attns[-self.params.n_samples:]), 0)  #batched_index_select(attns, 2, cat_indices_nodup)
                     masked_recons_perm_nodup, masked_attn_perm_nodup, recons_perm_nodup = captioned_masked_recons(recons_perm_nodup, masks_perm_nodup, slots_perm_nodup, attns_perm_nodup)
-                elif self.params.model == "iodine":
+                elif "iodine" in self.params.model:
                     masked_recons_perm_nodup, masked_attn_perm_nodup, recons_perm_nodup = captioned_masked_recons(recons_perm_nodup, masks_perm_nodup, slots_perm_nodup)
                 else:
                     raise NotImplementedError
@@ -172,7 +172,7 @@ class ObjTestMethod(pl.LightningModule):
                                                 M_N = self.datamodule.val_batch_size/self.datamodule.num_val_images,
                                                 optimizer_idx = optimizer_idx,
                                                 batch_idx = batch_idx)
-            elif self.params.model == "slot-attn" or self.params.model == "iodine":
+            elif self.params.model == "slot-attn" or "iodine" in self.params.model:
                 val_loss = self.model.loss_function(batch[0], batch[1:-1], batch[-1])
             else:
                 raise NotImplementedError
@@ -180,7 +180,7 @@ class ObjTestMethod(pl.LightningModule):
 
     def validation_epoch_end(self, outputs):
         avg_loss = torch.stack([x["loss"] for x in outputs]).mean()
-        if self.params.model == "slot-attn" or self.params.model == "iodine":
+        if self.params.model == "slot-attn" or "iodine" in self.params.model:
             avg_ari_mask = np.stack([x["mask_ari"] for x in outputs]).mean()
 
         # Algebra Test starts here
@@ -245,7 +245,7 @@ class ObjTestMethod(pl.LightningModule):
 
                     if self.params.model == "slot-attn":
                         _, _, _, slots, _, _, _, _, slots_nodup = self.model.forward(cat_batch, slots_only=False, dup_threshold=dup_threshold, viz=False)
-                    elif self.params.model == "iodine":
+                    elif "iodine" in self.params.model:
                         _, _, _, slots, _, _, _, slots_nodup = self.model.forward(cat_batch, dup_threshold=dup_threshold, viz=False)
                     else:
                         raise NotImplementedError
@@ -337,7 +337,7 @@ class ObjTestMethod(pl.LightningModule):
                 "avg_shape_acos_gap": (avg_obj_acos_ratio-avg_shape_acos_hn_ratio).to(self.device),
                 "avg_size_acos_gap": torch.sum(avg_obj_acos_ratio-avg_size_acos_hn_ratio).to(self.device),
             }
-            if self.params.model == "slot-attn" or self.params.model == "iodine":
+            if self.params.model == "slot-attn" or "iodine" in self.params.model:
                 logs["avg_ari_mask"] = avg_ari_mask
             if self.trainer.running_sanity_check:
                 self.trainer.running_sanity_check = False  # so that loggers don't skip logging
