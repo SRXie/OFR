@@ -129,7 +129,10 @@ class IODINE(nn.Module):
             # by batch size to get a summed-over-batch version of elbo
             # this ensures that inference is invariant to batch size
 
-            (B * elbo).backward(retain_graph=False)
+            # (B * elbo).backward(retain_graph=False)
+            self.posterior.mean_grad, self.posterior.logvar_grad, self.recons_grad, self.masks_grad = \
+                torch.autograd.grad(elbo, [self.posterior.mean, self.posterior.logvar, self.recons, self.masks], create_graph=training,
+                        retain_graph=training, only_inputs=True)
             if training:
                 elbos.append(elbo)
             # get inputs to the refinement network
@@ -226,14 +229,12 @@ class IODINE(nn.Module):
         :return: loss
         """
         B, _, H, W = x.size()
-
+        recon_combined, masks, recons, slots, elbo = self.forward(x, training=True)
         if not mask_gt:
-            recon_combined, masks, recons, slots, elbo = self.forward(x, training=True)
             return {
                 "loss": -elbo,
             }
         else:
-            recon_combined, masks, recons, slots = self.forward(x, training=False)
             # compute ARI with mask gt
             # (batch_size, num_slots, 1, H, W) to (batch_size, num_slots, H, W)
             pred_mask = self.masks.squeeze(2)
@@ -282,13 +283,13 @@ class IODINE(nn.Module):
         # (B, K, 3, H, W), (B, K, 1, H, W)
         self.recons, self.mask_logits = self.decoder(self.z)
 
-        self.recons.retain_grad()
+        # self.recons.retain_grad()
 
         # softmax mask
         # (B, K, 1, H, W)
         self.masks = F.softmax(self.mask_logits, dim=1)
 
-        self.masks.retain_grad()
+        # self.masks.retain_grad()
 
         # compute kl divergence
         # (B, K, L)
@@ -366,9 +367,9 @@ class IODINE(nn.Module):
 
         if 'grad_post' in self.encodings:
             # (B, K, L)
-            mean_grad = self.posterior.mean.grad.detach()
+            mean_grad = self.posterior.mean_grad.detach()
             # (B, K, L)
-            logvar_grad = self.posterior.logvar.grad.detach()
+            logvar_grad = self.posterior.logvar_grad.detach()
 
             if self.use_layernorm:
                 mean_grad = self.layernorm(mean_grad)
@@ -397,12 +398,12 @@ class IODINE(nn.Module):
             encoding = torch.cat([encoding, K_likelihood], dim=2) if encoding is not None else K_likelihood
 
         if 'grad_means' in self.encodings:
-            mean_grad = self.recons.grad.detach()
+            mean_grad = self.recons_grad.detach()
             if self.use_layernorm:
                 mean_grad = self.layernorm(mean_grad)
             encoding = torch.cat([encoding, mean_grad], dim=2) if encoding is not None else mean_grad
         if 'grad_mask' in self.encodings:
-            mask_grad = self.masks.grad.detach()
+            mask_grad = self.masks_grad.detach()
             if self.use_layernorm:
                 mask_grad = self.layernorm(mask_grad)
             encoding = torch.cat([encoding, mask_grad], dim=2) if encoding is not None else mask_grad
