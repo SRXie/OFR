@@ -1,12 +1,20 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import math
-from lib.utils import init_weights, _softplus_to_std, mvn, std_mvn
-from lib.utils import gmm_loglikelihood
+from utils import init_weights, _softplus_to_std, mvn, std_mvn
+from utils import gmm_loglikelihood
+from utils import compute_cos_distance
+from utils import batched_index_select
+from utils import compute_mask_ari
+from utils import to_rgb_from_tensor
+from utils import compute_corr_coef
+from utils import assert_shape
+from utils import compute_greedy_loss, compute_pseudo_greedy_loss
 import numpy as np
 
 class RefinementNetwork(nn.Module):
-    def __init__(self, z_size, input_size, refinenet_channels_in=64, conv_channels=64, lstm_dim=256):
+    def __init__(self, z_size, input_size, refinenet_channels_in=16, conv_channels=64, lstm_dim=256):
         super(RefinementNetwork, self).__init__()
         self.input_size = input_size
         self.z_size = z_size
@@ -21,8 +29,10 @@ class RefinementNetwork(nn.Module):
             nn.Conv2d(conv_channels, conv_channels, 3, 2, 1),
             nn.ELU(True),
             nn.AvgPool2d(4),
-            nn.Flatten(),
-            nn.Linear((input_size[1]//4)*(input_size[1]//4)*conv_channels, lstm_dim),
+            nn.Flatten()
+        )
+        self.mlp = nn.Sequential(
+            nn.Linear((input_size[1]//64)*(input_size[1]//64)*conv_channels, lstm_dim),
             nn.ELU(True)
         )
 
@@ -40,6 +50,7 @@ class RefinementNetwork(nn.Module):
         vec_inputs: [N * K, 4*z_size]
         """
         x = self.conv(img_inputs)
+        x = self.mlp(x)
         # concat with \lambda and \nabla \lambda
         x = torch.cat([x, vec_inputs], 1)
         x = self.input_proj(x)
@@ -61,7 +72,6 @@ class SpatialBroadcastDecoder(nn.Module):
     with re-using it for CLEVR. In their paper they slightly
     modify it (e.g., uses 3x3 conv instead of 5x5).
     """
-    @net.capture
     def __init__(self, input_size, z_size, conv_channels=64):
         super(SpatialBroadcastDecoder, self).__init__()
         self.h, self.w = input_size[1], input_size[2]
@@ -74,7 +84,7 @@ class SpatialBroadcastDecoder(nn.Module):
             nn.ELU(True),
             nn.Conv2d(conv_channels, conv_channels, 3, 1, 1),
             nn.ELU(True),
-            nn.Conv2d(conv_channels, 4, 1, 1)
+            nn.Conv2d(conv_channels, 4, 3, 1, 1)
         )
 
 
@@ -99,7 +109,7 @@ class SpatialBroadcastDecoder(nn.Module):
         return z_sb
 
     def forward(self, z):
-        z_sb = SpatialBroadcastDecoder.spatial_broadcast(z, self.h + 8, self.w + 8)
+        z_sb = SpatialBroadcastDecoder.spatial_broadcast(z, self.h, self.w)
         out = self.decode(z_sb) # [batch_size * K, output_size, h, w]
         return torch.sigmoid(out[:,:3]), out[:,3]
 
@@ -109,19 +119,20 @@ class IODINE(nn.Module):
         super(IODINE, self).__init__()
 
         self.z_size = z_size
-        self.input_size = [3]+resolution
+        self.input_size = [3]+list(resolution)
         self.K = num_slots
         self.inference_iters = num_iters
         self.kl_beta = kl_beta
-        self.gmm_log_scale = log_scale * torch.ones(K)
-        self.gmm_log_scale = self.gmm_log_scale.view(1, K, 1, 1, 1)
+        self.lstm_dim = lstm_dim
+        self.gmm_log_scale = log_scale * torch.ones(self.K)
+        self.gmm_log_scale = self.gmm_log_scale.view(1, self.K, 1, 1, 1)
 
-        self.image_decoder = SpatialBroadcastDecoder()
-        self.refine_net = RefinementNetwork()
+        self.image_decoder = SpatialBroadcastDecoder(z_size=self.z_size, input_size=self.input_size)
+        self.refine_net = RefinementNetwork(z_size=self.z_size, input_size=self.input_size) # 16 is the concatnation of all refine inputs
 
         init_weights(self.image_decoder, 'xavier')
         init_weights(self.refine_net, 'xavier')
-
+        
         # learnable initial posterior distribution
         # loc = 0, variance = 1
         self.lamda_0 = nn.Parameter(torch.cat([torch.zeros(1,self.z_size),torch.ones(1,self.z_size)],1))
@@ -139,6 +150,7 @@ class IODINE(nn.Module):
 
 
     @staticmethod
+    @torch.enable_grad()
     def refinenet_inputs(image, means, masks, mask_logits, log_p_k, normal_ll, lamda, loss, layer_norms, eval_mode):
         N, K, C, H, W = image.shape
         # non-gradient inputs
@@ -192,28 +204,28 @@ class IODINE(nn.Module):
             d_means, d_masks, x_mesh, y_mesh], 2)
         vec_inputs = torch.cat([
             lamda, d_loc_z, d_sp_z], 1)
-
         return image_inputs.view(N * K, -1, H, W), vec_inputs
 
-
+    @torch.enable_grad()
     def forward(self, x, training=False, dup_threshold=None, viz=False):
         """
         Evaluates the model as a whole, encodes and decodes
         and runs inference for T steps
         """
         C, H, W = self.input_size[0], self.input_size[1], self.input_size[2]
-        batch_size = x.shape[0]
+        batch_size  = x.shape[0]
         num_slots = self.K
+        slot_size = self.z_size
         # expand lambda_0
-        lamda = self.lamda_0.repeat(self.batch_size*self.K,1) # [N*K, 2*z_size]
-        p_z = std_mvn(shape=[self.batch_size * self.K, self.z_size], device=x.device)
+        lamda = self.lamda_0.repeat(batch_size*self.K,1) # [N*K, 2*z_size]
+        p_z = std_mvn(shape=[batch_size * self.K, self.z_size], device=x.device)
 
         total_loss = 0.
         losses = []
         x_means = []
         mask_logps = []
-        h, c = (torch.zeros(1, batch_size*self.K, lstm_dim),
-                    torch.zeros(1, batch_size*self.K, lstm_dim))
+        h, c = (torch.zeros(1, batch_size*self.K, self.lstm_dim),
+                    torch.zeros(1, batch_size*self.K, self.lstm_dim))
         h = h.to(x.device)
         c = c.to(x.device)
 
@@ -226,10 +238,10 @@ class IODINE(nn.Module):
 
             # Get means and masks
             x_loc, mask_logits = self.image_decoder(z)  #[N*K, C, H, W]
-            x_loc = x_loc.view(self.batch_size, self.K, C, H, W)
+            x_loc = x_loc.view(batch_size, self.K, C, H, W)
 
             # softmax across slots
-            mask_logits = mask_logits.view(self.batch_size, self.K, 1, H, W)
+            mask_logits = mask_logits.view(batch_size, self.K, 1, H, W)
             mask_logprobs = nn.functional.log_softmax(mask_logits, dim=1)
 
             # NLL [batch_size, 1, H, W]
@@ -238,9 +250,9 @@ class IODINE(nn.Module):
 
             # KL div
             kl_div = torch.distributions.kl.kl_divergence(q_z, p_z)
-            kl_div = kl_div.view(self.batch_size, self.K).sum(1)
-            #loss = nll + self.kl_beta * kl_div
-            #loss = torch.mean(loss)
+            kl_div = kl_div.view(batch_size, self.K).sum(1)
+            loss = nll + self.kl_beta * kl_div
+            loss = torch.mean(loss)
             scaled_loss = ((i+1.)/self.inference_iters) * loss
             losses += [scaled_loss]
             total_loss += scaled_loss
@@ -265,7 +277,7 @@ class IODINE(nn.Module):
                     duplicated = torch.sum(duplicated, dim=1)
                     duplicated_index = torch.nonzero(duplicated, as_tuple=True)
                     # get blank slots
-                    blank_slots = self.prior.sample().to(slots_nodup.device)
+                    blank_slots = p_z.mean[0]
                     # fill in deuplicated slots with blank slots
                     slots_nodup[duplicated_index[0], duplicated_index[1]] = blank_slots
 
@@ -306,7 +318,7 @@ class IODINE(nn.Module):
                 continue
 
             # compute refine inputs
-            x_ = x.repeat(self.K, 1, 1, 1).view(self.batch_size, self.K, C, H, W)
+            x_ = x.repeat(self.K, 1, 1, 1).view(batch_size, self.K, C, H, W)
 
             img_inps, vec_inps = IODINE.refinenet_inputs(x_, x_loc, mask_logprobs,
                     mask_logits, ll_outs['log_p_k'], ll_outs['normal_ll'], lamda, loss, self.layer_norms, not training)
@@ -315,7 +327,7 @@ class IODINE(nn.Module):
             lamda = lamda + delta
 
 
-        return recon_combined, masks, recons, z, total_loss, nll, kl
+        return recon_combined, masks, recons, z, total_loss, torch.mean(nll), torch.mean(kl_div)
 
     def loss_function(self, x, mask_gt=None, schema_gt=None):
         """
@@ -333,7 +345,7 @@ class IODINE(nn.Module):
         else:
             # compute ARI with mask gt
             # (batch_size, num_slots, 1, H, W) to (batch_size, num_slots, H, W)
-            pred_mask = self.masks.squeeze(2)
+            pred_mask = masks.squeeze(2)
 
             batch_size, num_slots, H, W = pred_mask.size()
             mask_gt = to_rgb_from_tensor(torch.stack(mask_gt, 1)[:,:,0,:,:])

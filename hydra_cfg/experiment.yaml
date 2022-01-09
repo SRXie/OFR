@@ -6,7 +6,7 @@ gpu_id: '0, 1, 2, 3, 4, 5, 6, 7'
 lr: 0.0003 # 3e-4 for iodine, 2e-4 for slot-attn
 batch_size: 4 # 32 for slot-attn
 val_batch_size: 1
-test_batch_size: 4
+test_batch_size: 2
 resolution: [128, 128] # Tuple[int, int]
 num_slots: 7
 num_iterations: 5 # 5 for iodine, 4 for slot-attn
