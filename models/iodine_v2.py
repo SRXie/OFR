@@ -299,9 +299,11 @@ class IODINE(nn.Module):
                         recons_nodup = batched_index_select(recons, 1, cat_indices)
                         masks_nodup = batched_index_select(masks_nodup, 1, cat_indices)
                         slots_D_prime=slots_nodup[:batch_size]-slots_nodup[batch_size:2*batch_size]+slots_nodup[2*batch_size:3*batch_size]
-
-                        recons_D_prime, mask_logits_D_prime = self.decoder(slots_D_prime)
-
+                        slots_D_prime = slots_D_prime.view(batch_size*num_slots, -1)
+                        recons_D_prime, mask_logits_D_prime = self.image_decoder(slots_D_prime)
+                        recons_D_prime = recons_D_prime.view(batch_size, self.K, C, H, W)
+                        mask_logits_D_prime =  mask_logits_D_prime.view(batch_size, self.K, 1, H, W)
+                        slots_D_prime = slots_D_prime.view(batch_size, num_slots, -1)
                         # Here we mask the de-duplicated slots in generation
                         detect_blank_slots = slots_D_prime.clone()
                         detect_blank_slots = ((detect_blank_slots - blank_slots.unsqueeze(0)).sum(-1)==0.0).nonzero(as_tuple=True)
