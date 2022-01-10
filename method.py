@@ -143,8 +143,7 @@ class ObjTestMethod(pl.LightningModule):
                 masked_attn_perm_nodup = split_and_interleave_stack(masked_attn_perm_nodup, self.params.n_samples)
 
                 # combine images in a nice way so we can display all outputs in one grid, output rescaled to be between 0 and 1
-                out = to_rgb_from_tensor(
-                    torch.cat(
+                out = torch.cat(
                         [
                             torch.cat([batch.unsqueeze(1), batch_nodup.unsqueeze(1)], dim=0),  # original images
                             torch.cat([recon_combined.unsqueeze(1),recon_combined_nodup.unsqueeze(1)], dim=0),  # reconstructions
@@ -154,7 +153,8 @@ class ObjTestMethod(pl.LightningModule):
                         ],
                         dim=1,
                     )
-                )
+                if self.params.model == "slot-attn":
+                    out = to_rgb_from_tensor(out)
 
                 batch_size, num_slots, C, H, W = recons.shape
                 images = vutils.make_grid(

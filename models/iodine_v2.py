@@ -7,7 +7,6 @@ from utils import gmm_loglikelihood
 from utils import compute_cos_distance
 from utils import batched_index_select
 from utils import compute_mask_ari
-from utils import to_rgb_from_tensor
 from utils import compute_corr_coef
 from utils import assert_shape
 from utils import compute_greedy_loss, compute_pseudo_greedy_loss
@@ -132,7 +131,7 @@ class IODINE(nn.Module):
 
         init_weights(self.image_decoder, 'xavier')
         init_weights(self.refine_net, 'xavier')
-        
+
         # learnable initial posterior distribution
         # loc = 0, variance = 1
         self.lamda_0 = nn.Parameter(torch.cat([torch.zeros(1,self.z_size),torch.ones(1,self.z_size)],1))
@@ -351,7 +350,7 @@ class IODINE(nn.Module):
             pred_mask = masks.squeeze(2)
 
             batch_size, num_slots, H, W = pred_mask.size()
-            mask_gt = to_rgb_from_tensor(torch.stack(mask_gt, 1)[:,:,0,:,:])
+            mask_gt = torch.stack(mask_gt, 1)[:,:,0,:,:]
             assert_shape(mask_gt.shape, pred_mask.shape)
             # index shape (batch_size, H, W)
             index = torch.argmax(pred_mask, dim=1)
