@@ -56,13 +56,13 @@ class _Workplace(object):
                 transforms.Resize(tuple(cfg.resolution)),
             ]
         )
-        if "iodine" in cfg.model:
-            clevr_transform = transforms.Compose([
-                transforms.ToPILImage(),
-                transforms.CenterCrop(168),
-                transforms.Resize(128),
-                transforms.ToTensor(),
-            ])
+        # if "iodine" in cfg.model:
+        #     clevr_transforms = transforms.Compose([
+        #         # transforms.ToPILImage(),
+        #         transforms.CenterCrop(168),
+        #         transforms.Resize(128),
+        #         transforms.ToTensor(),
+        #     ])
 
         if os.path.exists(os.path.join(cfg.test_root, "obj_test_occ_w", "CLEVR_test_cases.csv")):
             with open(os.path.join(cfg.test_root, "obj_test_occ_w", "CLEVR_test_cases.csv"), "r") as f:
