@@ -7,6 +7,7 @@ from utils import gmm_loglikelihood
 from utils import compute_cos_distance
 from utils import batched_index_select
 from utils import compute_mask_ari
+from utils import to_rgb_from_tensor
 from utils import compute_corr_coef
 from utils import assert_shape
 from utils import compute_greedy_loss, compute_pseudo_greedy_loss
@@ -110,7 +111,7 @@ class SpatialBroadcastDecoder(nn.Module):
     def forward(self, z):
         z_sb = SpatialBroadcastDecoder.spatial_broadcast(z, self.h, self.w)
         out = self.decode(z_sb) # [batch_size * K, output_size, h, w]
-        return torch.sigmoid(out[:,:3]), out[:,3]
+        return torch.tanh(out[:,:3]), out[:,3]
 
 
 class IODINE(nn.Module):
@@ -298,11 +299,8 @@ class IODINE(nn.Module):
                         recons_nodup = batched_index_select(recons, 1, cat_indices)
                         masks_nodup = batched_index_select(masks_nodup, 1, cat_indices)
                         slots_D_prime=slots_nodup[:batch_size]-slots_nodup[batch_size:2*batch_size]+slots_nodup[2*batch_size:3*batch_size]
-                        slots_D_prime = slots_D_prime.view(batch_size*num_slots, -1)
-                        recons_D_prime, mask_logits_D_prime = self.image_decoder(slots_D_prime)
-                        recons_D_prime=recons_D_prime.view(batch_size, self.K, C, H, W)
-                        mask_logits_D_prime=mask_logits_D_prime.view(batch_size, self.K, 1, H, W)
-                        slots_D_prime = slots_D_prime.view(batch_size, num_slots, slot_size)
+
+                        recons_D_prime, mask_logits_D_prime = self.decoder(slots_D_prime)
 
                         # Here we mask the de-duplicated slots in generation
                         detect_blank_slots = slots_D_prime.clone()
@@ -350,7 +348,7 @@ class IODINE(nn.Module):
             pred_mask = masks.squeeze(2)
 
             batch_size, num_slots, H, W = pred_mask.size()
-            mask_gt = torch.stack(mask_gt, 1)[:,:,0,:,:]
+            mask_gt = to_rgb_from_tensor(torch.stack(mask_gt, 1)[:,:,0,:,:])
             assert_shape(mask_gt.shape, pred_mask.shape)
             # index shape (batch_size, H, W)
             index = torch.argmax(pred_mask, dim=1)

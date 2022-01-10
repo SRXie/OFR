@@ -511,9 +511,8 @@ def captioned_masked_recons(recons, masks, slots, attns=None):
     feature_dup_idx = feature_dup_idx[:,:,1]
 
     masked_recons = recons * masks - (1 - masks)
-    if not attns is None:
-        masked_recons = to_rgb_from_tensor(masked_recons)
-        recons = to_rgb_from_tensor(recons)
+    masked_recons = to_rgb_from_tensor(masked_recons)
+    recons = to_rgb_from_tensor(recons)
     masked_attns = torch.zeros_like(recons)
     masked_attns[:,:,2,:,:] = masked_attns[:,:,2,:,:]+masks.squeeze(2)
     if not attns is None:
@@ -525,8 +524,7 @@ def captioned_masked_recons(recons, masks, slots, attns=None):
     mask_mass = masks.view(recons.shape[0], recons.shape[1], -1)
     mask_mass = torch.where(mask_mass>=mask_mass.max(dim=1)[0].unsqueeze(1).repeat(1,recons.shape[1],1), mask_mass, torch.zeros_like(mask_mass)).sum(-1)
     masks = masks.repeat(1,1,3,1,1)
-    if not attns is None:
-        masks = to_rgb_from_tensor(masks)
+    masks = to_rgb_from_tensor(masks)
     for i in range(masked_recons.shape[0]):
         for j in range(masked_recons.shape[1]):
             img = transforms.ToPILImage()(masked_recons[i,j])
@@ -535,8 +533,7 @@ def captioned_masked_recons(recons, masks, slots, attns=None):
             feature_text = "feat: "+str(feature_dup_idx[i,j].item())+" - {:.4f}".format(feature_dup_sim[i,j].item())
             draw.text((4,55), feature_text, (255, 255, 255), font=font)
             img = transforms.ToTensor()(img)
-            if not attns is None:
-                img = to_tensor_from_rgb(img)
+            img = to_tensor_from_rgb(img)
             masked_recons[i,j] = img
         for j in range(masked_recons.shape[1]):
             img = transforms.ToPILImage()(recons[i,j])
@@ -545,8 +542,7 @@ def captioned_masked_recons(recons, masks, slots, attns=None):
             pixel_text = "attn: {:.4f}".format(mask_mass[i,j].item())
             draw.text((4,0), pixel_text, (0, 0, 0), font=font)
             img = transforms.ToTensor()(img)
-            if not attns is None:
-                img = to_tensor_from_rgb(img)
+            img = to_tensor_from_rgb(img)
             recons[i,j] = img
     return masked_recons, masked_attns, recons
 
