@@ -378,10 +378,7 @@ class ObjTestMethod(pl.LightningModule):
 
         scheduler = optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=warm_and_decay_lr_scheduler)
 
-        if self.params.model == "slot-attn":
-            return (
-                [optimizer],
-                [{"scheduler": scheduler, "interval": "step",}],
-            )
-        else:
-            return optimizer
+        return (
+            [optimizer],
+            [{"scheduler": scheduler, "interval": "step",}],
+        )
