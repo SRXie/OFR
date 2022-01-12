@@ -281,25 +281,25 @@ class ObjTestMethod(pl.LightningModule):
             std_obj_cos_ratio, avg_obj_cos_ratio, avg_obj_cos, avg_obj_cos_baseline = summarize_losses(obj_cos_losses, obj_cos_losses_en_D)
             std_obj_acos_ratio, avg_obj_acos_ratio, avg_obj_acos, avg_obj_acos_baseline = summarize_losses(obj_acos_losses, obj_acos_losses_en_D)
 
-            _, avg_obj_l2_hn, _, _ = summarize_losses(obj_losses_hn, obj_losses_en_D)
-            _, avg_obj_cos_hn, _, _ = summarize_losses(obj_cos_losses_hn, obj_cos_losses_en_D)
-            _, avg_obj_acos_hn, _, _ = summarize_losses(obj_acos_losses_hn, obj_acos_losses_en_D)
+            _, _, avg_obj_l2_hn, _ = summarize_losses(obj_losses_hn, obj_losses_en_D)
+            _, _, avg_obj_cos_hn, _ = summarize_losses(obj_cos_losses_hn, obj_cos_losses_en_D)
+            _, _, avg_obj_acos_hn, _ = summarize_losses(obj_acos_losses_hn, obj_acos_losses_en_D)
 
-            _, avg_color_l2_hn, _, _ = summarize_losses(color_losses_hn, obj_losses_en_D)
-            _, avg_color_cos_hn, _, _ = summarize_losses(color_cos_losses_hn, obj_cos_losses_en_D)
-            _, avg_color_acos_hn, _, _ = summarize_losses(color_acos_losses_hn, obj_acos_losses_en_D)
+            _, _, avg_color_l2_hn, _ = summarize_losses(color_losses_hn, obj_losses_en_D)
+            _, _, avg_color_cos_hn, _ = summarize_losses(color_cos_losses_hn, obj_cos_losses_en_D)
+            _, _, avg_color_acos_hn, _ = summarize_losses(color_acos_losses_hn, obj_acos_losses_en_D)
 
-            _, avg_mat_l2_hn, _, _ = summarize_losses(mat_losses_hn, obj_losses_en_D)
-            _, avg_mat_cos_hn, _, _ = summarize_losses(mat_cos_losses_hn, obj_cos_losses_en_D)
-            _, avg_mat_acos_hn, _, _ = summarize_losses(mat_acos_losses_hn, obj_acos_losses_en_D)
+            _, _, avg_mat_l2_hn, _ = summarize_losses(mat_losses_hn, obj_losses_en_D)
+            _, _, avg_mat_cos_hn, _ = summarize_losses(mat_cos_losses_hn, obj_cos_losses_en_D)
+            _, _, avg_mat_acos_hn, _ = summarize_losses(mat_acos_losses_hn, obj_acos_losses_en_D)
 
-            _, avg_shape_l2_hn, _, _ = summarize_losses(shape_losses_hn, obj_losses_en_D)
-            _, avg_shape_cos_hn, _, _ = summarize_losses(shape_cos_losses_hn, obj_cos_losses_en_D)
-            _, avg_shape_acos_hn, _, _ = summarize_losses(shape_acos_losses_hn, obj_acos_losses_en_D)
+            _, _, avg_shape_l2_hn, _ = summarize_losses(shape_losses_hn, obj_losses_en_D)
+            _, _, avg_shape_cos_hn, _ = summarize_losses(shape_cos_losses_hn, obj_cos_losses_en_D)
+            _, _, avg_shape_acos_hn, _ = summarize_losses(shape_acos_losses_hn, obj_acos_losses_en_D)
 
-            _, avg_size_l2_hn, _, _ = summarize_losses(size_losses_hn, obj_losses_en_D)
-            _, avg_size_cos_hn, _, _ = summarize_losses(size_cos_losses_hn, obj_cos_losses_en_D)
-            _, avg_size_acos_hn, _, _ = summarize_losses(size_acos_losses_hn, obj_acos_losses_en_D)
+            _, _, avg_size_l2_hn, _ = summarize_losses(size_losses_hn, obj_losses_en_D)
+            _, _, avg_size_cos_hn, _ = summarize_losses(size_cos_losses_hn, obj_cos_losses_en_D)
+            _, _, avg_size_acos_hn, _ = summarize_losses(size_acos_losses_hn, obj_acos_losses_en_D)
 
             logs = {
                 "avg_val_loss": avg_loss,
@@ -330,7 +330,7 @@ class ObjTestMethod(pl.LightningModule):
                 "avg_color_cos_ratio_hn": (1-avg_obj_cos/avg_color_cos_hn).to(self.device),
                 "avg_mat_cos_ratio_hn": (1-avg_obj_cos/avg_mat_cos_hn).to(self.device),
                 "avg_shape_cos_ratio_hn": (1-avg_obj_cos/avg_shape_cos_hn).to(self.device),
-                "avg_size_cos_ratio_hn": (1-avg_obj_cos/avg_size_cos_hn).to(self.device),,
+                "avg_size_cos_ratio_hn": (1-avg_obj_cos/avg_size_cos_hn).to(self.device),
                 "avg_obj_acos_ratio": avg_obj_acos_ratio.to(self.device),
                 "avg_obj_acos": avg_obj_acos.to(self.device),
                 "avg_obj_acos_baseline": avg_obj_acos_baseline.to(self.device),
