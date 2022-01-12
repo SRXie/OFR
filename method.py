@@ -63,7 +63,11 @@ class ObjTestMethod(pl.LightningModule):
         if True:
 
             if self.params.model == "btc-vae":
-                recons = self.model.generate(batch)
+                mu, logvar = self.encode(batch)
+                zs_A, zs_B, zs_C, zs_D = mu.split(batch.shape[0]//4, 0)
+                zs_D_prime = zs_A - zs_B + zs_C
+                recons = self.model.decode(torch.cat((mu, zs_D_prime), 0))
+                batch = torch.cat(batch, batch[-batch.shape[0]//4:], 0)
                 batch = split_and_interleave_stack(batch, self.params.n_samples)
                 recons = split_and_interleave_stack(recons, self.params.n_samples)
                 # combine images in a nice way so we can display all outputs in one grid, output rescaled to be between 0 and 1
