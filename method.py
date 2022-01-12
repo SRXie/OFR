@@ -224,10 +224,7 @@ class ObjTestMethod(pl.LightningModule):
                     compute_shuffle_cosine_loss(cat_zs[:4*batch_size], obj_cos_losses_en_D, obj_acos_losses_en_D)
 
                     for ind in range(4, 9):
-                        if ind == 4:
-                            zs_D_prime = cat_zs[-batch_size:]
-                        else:
-                            zs_D_prime = cat_zs[3*batch_size:4*batch_size] #cat_zs[ind*batch_size:(ind+1)*batch_size]
+                        zs_D_prime = cat_zs[ind*batch_size:(ind+1)*batch_size]
                         cat_zs_hn = torch.cat((cat_zs[:3*batch_size], zs_D_prime), 0)
                         compute_loss(cat_zs_hn, hn_losses_list[ind-4])
                         compute_cosine_loss(cat_zs_hn, hn_cos_losses_list[ind-4], hn_acos_losses_list[ind-4])
@@ -259,7 +256,7 @@ class ObjTestMethod(pl.LightningModule):
                     else:
                         continue
                     # Here we compute the angle between DC and D'C
-                    batch_size*=8
+                    batch_size*=16
 
                     cat_slots = cat_slots_full[:4*batch_size]
                     losses, cos_losses, acos_losses, cat_slots = compute_all_losses(cat_slots)
@@ -273,69 +270,81 @@ class ObjTestMethod(pl.LightningModule):
                     obj_acos_losses_en_D.append(acos_losses_en_D)
 
                     for ind in range(4, 9):
-                        if ind == 4:
-                            slots_D_prime = cat_slots_full[-2*batch_size:-batch_size]
-                        else:
-                            slots_D_prime = cat_slots_full[3*batch_size:4*batch_size] #cat_slots_full[ind*batch_size:(ind+1)*batch_size]
+                        slots_D_prime = at_slots_full[ind*batch_size:(ind+1)*batch_size]
                         cat_slots = torch.cat((cat_slots[:3*batch_size], slots_D_prime), 0)
                         losses, cos_losses, acos_losses, _ = compute_all_losses(cat_slots)
                         hn_losses_list[ind-4].append(losses)
                         hn_cos_losses_list[ind-4].append(cos_losses)
                         hn_acos_losses_list[ind-4].append(acos_losses)
 
-            std_obj_l2_ratio, avg_obj_l2_ratio, avg_obj_l2, avg_obj_l2_ctrast_en = summarize_losses(obj_losses, obj_losses_en_D)
-            std_obj_cos_ratio, avg_obj_cos_ratio, avg_obj_cos, avg_obj_cos_ctrast_en = summarize_losses(obj_cos_losses, obj_cos_losses_en_D)
-            std_obj_acos_ratio, avg_obj_acos_ratio, avg_obj_acos, avg_obj_acos_ctrast_en = summarize_losses(obj_acos_losses, obj_acos_losses_en_D)
+            std_obj_l2_ratio, avg_obj_l2_ratio, avg_obj_l2, avg_obj_l2_baseline = summarize_losses(obj_losses, obj_losses_en_D)
+            std_obj_cos_ratio, avg_obj_cos_ratio, avg_obj_cos, avg_obj_cos_baseline = summarize_losses(obj_cos_losses, obj_cos_losses_en_D)
+            std_obj_acos_ratio, avg_obj_acos_ratio, avg_obj_acos, avg_obj_acos_baseline = summarize_losses(obj_acos_losses, obj_acos_losses_en_D)
 
-            _, avg_obj_l2_hn_ratio, _, _ = summarize_losses(obj_losses_hn, obj_losses_en_D)
-            _, avg_obj_cos_hn_ratio, _, _ = summarize_losses(obj_cos_losses_hn, obj_cos_losses_en_D)
-            _, avg_obj_acos_hn_ratio, _, _ = summarize_losses(obj_acos_losses_hn, obj_acos_losses_en_D)
+            _, avg_obj_l2_hn, _, _ = summarize_losses(obj_losses_hn, obj_losses_en_D)
+            _, avg_obj_cos_hn, _, _ = summarize_losses(obj_cos_losses_hn, obj_cos_losses_en_D)
+            _, avg_obj_acos_hn, _, _ = summarize_losses(obj_acos_losses_hn, obj_acos_losses_en_D)
 
-            _, avg_color_l2_hn_ratio, _, _ = summarize_losses(color_losses_hn, obj_losses_en_D)
-            _, avg_color_cos_hn_ratio, _, _ = summarize_losses(color_cos_losses_hn, obj_cos_losses_en_D)
-            _, avg_color_acos_hn_ratio, _, _ = summarize_losses(color_acos_losses_hn, obj_acos_losses_en_D)
+            _, avg_color_l2_hn, _, _ = summarize_losses(color_losses_hn, obj_losses_en_D)
+            _, avg_color_cos_hn, _, _ = summarize_losses(color_cos_losses_hn, obj_cos_losses_en_D)
+            _, avg_color_acos_hn, _, _ = summarize_losses(color_acos_losses_hn, obj_acos_losses_en_D)
 
-            _, avg_mat_l2_hn_ratio, _, _ = summarize_losses(mat_losses_hn, obj_losses_en_D)
-            _, avg_mat_cos_hn_ratio, _, _ = summarize_losses(mat_cos_losses_hn, obj_cos_losses_en_D)
-            _, avg_mat_acos_hn_ratio, _, _ = summarize_losses(mat_acos_losses_hn, obj_acos_losses_en_D)
+            _, avg_mat_l2_hn, _, _ = summarize_losses(mat_losses_hn, obj_losses_en_D)
+            _, avg_mat_cos_hn, _, _ = summarize_losses(mat_cos_losses_hn, obj_cos_losses_en_D)
+            _, avg_mat_acos_hn, _, _ = summarize_losses(mat_acos_losses_hn, obj_acos_losses_en_D)
 
-            _, avg_shape_l2_hn_ratio, _, _ = summarize_losses(shape_losses_hn, obj_losses_en_D)
-            _, avg_shape_cos_hn_ratio, _, _ = summarize_losses(shape_cos_losses_hn, obj_cos_losses_en_D)
-            _, avg_shape_acos_hn_ratio, _, _ = summarize_losses(shape_acos_losses_hn, obj_acos_losses_en_D)
+            _, avg_shape_l2_hn, _, _ = summarize_losses(shape_losses_hn, obj_losses_en_D)
+            _, avg_shape_cos_hn, _, _ = summarize_losses(shape_cos_losses_hn, obj_cos_losses_en_D)
+            _, avg_shape_acos_hn, _, _ = summarize_losses(shape_acos_losses_hn, obj_acos_losses_en_D)
 
-            _, avg_size_l2_hn_ratio, _, _ = summarize_losses(size_losses_hn, obj_losses_en_D)
-            _, avg_size_cos_hn_ratio, _, _ = summarize_losses(size_cos_losses_hn, obj_cos_losses_en_D)
-            _, avg_size_acos_hn_ratio, _, _ = summarize_losses(size_acos_losses_hn, obj_acos_losses_en_D)
+            _, avg_size_l2_hn, _, _ = summarize_losses(size_losses_hn, obj_losses_en_D)
+            _, avg_size_cos_hn, _, _ = summarize_losses(size_cos_losses_hn, obj_cos_losses_en_D)
+            _, avg_size_acos_hn, _, _ = summarize_losses(size_acos_losses_hn, obj_acos_losses_en_D)
 
             logs = {
                 "avg_val_loss": avg_loss,
                 "avg_obj_l2_ratio": avg_obj_l2_ratio.to(self.device),
                 "avg_obj_l2": avg_obj_l2.to(self.device),
-                "avg_obj_l2_ctrast_en": avg_obj_l2_ctrast_en.to(self.device),
+                "avg_obj_l2_baseline": avg_obj_l2_baseline.to(self.device),
                 "std_obj_l2_ratio": std_obj_l2_ratio.to(self.device),
-                "avg_obj_l2_gap": (avg_obj_l2_ratio-avg_obj_l2_hn_ratio).to(self.device),
-                "avg_color_l2_gap": (avg_obj_l2_ratio-avg_color_l2_hn_ratio).to(self.device),
-                "avg_mat_l2_gap": (avg_obj_l2_ratio-avg_mat_l2_hn_ratio).to(self.device),
-                "avg_shape_l2_gap": (avg_obj_l2_ratio-avg_shape_l2_hn_ratio).to(self.device),
-                "avg_size_l2_gap": (avg_obj_l2_ratio-avg_size_l2_hn_ratio).to(self.device),
+                "avg_obj_l2_baseline_hn": (avg_obj_l2_hn).to(self.device),
+                "avg_color_l2_baseline_hn": (avg_color_l2_hn).to(self.device),
+                "avg_mat_l2_baseline_hn": (avg_mat_l2_hn).to(self.device),
+                "avg_shape_l2_baseline_hn": (avg_shape_l2_hn).to(self.device),
+                "avg_size_l2_baseline_hn": (avg_size_l2_hn).to(self.device),
+                "avg_obj_l2_ratio_hn": (1-avg_obj_l2/avg_obj_l2_hn).to(self.device),
+                "avg_color_l2_ratio_hn": (1-avg_obj_l2/avg_color_l2_hn).to(self.device),
+                "avg_mat_l2_ratio_hn": (1-avg_obj_l2/avg_mat_l2_hn).to(self.device),
+                "avg_shape_l2_ratio_hn": (1-avg_obj_l2/avg_shape_l2_hn).to(self.device),
+                "avg_size_l2_ratio_hn": (1-avg_obj_l2/avg_size_l2_hn).to(self.device),
                 "avg_obj_cos_ratio": avg_obj_cos_ratio.to(self.device),
                 "avg_obj_cos": avg_obj_cos.to(self.device),
-                "avg_obj_cos_ctrast_en": avg_obj_cos_ctrast_en.to(self.device),
+                "avg_obj_cos_baseline": avg_obj_cos_baseline.to(self.device),
                 "std_obj_cos_ratio": std_obj_cos_ratio.to(self.device),
-                "avg_obj_cos_gap": (avg_obj_cos_ratio-avg_obj_cos_hn_ratio).mean().to(self.device),
-                "avg_color_cos_gap": (avg_obj_cos_ratio-avg_color_cos_hn_ratio).to(self.device),
-                "avg_mat_cos_gap": (avg_obj_cos_ratio-avg_mat_cos_hn_ratio).to(self.device),
-                "avg_shape_cos_gap": (avg_obj_cos_ratio-avg_shape_cos_hn_ratio).to(self.device),
-                "avg_size_cos_gap": (avg_obj_cos_ratio-avg_size_cos_hn_ratio).to(self.device),
+                "avg_obj_cos_baseline_hn": (avg_obj_cos_hn).to(self.device),
+                "avg_color_cos_baseline_hn": (avg_color_cos_hn).to(self.device),
+                "avg_mat_cos_baseline_hn": (avg_mat_cos_hn).to(self.device),
+                "avg_shape_cos_baseline_hn": (avg_shape_cos_hn).to(self.device),
+                "avg_size_cos_baseline_hn": (avg_size_cos_hn).to(self.device),
+                "avg_obj_cos_ratio_hn": (1-avg_obj_cos/avg_obj_cos_hn).mean().to(self.device),
+                "avg_color_cos_ratio_hn": (1-avg_obj_cos/avg_color_cos_hn).to(self.device),
+                "avg_mat_cos_ratio_hn": (1-avg_obj_cos/avg_mat_cos_hn).to(self.device),
+                "avg_shape_cos_ratio_hn": (1-avg_obj_cos/avg_shape_cos_hn).to(self.device),
+                "avg_size_cos_ratio_hn": (1-avg_obj_cos/avg_size_cos_hn).to(self.device),,
                 "avg_obj_acos_ratio": avg_obj_acos_ratio.to(self.device),
                 "avg_obj_acos": avg_obj_acos.to(self.device),
-                "avg_obj_acos_ctrast_en": avg_obj_acos_ctrast_en.to(self.device),
+                "avg_obj_acos_baseline": avg_obj_acos_baseline.to(self.device),
                 "std_obj_acos_ratio": std_obj_acos_ratio.to(self.device),
-                "avg_obj_acos_gap": (avg_obj_acos_ratio-avg_obj_acos_hn_ratio).mean().to(self.device),
-                "avg_color_acos_gap": (avg_obj_acos_ratio-avg_color_acos_hn_ratio).to(self.device),
-                "avg_mat_acos_gap": (avg_obj_acos_ratio-avg_mat_acos_hn_ratio).to(self.device),
-                "avg_shape_acos_gap": (avg_obj_acos_ratio-avg_shape_acos_hn_ratio).to(self.device),
-                "avg_size_acos_gap": torch.sum(avg_obj_acos_ratio-avg_size_acos_hn_ratio).to(self.device),
+                "avg_obj_acos_baseline_hn": (avg_obj_acos_hn).mean().to(self.device),
+                "avg_color_acos_baseline_hn": (avg_color_acos_hn).to(self.device),
+                "avg_mat_acos_baseline_hn": (avg_mat_acos_hn).to(self.device),
+                "avg_shape_acos_baseline_hn": (avg_shape_acos_hn).to(self.device),
+                "avg_size_acos_baseline_hn": (avg_size_acos_hn).to(self.device),
+                "avg_obj_acos_ratio_hn": (1-avg_obj_acos/avg_obj_acos_hn).to(self.device),
+                "avg_color_acos_ratio_hn": (1-avg_obj_acos/avg_color_acos_hn).to(self.device),
+                "avg_mat_acos_ratio_hn": (1-avg_obj_acos/avg_mat_acos_hn).to(self.device),
+                "avg_shape_acos_ratio_hn": (1-avg_obj_acos/avg_shape_acos_hn).to(self.device),
+                "avg_size_acos_ratio_hn": (1-avg_obj_acos/avg_size_acos_hn).to(self.device),
             }
             if self.params.model == "slot-attn" or "iodine" in self.params.model:
                 logs["avg_ari_mask"] = avg_ari_mask

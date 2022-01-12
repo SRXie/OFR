@@ -376,9 +376,9 @@ def summarize_losses(losses, losses_en):
     std_ratio = ratio.std()/math.sqrt(ratio.shape[0])
     avg_ratio = ratio.mean()
     avg_loss = cat_losses.mean()
-    avg_ctrast_en = cat_losses_en.mean()-avg_loss
+    avg_baseline = cat_losses_en.mean()
 
-    return std_ratio, avg_ratio, avg_loss, avg_ctrast_en
+    return std_ratio, avg_ratio, avg_loss, avg_baseline
 
 def compute_loss(cat_zs, losses):
     zs_A, zs_B, zs_C, zs_D = torch.split(cat_zs, cat_zs.shape[0]//4, 0)
