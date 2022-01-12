@@ -2,15 +2,15 @@
 sweep_name: null
 model: iodine
 seed: 0
-gpu_id: '0, 1, 2, 3, 4, 5, 6, 7'
-lr: 0.0003 # 3e-4 for iodine, 2e-4 for slot-attn
-batch_size: 4 # 32 for slot-attn
-val_batch_size: 1
-test_batch_size: 2
+gpu_id: '0'
+lr: 0.0002 # 3e-4 for iodine, 2e-4 for slot-attn
+batch_size: 128 # 32 for slot-attn
+val_batch_size: 64
+test_batch_size: 64
 resolution: [128, 128] # Tuple[int, int]
 num_slots: 7
-num_iterations: 5 # 5 for iodine, 4 for slot-attn
-latent_dim: 64 # 256 for bvae
+num_iterations: 4 # 5 for iodine, 4 for slot-attn
+latent_dim: 256 # 256 for bvae
 decoder_type: deconv # for bvae
 alpha: 1. # for bvae
 beta: 0. # for bvae
@@ -22,10 +22,10 @@ data_mix_csv: /checkpoint/siruixie/data_mix.csv
 data_root:  /checkpoint/siruixie/clevr_corr/ #/datasets01/CLEVR_v1.0/060817/images/train/
 val_root: /checkpoint/siruixie/clevr_with_masks/
 test_root: /checkpoint/siruixie/clevr_obj_test/output/
-gpus: 8
-max_epochs: 1000 # 1000 for iodine, 500 for slot-attn
+gpus: 1
+max_epochs: 300 # 1000 for iodine, 500 for slot-attn
 num_sanity_val_steps: 1
-scheduler_gamma: 0.5
+scheduler_gamma: 1.0
 weight_decay: 0.0
 num_train_images: 23000 # Optional[int]
 num_val_images: 10000  # Optional[int]
