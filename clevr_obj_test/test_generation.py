@@ -8,6 +8,7 @@ import itertools
 import random
 from PIL import Image
 import numpy as np
+from copy import deepcopy
 
 SCENE_SUMMARY = None
 
@@ -128,12 +129,12 @@ def obj_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0, decomposed=No
                             subset_idx_list_E[drop_idx_d] =  subset_idx_list_B[drop_idx_b]
                             subset_idx_list_E = sorted(subset_idx_list_E)
                             subset_idx_E = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_E)]
-                            image_E_path = create_path(test_root, main_scene_idx, subset_idx_E, subset_idx_C, file_type="bgs")
+                            image_E_path = create_path(test_root, main_scene_idx, subset_idx_E, file_type="bgs")
 
-                            image_F_path = image_D_path.replace("/images/", "/color/")
-                            image_G_path = image_D_path.replace("/images/", "/material/")
-                            image_H_path = image_D_path.replace("/images/", "/shape/")
-                            image_I_path = image_D_path.replace("/images/", "/size/")
+                            image_F_path = image_D_path.replace("/bgs/", "/color/")
+                            image_G_path = image_D_path.replace("/bgs/", "/material/")
+                            image_H_path = image_D_path.replace("/bgs/", "/shape/")
+                            image_I_path = image_D_path.replace("/bgs/", "/size/")
 
                             tuples.append((image_A_path, image_B_path, image_C_path, image_D_path, image_E_path, image_F_path, image_G_path, image_H_path, image_I_path))
                     except Exception as e:
