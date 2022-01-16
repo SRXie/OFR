@@ -64,13 +64,13 @@ class _Workplace(object):
         #         transforms.ToTensor(),
         #     ])
 
-        if os.path.exists(os.path.join(cfg.test_root, "obj_test_occ_w", "CLEVR_test_cases.csv")):
-            with open(os.path.join(cfg.test_root, "obj_test_occ_w", "CLEVR_test_cases.csv"), "r") as f:
+        if os.path.exists(os.path.join(cfg.test_root, "obj_test", "CLEVR_test_cases.csv")):
+            with open(os.path.join(cfg.test_root, "obj_test", "CLEVR_test_cases.csv"), "r") as f:
                 csv_reader = reader(f)
                 self.obj_algebra_test_cases = list(csv_reader)
         else:
             self.obj_algebra_test_cases = None
-            print(os.path.join(cfg.test_root, "obj_test_occ_w", "CLEVR_test_cases.csv")+" does not exist.")
+            print(os.path.join(cfg.test_root, "obj_test", "CLEVR_test_cases.csv")+" does not exist.")
 
         if os.path.exists(os.path.join(cfg.val_root, "CLEVR_val_list.csv")):
             with open(os.path.join(cfg.val_root, "CLEVR_val_list.csv"), "r") as f:
@@ -154,7 +154,7 @@ class _Workplace(object):
         #     state_dict[key.replace('model.', '')] = state_dict.pop(key)
         # model.load_state_dict(state_dict)
 
-        # ckpt = torch.load("/private/home/siruixie/Sirui/OFR/outputs/objectness-test-occ/3ffr137j/checkpoints/epoch=243-step=87839.ckpt")
+        # ckpt = torch.load("/private/home/siruixie/OFR_debug/OFR/outputs/objectness-test-metric/26bycsk6/checkpoints/epoch=3-step=719.ckpt")
         # state_dict = ckpt['state_dict']
         # for key in list(state_dict.keys()):
         #     state_dict[key.replace('model.', '')] = state_dict.pop(key)

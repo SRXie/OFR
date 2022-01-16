@@ -63,11 +63,12 @@ class ObjTestMethod(pl.LightningModule):
         if True:
 
             if self.params.model == "btc-vae":
-                mu, logvar = self.encode(batch)
+                mu, logvar = self.model.encode(batch)
                 zs_A, zs_B, zs_C, zs_D = mu.split(batch.shape[0]//4, 0)
                 zs_D_prime = zs_A - zs_B + zs_C
                 recons = self.model.decode(torch.cat((mu, zs_D_prime), 0))
-                batch = torch.cat(batch, batch[-batch.shape[0]//4:], 0)
+                bs = batch.shape[0]//4
+                batch = torch.cat((batch, batch[:bs]-batch[bs:2*bs]+batch[2*bs:3*bs]), 0)
                 batch = split_and_interleave_stack(batch, self.params.n_samples)
                 recons = split_and_interleave_stack(recons, self.params.n_samples)
                 # combine images in a nice way so we can display all outputs in one grid, output rescaled to be between 0 and 1
@@ -120,7 +121,8 @@ class ObjTestMethod(pl.LightningModule):
                 # No need to match again
                 # cat_indices_nodup = compute_greedy_loss(slots_nodup, [])
                 batch_list = []
-                batch_nodup = torch.cat((batch, batch[-self.params.n_samples:]), 0)
+                bs = self.params.n_samples
+                batch_nodup = torch.cat((batch, batch[:bs]-batch[bs:2*bs]+batch[2*bs:3*bs]), 0)
                 recons_perm_nodup = recons_nodup #batched_index_select(recons_nodup, 1, cat_indices_nodup)
                 masks_perm_nodup = masks_nodup #batched_index_select(masks_nodup, 1, cat_indices_nodup)
                 slots_perm_nodup = slots_nodup #batched_index_select(slots_nodup, 1, cat_indices_nodup)
@@ -206,7 +208,7 @@ class ObjTestMethod(pl.LightningModule):
                 for batch in dl:
                     # batch is a length-4 list, each element is a tensor of shape (batch_size, 3, width, height)
                     batch_size = batch[0].shape[0]
-                    cat_batch = torch.cat(batch, 0)
+                    cat_batch = torch.cat(batch+[batch[0]-batch[1]+batch[2]], 0)
                     if self.params.gpus > 0:
                         cat_batch = cat_batch.to(self.device)
 
@@ -227,7 +229,7 @@ class ObjTestMethod(pl.LightningModule):
                     compute_shuffle_loss(cat_zs[:4*batch_size], obj_losses_en_D)
                     compute_shuffle_cosine_loss(cat_zs[:4*batch_size], obj_cos_losses_en_D, obj_acos_losses_en_D)
 
-                    for ind in range(4, 9):
+                    for ind in range(4, 10):
                         zs_D_prime = cat_zs[ind*batch_size:(ind+1)*batch_size]
                         cat_zs_hn = torch.cat((cat_zs[:3*batch_size], zs_D_prime), 0)
                         compute_loss(cat_zs_hn, hn_losses_list[ind-4])
@@ -240,7 +242,7 @@ class ObjTestMethod(pl.LightningModule):
                     # batch is a length-9 list, each element is a tensor of shape (batch_size, 3, width, height)
                     i += 0.01
                     batch_size = batch[0].shape[0]
-                    cat_batch = torch.cat(batch+[batch[3]], 0)
+                    cat_batch = torch.cat(batch+[batch[0]-batch[1]+batch[2]], 0)
                     if self.params.gpus > 0:
                         cat_batch = cat_batch.to(self.device)
 
@@ -273,8 +275,8 @@ class ObjTestMethod(pl.LightningModule):
                     obj_cos_losses_en_D.append(cos_losses_en_D)
                     obj_acos_losses_en_D.append(acos_losses_en_D)
 
-                    for ind in range(4, 9):
-                        slots_D_prime = at_slots_full[ind*batch_size:(ind+1)*batch_size]
+                    for ind in range(4, 10):
+                        slots_D_prime = cat_slots_full[ind*batch_size:(ind+1)*batch_size]
                         cat_slots = torch.cat((cat_slots[:3*batch_size], slots_D_prime), 0)
                         losses, cos_losses, acos_losses, _ = compute_all_losses(cat_slots)
                         hn_losses_list[ind-4].append(losses)
@@ -305,6 +307,10 @@ class ObjTestMethod(pl.LightningModule):
             _, _, avg_size_cos_hn, _ = summarize_losses(size_cos_losses_hn, obj_cos_losses_en_D)
             _, _, avg_size_acos_hn, _ = summarize_losses(size_acos_losses_hn, obj_acos_losses_en_D)
 
+            _, _, avg_pixel_l2_hn, _ = summarize_losses(snd_losses_hn, obj_losses_en_D)
+            _, _, avg_pixel_cos_hn, _ = summarize_losses(snd_cos_losses_hn, obj_cos_losses_en_D)
+            _, _, avg_pixel_acos_hn, _ = summarize_losses(snd_acos_losses_hn, obj_acos_losses_en_D)
+
             logs = {
                 "avg_val_loss": avg_loss,
                 "avg_obj_l2_ratio": avg_obj_l2_ratio.to(self.device),
@@ -316,11 +322,13 @@ class ObjTestMethod(pl.LightningModule):
                 "avg_mat_l2_baseline_hn": (avg_mat_l2_hn).to(self.device),
                 "avg_shape_l2_baseline_hn": (avg_shape_l2_hn).to(self.device),
                 "avg_size_l2_baseline_hn": (avg_size_l2_hn).to(self.device),
+                "avg_pixel_l2_baseline_hn": (avg_pixel_l2_hn).to(self.device),
                 "avg_obj_l2_ratio_hn": (1-avg_obj_l2/avg_obj_l2_hn).to(self.device),
                 "avg_color_l2_ratio_hn": (1-avg_obj_l2/avg_color_l2_hn).to(self.device),
                 "avg_mat_l2_ratio_hn": (1-avg_obj_l2/avg_mat_l2_hn).to(self.device),
                 "avg_shape_l2_ratio_hn": (1-avg_obj_l2/avg_shape_l2_hn).to(self.device),
                 "avg_size_l2_ratio_hn": (1-avg_obj_l2/avg_size_l2_hn).to(self.device),
+                "avg_pixel_l2_ratio_hn": (1-avg_obj_l2/avg_pixel_l2_hn).to(self.device),
                 "avg_obj_cos_ratio": avg_obj_cos_ratio.to(self.device),
                 "avg_obj_cos": avg_obj_cos.to(self.device),
                 "avg_obj_cos_baseline": avg_obj_cos_baseline.to(self.device),
@@ -330,11 +338,13 @@ class ObjTestMethod(pl.LightningModule):
                 "avg_mat_cos_baseline_hn": (avg_mat_cos_hn).to(self.device),
                 "avg_shape_cos_baseline_hn": (avg_shape_cos_hn).to(self.device),
                 "avg_size_cos_baseline_hn": (avg_size_cos_hn).to(self.device),
+                "avg_pixel_cos_baseline_hn": (avg_pixel_cos_hn).to(self.device),
                 "avg_obj_cos_ratio_hn": (1-avg_obj_cos/avg_obj_cos_hn).mean().to(self.device),
                 "avg_color_cos_ratio_hn": (1-avg_obj_cos/avg_color_cos_hn).to(self.device),
                 "avg_mat_cos_ratio_hn": (1-avg_obj_cos/avg_mat_cos_hn).to(self.device),
                 "avg_shape_cos_ratio_hn": (1-avg_obj_cos/avg_shape_cos_hn).to(self.device),
                 "avg_size_cos_ratio_hn": (1-avg_obj_cos/avg_size_cos_hn).to(self.device),
+                "avg_pixel_cos_ratio_hn": (1-avg_obj_cos/avg_pixel_cos_hn).to(self.device),
                 "avg_obj_acos_ratio": avg_obj_acos_ratio.to(self.device),
                 "avg_obj_acos": avg_obj_acos.to(self.device),
                 "avg_obj_acos_baseline": avg_obj_acos_baseline.to(self.device),
@@ -344,11 +354,13 @@ class ObjTestMethod(pl.LightningModule):
                 "avg_mat_acos_baseline_hn": (avg_mat_acos_hn).to(self.device),
                 "avg_shape_acos_baseline_hn": (avg_shape_acos_hn).to(self.device),
                 "avg_size_acos_baseline_hn": (avg_size_acos_hn).to(self.device),
+                "avg_pixel_acos_baseline_hn": (avg_pixel_acos_hn).to(self.device),
                 "avg_obj_acos_ratio_hn": (1-avg_obj_acos/avg_obj_acos_hn).to(self.device),
                 "avg_color_acos_ratio_hn": (1-avg_obj_acos/avg_color_acos_hn).to(self.device),
                 "avg_mat_acos_ratio_hn": (1-avg_obj_acos/avg_mat_acos_hn).to(self.device),
                 "avg_shape_acos_ratio_hn": (1-avg_obj_acos/avg_shape_acos_hn).to(self.device),
                 "avg_size_acos_ratio_hn": (1-avg_obj_acos/avg_size_acos_hn).to(self.device),
+                "avg_pixel_acos_ratio_hn": (1-avg_obj_acos/avg_pixel_acos_hn).to(self.device),
             }
             if self.params.model == "slot-attn" or "iodine" in self.params.model:
                 logs["avg_ari_mask"] = avg_ari_mask
@@ -379,9 +391,10 @@ class ObjTestMethod(pl.LightningModule):
                 factor = 1
             factor *= self.params.scheduler_gamma ** (step / decay_steps)
             return factor
-
-        scheduler = optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=warm_and_decay_lr_scheduler)
-
+        if self.params.model == "slot-attn":
+            scheduler = optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=warm_and_decay_lr_scheduler)
+        else:
+            scheduler = optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.params.scheduler_gamma)
         return (
             [optimizer],
             [{"scheduler": scheduler, "interval": "step",}],

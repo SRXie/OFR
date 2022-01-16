@@ -382,7 +382,9 @@ class BetaTCVAE(nn.Module):
 
     def forward(self, input: Tensor, **kwargs) -> List[Tensor]:
         mu, log_var = self.encode(input)
-        z = self.reparameterize(mu, log_var)
+        # mu = mu.detach()
+        # log_var = log_var.detach()
+        z = self.reparameterize(mu, log_var)#.detach()
         return  [self.decode(z), input, mu, log_var, z]
 
     def log_density_gaussian(self, x: Tensor, mu: Tensor, logvar: Tensor):
