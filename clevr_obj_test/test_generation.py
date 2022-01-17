@@ -121,22 +121,28 @@ def obj_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0, decomposed=No
                         mask_D = np.where(mask_D==64, 0.0, mask_D)
                         mask_D = np.where(mask_D==255, 1.0, mask_D)
 
-                        if np.abs(mask_A-mask_B+mask_C-mask_D).sum() > 1200.0: # 800 is the minimum number of visible pixels
+                        if np.abs(mask_A-mask_B+mask_C-mask_D).sum() > 1200.0: # 1200 is the minimum number of visible pixels
                             # hard negative
-                            drop_idx_b = random.randint(0, len(subset_idx_list_B)-1)
-                            drop_idx_d = random.randint(0, len(subset_idx_list_D)-1)
+                            drop_idx_d = random.randint(0, len(subset_idx_list_D)-2)
                             subset_idx_list_E = deepcopy(subset_idx_list_D)
-                            subset_idx_list_E[drop_idx_d] =  subset_idx_list_B[drop_idx_b]
-                            subset_idx_list_E = sorted(subset_idx_list_E)
+                            subset_idx_list_E =  subset_idx_list_E[:replace_idx_b]+list(subset_idx_list_E[replace_idx_b+1:])
                             subset_idx_E = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_E)]
                             image_E_path = create_path(test_root, main_scene_idx, subset_idx_E, file_type="bgs")
 
-                            image_F_path = image_D_path.replace("/bgs/", "/color/")
-                            image_G_path = image_D_path.replace("/bgs/", "/material/")
-                            image_H_path = image_D_path.replace("/bgs/", "/shape/")
-                            image_I_path = image_D_path.replace("/bgs/", "/size/")
+                            replace_idx_b = random.randint(0, len(subset_idx_list_B)-1)
+                            replace_idx_d = random.randint(0, len(subset_idx_list_D)-1)
+                            subset_idx_list_F = deepcopy(subset_idx_list_D)
+                            subset_idx_list_F[replace_idx_d] =  subset_idx_list_B[replace_idx_b]
+                            subset_idx_list_F = sorted(subset_idx_list_F)
+                            subset_idx_F = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_F)]
+                            image_F_path = create_path(test_root, main_scene_idx, subset_idx_F, file_type="bgs")
 
-                            tuples.append((image_A_path, image_B_path, image_C_path, image_D_path, image_E_path, image_F_path, image_G_path, image_H_path, image_I_path))
+                            image_G_path = image_D_path.replace("/bgs/", "/color/")
+                            image_H_path = image_D_path.replace("/bgs/", "/material/")
+                            image_I_path = image_D_path.replace("/bgs/", "/shape/")
+                            image_J_path = image_D_path.replace("/bgs/", "/size/")
+
+                            tuples.append((image_A_path, image_B_path, image_C_path, image_D_path, image_E_path, image_F_path, image_G_path, image_H_path, image_I_path, image_J_path))
                     except Exception as e:
                         print(e)
 

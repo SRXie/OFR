@@ -196,12 +196,12 @@ class ObjTestMethod(pl.LightningModule):
         obj_cos_losses, obj_cos_losses_en_D = [], []
         obj_acos_losses, obj_acos_losses_en_D = [], []
 
-        obj_losses_hn, color_losses_hn, mat_losses_hn, shape_losses_hn, size_losses_hn, snd_losses_hn = [], [], [], [], [], []
-        hn_losses_list = [obj_losses_hn, color_losses_hn, mat_losses_hn, shape_losses_hn, size_losses_hn, snd_losses_hn]
-        obj_cos_losses_hn, color_cos_losses_hn, mat_cos_losses_hn, shape_cos_losses_hn, size_cos_losses_hn, snd_cos_losses_hn = [], [], [], [], [], []
-        hn_cos_losses_list = [obj_cos_losses_hn, color_cos_losses_hn, mat_cos_losses_hn, shape_cos_losses_hn, size_cos_losses_hn, snd_cos_losses_hn]
-        obj_acos_losses_hn, color_acos_losses_hn, mat_acos_losses_hn, shape_acos_losses_hn, size_acos_losses_hn, snd_acos_losses_hn = [], [], [], [], [], []
-        hn_acos_losses_list = [obj_acos_losses_hn, color_acos_losses_hn, mat_acos_losses_hn, shape_acos_losses_hn, size_acos_losses_hn, snd_acos_losses_hn]
+        drop_losses_hn, obj_losses_hn, color_losses_hn, mat_losses_hn, shape_losses_hn, size_losses_hn, snd_losses_hn = [], [], [], [], [], [], []
+        hn_losses_list = [drop_losses_hn, obj_losses_hn, color_losses_hn, mat_losses_hn, shape_losses_hn, size_losses_hn, snd_losses_hn]
+        drop_cos_losses_hn, obj_cos_losses_hn, color_cos_losses_hn, mat_cos_losses_hn, shape_cos_losses_hn, size_cos_losses_hn, snd_cos_losses_hn = [], [], [], [], [], [], []
+        hn_cos_losses_list = [drop_cos_losses_hn, obj_cos_losses_hn, color_cos_losses_hn, mat_cos_losses_hn, shape_cos_losses_hn, size_cos_losses_hn, snd_cos_losses_hn]
+        drop_acos_losses_hn, obj_acos_losses_hn, color_acos_losses_hn, mat_acos_losses_hn, shape_acos_losses_hn, size_acos_losses_hn, snd_acos_losses_hn = [], [], [], [], [], [], []
+        hn_acos_losses_list = [drop_acos_losses_hn, obj_acos_losses_hn, color_acos_losses_hn, mat_acos_losses_hn, shape_acos_losses_hn, size_acos_losses_hn, snd_acos_losses_hn]
 
         if True:
             if self.params.model == "btc-vae":
@@ -229,7 +229,7 @@ class ObjTestMethod(pl.LightningModule):
                     compute_shuffle_loss(cat_zs[:4*batch_size], obj_losses_en_D)
                     compute_shuffle_cosine_loss(cat_zs[:4*batch_size], obj_cos_losses_en_D, obj_acos_losses_en_D)
 
-                    for ind in range(4, 10):
+                    for ind in range(4, 11):
                         zs_D_prime = cat_zs[ind*batch_size:(ind+1)*batch_size]
                         cat_zs_hn = torch.cat((cat_zs[:3*batch_size], zs_D_prime), 0)
                         compute_loss(cat_zs_hn, hn_losses_list[ind-4])
@@ -275,7 +275,7 @@ class ObjTestMethod(pl.LightningModule):
                     obj_cos_losses_en_D.append(cos_losses_en_D)
                     obj_acos_losses_en_D.append(acos_losses_en_D)
 
-                    for ind in range(4, 10):
+                    for ind in range(4, 11):
                         slots_D_prime = cat_slots_full[ind*batch_size:(ind+1)*batch_size]
                         cat_slots = torch.cat((cat_slots[:3*batch_size], slots_D_prime), 0)
                         losses, cos_losses, acos_losses, _ = compute_all_losses(cat_slots)
@@ -286,6 +286,10 @@ class ObjTestMethod(pl.LightningModule):
             std_obj_l2_ratio, avg_obj_l2_ratio, avg_obj_l2, avg_obj_l2_baseline = summarize_losses(obj_losses, obj_losses_en_D)
             std_obj_cos_ratio, avg_obj_cos_ratio, avg_obj_cos, avg_obj_cos_baseline = summarize_losses(obj_cos_losses, obj_cos_losses_en_D)
             std_obj_acos_ratio, avg_obj_acos_ratio, avg_obj_acos, avg_obj_acos_baseline = summarize_losses(obj_acos_losses, obj_acos_losses_en_D)
+
+            avg_drop_l2_hn, avg_drop_l2_ratio_hn = summarize_precondition_losses(drop_losses_hn, obj_losses)
+            avg_drop_cos_hn, avg_drop_cos_ratio_hn = summarize_precondition_losses(drop_cos_losses_hn, obj_cos_losses)
+            avg_drop_acos_hn, avg_drop_acos_ratio_hn = summarize_precondition_losses(drop_acos_losses_hn, obj_acos_losses)
 
             avg_obj_l2_hn, avg_obj_l2_ratio_hn = summarize_precondition_losses(obj_losses_hn, obj_losses)
             avg_obj_cos_hn, avg_obj_cos_ratio_hn = summarize_precondition_losses(obj_cos_losses_hn, obj_cos_losses)
@@ -317,12 +321,14 @@ class ObjTestMethod(pl.LightningModule):
                 "avg_obj_l2": avg_obj_l2.to(self.device),
                 "avg_obj_l2_baseline": avg_obj_l2_baseline.to(self.device),
                 "std_obj_l2_ratio": std_obj_l2_ratio.to(self.device),
+                "avg_drop_l2_baseline_hn": (avg_drop_l2_hn).to(self.device),
                 "avg_obj_l2_baseline_hn": (avg_obj_l2_hn).to(self.device),
                 "avg_color_l2_baseline_hn": (avg_color_l2_hn).to(self.device),
                 "avg_mat_l2_baseline_hn": (avg_mat_l2_hn).to(self.device),
                 "avg_shape_l2_baseline_hn": (avg_shape_l2_hn).to(self.device),
                 "avg_size_l2_baseline_hn": (avg_size_l2_hn).to(self.device),
                 "avg_pixel_l2_baseline_hn": (avg_pixel_l2_hn).to(self.device),
+                "avg_drop_l2_ratio_hn": avg_drop_l2_ratio_hn.to(self.device),
                 "avg_obj_l2_ratio_hn": avg_obj_l2_ratio_hn.to(self.device),
                 "avg_color_l2_ratio_hn": avg_color_l2_ratio_hn.to(self.device),
                 "avg_mat_l2_ratio_hn": avg_mat_l2_ratio_hn.to(self.device),
@@ -333,12 +339,14 @@ class ObjTestMethod(pl.LightningModule):
                 "avg_obj_cos": avg_obj_cos.to(self.device),
                 "avg_obj_cos_baseline": avg_obj_cos_baseline.to(self.device),
                 "std_obj_cos_ratio": std_obj_cos_ratio.to(self.device),
+                "avg_drop_cos_baseline_hn": (avg_drop_cos_hn).to(self.device),
                 "avg_obj_cos_baseline_hn": (avg_obj_cos_hn).to(self.device),
                 "avg_color_cos_baseline_hn": (avg_color_cos_hn).to(self.device),
                 "avg_mat_cos_baseline_hn": (avg_mat_cos_hn).to(self.device),
                 "avg_shape_cos_baseline_hn": (avg_shape_cos_hn).to(self.device),
                 "avg_size_cos_baseline_hn": (avg_size_cos_hn).to(self.device),
                 "avg_pixel_cos_baseline_hn": (avg_pixel_cos_hn).to(self.device),
+                "avg_drop_cos_ratio_hn": avg_drop_cos_ratio_hn.to(self.device),
                 "avg_obj_cos_ratio_hn": avg_obj_cos_ratio_hn.to(self.device),
                 "avg_color_cos_ratio_hn": avg_color_cos_ratio_hn.to(self.device),
                 "avg_mat_cos_ratio_hn": avg_mat_cos_ratio_hn.to(self.device),
@@ -349,12 +357,14 @@ class ObjTestMethod(pl.LightningModule):
                 "avg_obj_acos": avg_obj_acos.to(self.device),
                 "avg_obj_acos_baseline": avg_obj_acos_baseline.to(self.device),
                 "std_obj_acos_ratio": std_obj_acos_ratio.to(self.device),
+                "avg_drop_acos_baseline_hn": (avg_drop_acos_hn).to(self.device),
                 "avg_obj_acos_baseline_hn": (avg_obj_acos_hn).to(self.device),
                 "avg_color_acos_baseline_hn": (avg_color_acos_hn).to(self.device),
                 "avg_mat_acos_baseline_hn": (avg_mat_acos_hn).to(self.device),
                 "avg_shape_acos_baseline_hn": (avg_shape_acos_hn).to(self.device),
                 "avg_size_acos_baseline_hn": (avg_size_acos_hn).to(self.device),
                 "avg_pixel_acos_baseline_hn": (avg_pixel_acos_hn).to(self.device),
+                "avg_drop_acos_ratio_hn": avg_drop_acos_ratio_hn.to(self.device),
                 "avg_obj_acos_ratio_hn": avg_obj_acos_ratio_hn.to(self.device),
                 "avg_color_acos_ratio_hn": avg_color_acos_ratio_hn.to(self.device),
                 "avg_mat_acos_ratio_hn": avg_mat_acos_ratio_hn.to(self.device),
