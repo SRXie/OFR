@@ -13,7 +13,7 @@ from utils import compute_cos_distance, compute_rank_correlation
 from utils import batched_index_select
 from utils import compute_greedy_loss, compute_loss, compute_cosine_loss
 from utils import compute_shuffle_greedy_loss, compute_shuffle_loss, compute_shuffle_cosine_loss
-from utils import compute_all_losses, compute_precondition_losses, summarize_losses
+from utils import compute_all_losses, summarize_precondition_losses, summarize_losses
 from utils import swap_bg_slot_back
 from utils import captioned_masked_recons
 from utils import split_and_interleave_stack
