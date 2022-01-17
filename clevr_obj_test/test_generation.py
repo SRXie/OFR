@@ -38,7 +38,7 @@ def create_scene_from_path(test_root, main_scene_idx, sub_scene_idx=0):
         scene_dict = json.load(f1)
 
     with open(meta_path) as f2:
-        if "/obj_test_occ_w/" in meta_path:
+        if "/obj_test/" in meta_path:
             objs2img = json.load(f2)
             attrs2img = None
         elif "/attr_test/" in meta_path:
