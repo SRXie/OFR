@@ -369,6 +369,14 @@ def compute_all_losses(cat_slots):
 
     return greedy_losses, cos_losses, acos_losses, cat_slots
 
+def summarize_precondition_losses(losses_hn, losses):
+    cat_losses = torch.cat(losses, 0)
+    cat_losses_hn = torch.cat(losses_hn, 0)
+    avg_loss = cat_losses.mean()
+    ratio = torch.count_nonzero(cat_losses_hn>cat_losses)/cat_losses.shape[0]
+
+    return avg_loss, ratio
+
 def summarize_losses(losses, losses_en):
     cat_losses = torch.cat(losses, 0)
     cat_losses_en = torch.cat([x for x in losses_en], 0)

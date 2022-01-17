@@ -13,7 +13,7 @@ from utils import compute_cos_distance, compute_rank_correlation
 from utils import batched_index_select
 from utils import compute_greedy_loss, compute_loss, compute_cosine_loss
 from utils import compute_shuffle_greedy_loss, compute_shuffle_loss, compute_shuffle_cosine_loss
-from utils import compute_all_losses, summarize_losses
+from utils import compute_all_losses, compute_precondition_losses, summarize_losses
 from utils import swap_bg_slot_back
 from utils import captioned_masked_recons
 from utils import split_and_interleave_stack
@@ -213,7 +213,7 @@ class ObjTestMethod(pl.LightningModule):
                         cat_batch = cat_batch.to(self.device)
 
                     mu, log_var = self.model.encode(cat_batch)
-                    cat_zs = mu #self.model.reparameterize(mu, log_var).detach()
+                    cat_zs = mu.detach() #self.model.reparameterize(mu, log_var).detach()
 
                     # if self.trainer.running_sanity_check:
                     #     compute_loss(cat_batch[:4*batch_size].view(4*batch_size, -1), obj_losses)
@@ -253,7 +253,7 @@ class ObjTestMethod(pl.LightningModule):
                     else:
                         raise NotImplementedError
 
-                    slots_nodup = slots_nodup.cpu()
+                    slots_nodup = slots_nodup.detach().cpu()
                     slots_nodup_list.append(slots_nodup)
                     if len(slots_nodup_list)==64//self.params.test_batch_size:
                         cat_slots_full = torch.cat(slots_nodup_list, 0)
@@ -287,29 +287,29 @@ class ObjTestMethod(pl.LightningModule):
             std_obj_cos_ratio, avg_obj_cos_ratio, avg_obj_cos, avg_obj_cos_baseline = summarize_losses(obj_cos_losses, obj_cos_losses_en_D)
             std_obj_acos_ratio, avg_obj_acos_ratio, avg_obj_acos, avg_obj_acos_baseline = summarize_losses(obj_acos_losses, obj_acos_losses_en_D)
 
-            _, _, avg_obj_l2_hn, _ = summarize_losses(obj_losses_hn, obj_losses_en_D)
-            _, _, avg_obj_cos_hn, _ = summarize_losses(obj_cos_losses_hn, obj_cos_losses_en_D)
-            _, _, avg_obj_acos_hn, _ = summarize_losses(obj_acos_losses_hn, obj_acos_losses_en_D)
+            avg_obj_l2_hn, avg_obj_l2_ratio_hn = summarize_precondition_losses(obj_losses_hn, obj_losses)
+            avg_obj_cos_hn, avg_obj_cos_ratio_hn = summarize_precondition_losses(obj_cos_losses_hn, obj_cos_losses)
+            avg_obj_acos_hn, avg_obj_acos_ratio_hn = summarize_precondition_losses(obj_acos_losses_hn, obj_acos_losses)
 
-            _, _, avg_color_l2_hn, _ = summarize_losses(color_losses_hn, obj_losses_en_D)
-            _, _, avg_color_cos_hn, _ = summarize_losses(color_cos_losses_hn, obj_cos_losses_en_D)
-            _, _, avg_color_acos_hn, _ = summarize_losses(color_acos_losses_hn, obj_acos_losses_en_D)
+            avg_color_l2_hn, avg_color_l2_ratio_hn = summarize_precondition_losses(color_losses_hn, obj_losses)
+            avg_color_cos_hn, avg_color_cos_ratio_hn = summarize_precondition_losses(color_cos_losses_hn, obj_cos_losses)
+            avg_color_acos_hn, avg_color_acos_ratio_hn = summarize_precondition_losses(color_acos_losses_hn, obj_acos_losses)
 
-            _, _, avg_mat_l2_hn, _ = summarize_losses(mat_losses_hn, obj_losses_en_D)
-            _, _, avg_mat_cos_hn, _ = summarize_losses(mat_cos_losses_hn, obj_cos_losses_en_D)
-            _, _, avg_mat_acos_hn, _ = summarize_losses(mat_acos_losses_hn, obj_acos_losses_en_D)
+            avg_mat_l2_hn, avg_mat_l2_ratio_hn = summarize_precondition_losses(mat_losses_hn, obj_losses)
+            avg_mat_cos_hn, avg_mat_cos_ratio_hn = summarize_precondition_losses(mat_cos_losses_hn, obj_cos_losses)
+            avg_mat_acos_hn, avg_mat_acos_ratio_hn = summarize_precondition_losses(mat_acos_losses_hn, obj_acos_losses)
 
-            _, _, avg_shape_l2_hn, _ = summarize_losses(shape_losses_hn, obj_losses_en_D)
-            _, _, avg_shape_cos_hn, _ = summarize_losses(shape_cos_losses_hn, obj_cos_losses_en_D)
-            _, _, avg_shape_acos_hn, _ = summarize_losses(shape_acos_losses_hn, obj_acos_losses_en_D)
+            avg_shape_l2_hn, avg_shape_l2_ratio_hn = summarize_precondition_losses(shape_losses_hn, obj_losses)
+            avg_shape_cos_hn, avg_shape_cos_ratio_hn = summarize_precondition_losses(shape_cos_losses_hn, obj_cos_losses)
+            avg_shape_acos_hn, avg_shape_acos_ratio_hn = summarize_precondition_losses(shape_acos_losses_hn, obj_acos_losses)
 
-            _, _, avg_size_l2_hn, _ = summarize_losses(size_losses_hn, obj_losses_en_D)
-            _, _, avg_size_cos_hn, _ = summarize_losses(size_cos_losses_hn, obj_cos_losses_en_D)
-            _, _, avg_size_acos_hn, _ = summarize_losses(size_acos_losses_hn, obj_acos_losses_en_D)
+            avg_size_l2_hn, avg_size_l2_ratio_hn = summarize_precondition_losses(size_losses_hn, obj_losses)
+            avg_size_cos_hn, avg_size_cos_ratio_hn = summarize_precondition_losses(size_cos_losses_hn, obj_cos_losses)
+            avg_size_acos_hn, avg_size_acos_ratio_hn = summarize_precondition_losses(size_acos_losses_hn, obj_acos_losses)
 
-            _, _, avg_pixel_l2_hn, _ = summarize_losses(snd_losses_hn, obj_losses_en_D)
-            _, _, avg_pixel_cos_hn, _ = summarize_losses(snd_cos_losses_hn, obj_cos_losses_en_D)
-            _, _, avg_pixel_acos_hn, _ = summarize_losses(snd_acos_losses_hn, obj_acos_losses_en_D)
+            avg_pixel_l2_hn, avg_pixel_l2_ratio_hn = summarize_precondition_losses(snd_losses_hn, obj_losses)
+            avg_pixel_cos_hn, avg_pixel_cos_ratio_hn = summarize_precondition_losses(snd_cos_losses_hn, obj_cos_losses)
+            avg_pixel_acos_hn, avg_pixel_acos_ratio_hn = summarize_precondition_losses(snd_acos_losses_hn, obj_acos_losses)
 
             logs = {
                 "avg_val_loss": avg_loss,
@@ -323,12 +323,12 @@ class ObjTestMethod(pl.LightningModule):
                 "avg_shape_l2_baseline_hn": (avg_shape_l2_hn).to(self.device),
                 "avg_size_l2_baseline_hn": (avg_size_l2_hn).to(self.device),
                 "avg_pixel_l2_baseline_hn": (avg_pixel_l2_hn).to(self.device),
-                "avg_obj_l2_ratio_hn": (1-avg_obj_l2/avg_obj_l2_hn).to(self.device),
-                "avg_color_l2_ratio_hn": (1-avg_obj_l2/avg_color_l2_hn).to(self.device),
-                "avg_mat_l2_ratio_hn": (1-avg_obj_l2/avg_mat_l2_hn).to(self.device),
-                "avg_shape_l2_ratio_hn": (1-avg_obj_l2/avg_shape_l2_hn).to(self.device),
-                "avg_size_l2_ratio_hn": (1-avg_obj_l2/avg_size_l2_hn).to(self.device),
-                "avg_pixel_l2_ratio_hn": (1-avg_obj_l2/avg_pixel_l2_hn).to(self.device),
+                "avg_obj_l2_ratio_hn": avg_obj_l2_ratio_hn.to(self.device),
+                "avg_color_l2_ratio_hn": avg_color_l2_ratio_hn.to(self.device),
+                "avg_mat_l2_ratio_hn": avg_mat_l2_ratio_hn.to(self.device),
+                "avg_shape_l2_ratio_hn": avg_shape_l2_ratio_hn.to(self.device),
+                "avg_size_l2_ratio_hn": avg_size_l2_ratio_hn.to(self.device),
+                "avg_pixel_l2_ratio_hn": avg_pixel_l2_ratio_hn.to(self.device),
                 "avg_obj_cos_ratio": avg_obj_cos_ratio.to(self.device),
                 "avg_obj_cos": avg_obj_cos.to(self.device),
                 "avg_obj_cos_baseline": avg_obj_cos_baseline.to(self.device),
@@ -339,28 +339,28 @@ class ObjTestMethod(pl.LightningModule):
                 "avg_shape_cos_baseline_hn": (avg_shape_cos_hn).to(self.device),
                 "avg_size_cos_baseline_hn": (avg_size_cos_hn).to(self.device),
                 "avg_pixel_cos_baseline_hn": (avg_pixel_cos_hn).to(self.device),
-                "avg_obj_cos_ratio_hn": (1-avg_obj_cos/avg_obj_cos_hn).mean().to(self.device),
-                "avg_color_cos_ratio_hn": (1-avg_obj_cos/avg_color_cos_hn).to(self.device),
-                "avg_mat_cos_ratio_hn": (1-avg_obj_cos/avg_mat_cos_hn).to(self.device),
-                "avg_shape_cos_ratio_hn": (1-avg_obj_cos/avg_shape_cos_hn).to(self.device),
-                "avg_size_cos_ratio_hn": (1-avg_obj_cos/avg_size_cos_hn).to(self.device),
-                "avg_pixel_cos_ratio_hn": (1-avg_obj_cos/avg_pixel_cos_hn).to(self.device),
+                "avg_obj_cos_ratio_hn": avg_obj_cos_ratio_hn.to(self.device),
+                "avg_color_cos_ratio_hn": avg_color_cos_ratio_hn.to(self.device),
+                "avg_mat_cos_ratio_hn": avg_mat_cos_ratio_hn.to(self.device),
+                "avg_shape_cos_ratio_hn": avg_shape_cos_ratio_hn.to(self.device),
+                "avg_size_cos_ratio_hn": avg_size_cos_ratio_hn.to(self.device),
+                "avg_pixel_cos_ratio_hn": avg_pixel_cos_ratio_hn.to(self.device),
                 "avg_obj_acos_ratio": avg_obj_acos_ratio.to(self.device),
                 "avg_obj_acos": avg_obj_acos.to(self.device),
                 "avg_obj_acos_baseline": avg_obj_acos_baseline.to(self.device),
                 "std_obj_acos_ratio": std_obj_acos_ratio.to(self.device),
-                "avg_obj_acos_baseline_hn": (avg_obj_acos_hn).mean().to(self.device),
+                "avg_obj_acos_baseline_hn": (avg_obj_acos_hn).to(self.device),
                 "avg_color_acos_baseline_hn": (avg_color_acos_hn).to(self.device),
                 "avg_mat_acos_baseline_hn": (avg_mat_acos_hn).to(self.device),
                 "avg_shape_acos_baseline_hn": (avg_shape_acos_hn).to(self.device),
                 "avg_size_acos_baseline_hn": (avg_size_acos_hn).to(self.device),
                 "avg_pixel_acos_baseline_hn": (avg_pixel_acos_hn).to(self.device),
-                "avg_obj_acos_ratio_hn": (1-avg_obj_acos/avg_obj_acos_hn).to(self.device),
-                "avg_color_acos_ratio_hn": (1-avg_obj_acos/avg_color_acos_hn).to(self.device),
-                "avg_mat_acos_ratio_hn": (1-avg_obj_acos/avg_mat_acos_hn).to(self.device),
-                "avg_shape_acos_ratio_hn": (1-avg_obj_acos/avg_shape_acos_hn).to(self.device),
-                "avg_size_acos_ratio_hn": (1-avg_obj_acos/avg_size_acos_hn).to(self.device),
-                "avg_pixel_acos_ratio_hn": (1-avg_obj_acos/avg_pixel_acos_hn).to(self.device),
+                "avg_obj_acos_ratio_hn": avg_obj_acos_ratio_hn.to(self.device),
+                "avg_color_acos_ratio_hn": avg_color_acos_ratio_hn.to(self.device),
+                "avg_mat_acos_ratio_hn": avg_mat_acos_ratio_hn.to(self.device),
+                "avg_shape_acos_ratio_hn": avg_shape_acos_ratio_hn.to(self.device),
+                "avg_size_acos_ratio_hn": avg_size_acos_ratio_hn.to(self.device),
+                "avg_pixel_acos_ratio_hn": avg_pixel_acos_ratio_hn.to(self.device),
             }
             if self.params.model == "slot-attn" or "iodine" in self.params.model:
                 logs["avg_ari_mask"] = avg_ari_mask
