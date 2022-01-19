@@ -11,6 +11,23 @@ with open(os.path.join("/checkpoint/siruixie/clevr_obj_test/output/obj_test_occ_
 A, B, C, D = [], [], [], []
 ABCD = [A, B, C, D]
 
+color_map = {
+    "gray": 0.87,
+    "red": 0.73,
+    "blue": 0.42,
+    "green": 0.29,
+    "brown": 0.33,
+    "purple": 0.15,
+    "cyan": 0.66,
+    "yellow": 0.52
+    }
+
+shape_map = {
+    "cube": 0.3,
+    "sphere": 0.6,
+    "cylinder": 0.9
+}
+
 for test_case in obj_algebra_test_cases:
 
     test_case = test_case[:4] # get A, B, C, D
