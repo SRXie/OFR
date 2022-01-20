@@ -537,17 +537,17 @@ def captioned_masked_recons(recons, masks, slots, attns=None):
         for j in range(masked_recons.shape[1]):
             img = transforms.ToPILImage()(masked_recons[i,j])
             draw = ImageDraw.Draw(img)
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 8)
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
             feature_text = "feat: "+str(feature_dup_idx[i,j].item())+" - {:.4f}".format(feature_dup_sim[i,j].item())
-            draw.text((4,55), feature_text, (255, 255, 255), font=font)
+            draw.text((4,90), feature_text, (255, 255, 255), font=font)
             img = transforms.ToTensor()(img)
             img = to_tensor_from_rgb(img)
             masked_recons[i,j] = img
         for j in range(masked_recons.shape[1]):
             img = transforms.ToPILImage()(recons[i,j])
             draw = ImageDraw.Draw(img)
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 8)
-            pixel_text = "attn: {:.4f}".format(mask_mass[i,j].item())
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
+            pixel_text = "mask: {:.4f}".format(mask_mass[i,j].item())
             draw.text((4,0), pixel_text, (0, 0, 0), font=font)
             img = transforms.ToTensor()(img)
             img = to_tensor_from_rgb(img)
