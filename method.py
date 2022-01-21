@@ -89,9 +89,9 @@ class ObjTestMethod(pl.LightningModule):
 
             else:
                 if self.params.model == "slot-attn":
-                    recon_combined, recons, masks, slots, attns, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold, viz=True)
+                    recon_combined, recons, masks, slots, attns, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold, rm_invisible = self.params.rm_invisible, viz=True)
                 elif "iodine" in self.params.model:
-                    recon_combined, recons, masks, slots, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold, viz=True)
+                    recon_combined, recons, masks, slots, recon_combined_nodup, recons_nodup, masks_nodup, slots_nodup = self.model.forward(batch, dup_threshold=self.params.dup_threshold, rm_invisible = self.params.rm_invisible, viz=True)
                 else:
                     raise NotImplementedError
 
@@ -237,6 +237,7 @@ class ObjTestMethod(pl.LightningModule):
             else:
                 slots_nodup_list = []
                 dup_threshold = self.params.dup_threshold
+                rm_invisible = self.params.rm_invisible
                 i = 0
                 for batch in dl:
                     # batch is a length-9 list, each element is a tensor of shape (batch_size, 3, width, height)
@@ -247,9 +248,9 @@ class ObjTestMethod(pl.LightningModule):
                         cat_batch = cat_batch.to(self.device)
 
                     if self.params.model == "slot-attn":
-                        _, _, _, slots, _, _, _, _, slots_nodup = self.model.forward(cat_batch, slots_only=False, dup_threshold=dup_threshold, viz=False)
+                        _, _, _, slots, _, _, _, _, slots_nodup = self.model.forward(cat_batch, slots_only=False, dup_threshold=dup_threshold, rm_invisible = rm_invisible, viz=False)
                     elif "iodine" in self.params.model:
-                        _, _, _, slots, _, _, _, slots_nodup = self.model.forward(cat_batch, dup_threshold=dup_threshold, viz=False)
+                        _, _, _, slots, _, _, _, slots_nodup = self.model.forward(cat_batch, dup_threshold=dup_threshold, rm_invisible = rm_invisible, viz=False)
                     else:
                         raise NotImplementedError
 

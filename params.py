@@ -37,3 +37,4 @@ class Params:
     decay_steps_pct: float = 0.2
     test_type: str = "obj"
     dup_threshold: Optional[float] = 0.15
+    rm_invisible: bool = True

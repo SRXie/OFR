@@ -219,7 +219,7 @@ class SlotAttentionModel(nn.Module):
         self.slots_log_sigma = self.slot_attention.slots_log_sigma
         self.blank_slot = None
 
-    def forward(self, x, slots_only=False, dup_threshold=None, viz=False):
+    def forward(self, x, slots_only=False, dup_threshold=None, rm_invisible=False, viz=False):
         if self.empty_cache:
             torch.cuda.empty_cache()
 
@@ -300,8 +300,9 @@ class SlotAttentionModel(nn.Module):
 
             masks_nodup_mass = masks_nodup.view(batch_size, num_slots, -1)
             masks_nodup_mass = torch.where(masks_nodup_mass>=masks_nodup_mass.max(dim=1)[0].unsqueeze(1).repeat(1,recons.shape[1],1), masks_nodup_mass, torch.zeros_like(masks_nodup_mass)).sum(-1)
-            invisible_index = torch.nonzero(masks_nodup_mass==0.0, as_tuple=True)
-            slots_nodup[invisible_index[0], invisible_index[1]] = blank_slots
+            if rm_invisible:
+                invisible_index = torch.nonzero(masks_nodup_mass==0.0, as_tuple=True)
+                slots_nodup[invisible_index[0], invisible_index[1]] = blank_slots
 
             unnormalized_masks_nodup[duplicated_index[0], duplicated_index[1]] = -1000000.0*torch.ones_like(masks_nodup_mass[0,0])
             masks_nodup = F.softmax(unnormalized_masks_nodup, dim=1)
