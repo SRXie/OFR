@@ -6,16 +6,16 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from utils import Tensor
-from utils import assert_shape
-from utils import build_grid
-from utils import conv_transpose_out_shape
-from utils import compute_cos_distance
-from utils import batched_index_select
-from utils import compute_mask_ari
-from utils import to_rgb_from_tensor
-from utils import compute_corr_coef
-from utils import compute_greedy_loss, compute_pseudo_greedy_loss
+from objt_utils import Tensor
+from objt_utils import assert_shape
+from objt_utils import build_grid
+from objt_utils import conv_transpose_out_shape
+from objt_utils import compute_cos_distance
+from objt_utils import batched_index_select
+from objt_utils import compute_mask_ari
+from objt_utils import to_rgb_from_tensor
+from objt_utils import compute_corr_coef
+from objt_utils import compute_greedy_loss, compute_pseudo_greedy_loss
 
 
 class SlotAttention(nn.Module):

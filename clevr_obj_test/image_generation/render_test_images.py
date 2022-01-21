@@ -43,7 +43,7 @@ if INSIDE_BLENDER:
     print("$VERSION is your Blender version (such as 2.78).")
     sys.exit(1)
 
-ROOT = '/checkpoint/siruixie/clevr_obj_test/output/obj_test_occ_prep/8'
+ROOT = '/checkpoint/siruixie/clevr_obj_test/output/obj_test_occ_prep/1'
 parser = argparse.ArgumentParser()
 
 # Input options

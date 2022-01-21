@@ -3,7 +3,7 @@ from typing import Optional
 import hydra
 import logging
 import os
-from csv import reader
+from csv import reader, writer
 from time import localtime, strftime
 import pytorch_lightning.loggers as pl_loggers
 from pytorch_lightning import Trainer
@@ -18,8 +18,8 @@ from data import CLEVRDataModule
 from method import ObjTestMethod
 from models.slot_attention import SlotAttentionModel
 from models.beta_vae import BetaVAE, BetaTCVAE
-from utils import ImageLogCallback
-from utils import rescale
+from objt_utils import ImageLogCallback
+from objt_utils import rescale
 
 
 class _Workplace(object):
@@ -64,13 +64,13 @@ class _Workplace(object):
         #         transforms.ToTensor(),
         #     ])
 
-        if os.path.exists(os.path.join(cfg.test_root, "obj_test", "CLEVR_test_cases.csv")):
-            with open(os.path.join(cfg.test_root, "obj_test", "CLEVR_test_cases.csv"), "r") as f:
+        if os.path.exists(os.path.join(cfg.test_root, "obj_test_final", "CLEVR_test_cases_hard.csv")):
+            with open(os.path.join(cfg.test_root, "obj_test_final", "CLEVR_test_cases_hard.csv"), "r") as f:
                 csv_reader = reader(f)
                 self.obj_algebra_test_cases = list(csv_reader)
         else:
             self.obj_algebra_test_cases = None
-            print(os.path.join(cfg.test_root, "obj_test", "CLEVR_test_cases.csv")+" does not exist.")
+            print(os.path.join(cfg.test_root, "obj_test_final", "CLEVR_test_cases_hard.csv")+" does not exist.")
 
         if os.path.exists(os.path.join(cfg.val_root, "CLEVR_val_list.csv")):
             with open(os.path.join(cfg.val_root, "CLEVR_val_list.csv"), "r") as f:
@@ -153,16 +153,16 @@ class _Workplace(object):
         # for key in list(state_dict.keys()):
         #     state_dict[key.replace('model.', '')] = state_dict.pop(key)
         # model.load_state_dict(state_dict)
-
-        # ckpt = torch.load("/private/home/siruixie/OFR_debug/OFR/outputs/objectness-test-metric/26bycsk6/checkpoints/epoch=3-step=719.ckpt")
+        # ckpt = torch.load("/checkpoint/siruixie/runs/objectness/hydra_train_corr_new/data_mix_idx=1,lr=0.0002,sweep_name=corr_new/objectness-test-corr/31c8iux8/checkpoints/epoch=299-step=107999.ckpt")
+        # ckpt = torch.load("/checkpoint/siruixie/runs/objectness/hydra_train_corr_new/data_mix_idx=13,lr=0.0002,sweep_name=corr_new/objectness-test-corr/2rx0xfji/checkpoints/epoch=299-step=216000.ckpt")
         # state_dict = ckpt['state_dict']
         # for key in list(state_dict.keys()):
         #     state_dict[key.replace('model.', '')] = state_dict.pop(key)
         # model.load_state_dict(state_dict)
         self.method = ObjTestMethod(model=model, datamodule=clevr_datamodule, params=cfg)
 
-        logger_name = cfg.model+"/"+self.dataset+"/s-" + str(seed)
-        logger = pl_loggers.WandbLogger(project="objectness-test-metric", name=logger_name)
+        logger_name = cfg.model+"/"+self.dataset+"/s-" + str(seed)+"-dup-"+str(cfg.dup_threshold)
+        logger = pl_loggers.WandbLogger(project="objectness-test-final", name=logger_name)
 
         self.trainer = Trainer(
             logger=logger if cfg.is_logger_enabled else False,
@@ -183,7 +183,7 @@ class _Workplace(object):
         print("-----------------")
         print(self.trainer.logged_metrics)
 
-@hydra.main(config_path='hydra_cfg', config_name='experiment')
+@hydra.main(config_path='hydra_cfg', config_name='slot-attn')
 def main(cfg):
     logging.info(cfg)
 
@@ -192,7 +192,7 @@ def main(cfg):
     workplace = _Workplace(cfg)
 
     workplace.run_training()
-
+    
 
 if __name__ == "__main__":
     main()

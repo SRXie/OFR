@@ -374,8 +374,8 @@ def summarize_precondition_losses(losses_hn, losses):
     cat_losses_hn = torch.cat(losses_hn, 0)
     avg_loss = cat_losses.mean()
     ratio = torch.count_nonzero(cat_losses_hn>cat_losses)/cat_losses.shape[0]
-
-    return avg_loss, ratio
+    gap = cat_losses_hn.mean() - avg_loss
+    return avg_loss, ratio, gap
 
 def summarize_losses(losses, losses_en):
     cat_losses = torch.cat(losses, 0)
@@ -539,7 +539,7 @@ def captioned_masked_recons(recons, masks, slots, attns=None):
             draw = ImageDraw.Draw(img)
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
             feature_text = "feat: "+str(feature_dup_idx[i,j].item())+" - {:.4f}".format(feature_dup_sim[i,j].item())
-            draw.text((4,90), feature_text, (255, 255, 255), font=font)
+            draw.text((4,93), feature_text, (255, 255, 255), font=font)
             img = transforms.ToTensor()(img)
             img = to_tensor_from_rgb(img)
             masked_recons[i,j] = img

@@ -19,7 +19,7 @@ from torch.utils.data import Dataset
 from torch.utils.data import RandomSampler
 from torchvision.transforms import transforms
 
-from utils import compact
+from objt_utils import compact
 from clevr_obj_test.test_generation import obj_algebra_test
 
 
@@ -159,7 +159,7 @@ class CLEVRAlgebraTestset(Dataset):
         self.clevr_transforms = clevr_transforms
         self.max_num_main_scenes = max_num_images
         if test_type == "obj":
-            self.test_root =  os.path.join(data_root, "obj_test")
+            self.test_root =  os.path.join(data_root, "obj_test_final")
         else:
             raise NotImplemented
         self.data_path = os.path.join(self.test_root, "images")

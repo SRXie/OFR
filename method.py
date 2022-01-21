@@ -7,17 +7,17 @@ from torchvision import utils as vutils
 from torchvision.transforms import transforms
 
 from params import Params
-from utils import Tensor
-from utils import to_rgb_from_tensor, to_tensor_from_rgb
-from utils import compute_cos_distance, compute_rank_correlation
-from utils import batched_index_select
-from utils import compute_greedy_loss, compute_loss, compute_cosine_loss
-from utils import compute_shuffle_greedy_loss, compute_shuffle_loss, compute_shuffle_cosine_loss
-from utils import compute_all_losses, summarize_precondition_losses, summarize_losses
-from utils import swap_bg_slot_back
-from utils import captioned_masked_recons
-from utils import split_and_interleave_stack
-from utils import compute_corr_coef
+from objt_utils import Tensor
+from objt_utils import to_rgb_from_tensor, to_tensor_from_rgb
+from objt_utils import compute_cos_distance, compute_rank_correlation
+from objt_utils import batched_index_select
+from objt_utils import compute_greedy_loss, compute_loss, compute_cosine_loss
+from objt_utils import compute_shuffle_greedy_loss, compute_shuffle_loss, compute_shuffle_cosine_loss
+from objt_utils import compute_all_losses, summarize_precondition_losses, summarize_losses
+from objt_utils import swap_bg_slot_back
+from objt_utils import captioned_masked_recons
+from objt_utils import split_and_interleave_stack
+from objt_utils import compute_corr_coef
 
 
 class ObjTestMethod(pl.LightningModule):
@@ -68,7 +68,7 @@ class ObjTestMethod(pl.LightningModule):
                 zs_D_prime = zs_A - zs_B + zs_C
                 recons = self.model.decode(torch.cat((mu, zs_D_prime), 0))
                 bs = batch.shape[0]//4
-                batch = torch.cat((batch, batch[-bs:]), 0)
+                batch = torch.cat((batch, batch[:bs]-batch[1*bs:2*bs]+batch[2*bs:3*bs]), 0)
                 batch = split_and_interleave_stack(batch, self.params.n_samples)
                 recons = split_and_interleave_stack(recons, self.params.n_samples)
                 # combine images in a nice way so we can display all outputs in one grid, output rescaled to be between 0 and 1
@@ -215,19 +215,19 @@ class ObjTestMethod(pl.LightningModule):
                     mu, log_var = self.model.encode(cat_batch)
                     cat_zs = mu.detach() #self.model.reparameterize(mu, log_var).detach()
 
-                    # if self.trainer.running_sanity_check:
-                    #     compute_loss(cat_batch[:4*batch_size].view(4*batch_size, -1), obj_losses)
-                    #     compute_cosine_loss(cat_batch[:4*batch_size].view(4*batch_size, -1), obj_cos_losses, obj_acos_losses)
+                    if self.trainer.running_sanity_check:
+                        compute_loss(cat_batch[:4*batch_size].view(4*batch_size, -1), obj_losses)
+                        compute_cosine_loss(cat_batch[:4*batch_size].view(4*batch_size, -1), obj_cos_losses, obj_acos_losses)
 
-                    #     compute_shuffle_loss(cat_batch[:4*batch_size].view(4*batch_size, -1), obj_losses_en_D)
-                    #     compute_shuffle_cosine_loss(cat_batch[:4*batch_size].view(4*batch_size, -1), obj_cos_losses_en_D, obj_acos_losses_en_D)
+                        compute_shuffle_loss(cat_batch[:4*batch_size].view(4*batch_size, -1), obj_losses_en_D)
+                        compute_shuffle_cosine_loss(cat_batch[:4*batch_size].view(4*batch_size, -1), obj_cos_losses_en_D, obj_acos_losses_en_D)
 
-                    # else:
-                    compute_loss(cat_zs[:4*batch_size], obj_losses)
-                    compute_cosine_loss(cat_zs[:4*batch_size], obj_cos_losses, obj_acos_losses)
+                    else:
+                        compute_loss(cat_zs[:4*batch_size], obj_losses)
+                        compute_cosine_loss(cat_zs[:4*batch_size], obj_cos_losses, obj_acos_losses)
 
-                    compute_shuffle_loss(cat_zs[:4*batch_size], obj_losses_en_D)
-                    compute_shuffle_cosine_loss(cat_zs[:4*batch_size], obj_cos_losses_en_D, obj_acos_losses_en_D)
+                        compute_shuffle_loss(cat_zs[:4*batch_size], obj_losses_en_D)
+                        compute_shuffle_cosine_loss(cat_zs[:4*batch_size], obj_cos_losses_en_D, obj_acos_losses_en_D)
 
                     for ind in range(4, 11):
                         zs_D_prime = cat_zs[ind*batch_size:(ind+1)*batch_size]
@@ -342,7 +342,7 @@ class ObjTestMethod(pl.LightningModule):
                 "avg_shape_l2_gap_hn": avg_shape_l2_gap_hn.to(self.device),
                 "avg_size_l2_gap_hn": avg_size_l2_gap_hn.to(self.device),
                 "avg_pixel_l2_gap_hn": avg_pixel_l2_gap_hn.to(self.device),
-                "avg_obj_cos_gap": avg_obj_cos_gap.to(self.device),
+                "avg_obj_cos_ratio": avg_obj_cos_ratio.to(self.device),
                 "avg_obj_cos": avg_obj_cos.to(self.device),
                 "avg_obj_cos_baseline": avg_obj_cos_baseline.to(self.device),
                 "std_obj_cos_ratio": std_obj_cos_ratio.to(self.device),
@@ -360,7 +360,6 @@ class ObjTestMethod(pl.LightningModule):
                 "avg_shape_cos_ratio_hn": avg_shape_cos_ratio_hn.to(self.device),
                 "avg_size_cos_ratio_hn": avg_size_cos_ratio_hn.to(self.device),
                 "avg_pixel_cos_ratio_hn": avg_pixel_cos_ratio_hn.to(self.device),
-                "avg_obj_acos_gap": avg_obj_acos_gap.to(self.device),
                 "avg_drop_cos_gap_hn": avg_drop_cos_gap_hn.to(self.device),
                 "avg_obj_cos_gap_hn": avg_obj_cos_gap_hn.to(self.device),
                 "avg_color_cos_gap_hn": avg_color_cos_gap_hn.to(self.device),
@@ -368,7 +367,7 @@ class ObjTestMethod(pl.LightningModule):
                 "avg_shape_cos_gap_hn": avg_shape_cos_gap_hn.to(self.device),
                 "avg_size_cos_gap_hn": avg_size_cos_gap_hn.to(self.device),
                 "avg_pixel_cos_gap_hn": avg_pixel_cos_gap_hn.to(self.device),
-                "avg_obj_acos_gap": avg_obj_acos_gap.to(self.device),
+                "avg_obj_acos_ratio": avg_obj_acos_ratio.to(self.device),
                 "avg_obj_acos": avg_obj_acos.to(self.device),
                 "avg_obj_acos_baseline": avg_obj_acos_baseline.to(self.device),
                 "std_obj_acos_ratio": std_obj_acos_ratio.to(self.device),
