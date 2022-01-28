@@ -40,6 +40,7 @@ warmup_steps: 10000
 decay_steps: 100000
 test_type: obj
 dup_threshold: 0.15
+rm_invisible: False
 result_csv: /checkpoint/siruixie/data_mix_result.csv
 
 hydra:

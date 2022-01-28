@@ -32,6 +32,7 @@ class CLEVRDataset(Dataset):
         max_n_objects: int = 10,
         data_weights: Dict = None,
         split: str = "train",
+        train_list = None,
     ):
         super().__init__()
         self.data_root = data_root
@@ -41,6 +42,7 @@ class CLEVRDataset(Dataset):
         self.max_n_objects = max_n_objects
         self.data_weights = data_weights
         self.split = split
+        self.train_list = train_list
         assert os.path.exists(self.data_root), f"Path {self.data_root} does not exist"
         assert self.split == "train" or self.split == "val" or self.split == "test"
         assert os.path.exists(self.data_path), f"Path {self.data_path} does not exist"
@@ -56,6 +58,9 @@ class CLEVRDataset(Dataset):
         return len(self.files)
 
     def get_files(self) -> List[str]:
+        if not self.train_list is None:
+            paths = [item for sublist in self.train_list for item in sublist]
+            return compact(paths)
         paths = []
         for dataset, weight in self.data_weights.items():
             print(dataset, weight)

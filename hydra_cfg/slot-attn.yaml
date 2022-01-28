@@ -19,7 +19,7 @@ test_root: /checkpoint/siruixie/clevr_obj_test/output/
 gpus: 2
 max_epochs: 500 # 1000 for iodine, 500 for slot-attn
 num_sanity_val_steps: 1
-scheduler_gamma: 1.0
+scheduler_gamma: 0.5
 weight_decay: 0.0
 num_train_images: 23000 # Optional[int]
 num_val_images: 10000  # Optional[int]

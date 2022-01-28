@@ -121,7 +121,7 @@ def obj_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0, decomposed=No
                         mask_D = np.where(mask_D==64, 0.0, mask_D)
                         mask_D = np.where(mask_D==255, 1.0, mask_D)
 
-                        if np.abs(mask_A-mask_B+mask_C-mask_D).sum() > 1400.0: # 1200 is the minimum number of visible pixels
+                        if np.abs(mask_A-mask_B+mask_C-mask_D).sum() < 400.0: #> 1400.0: # 1200 is the minimum number of visible pixels
                             # hard negative
                             drop_idx_d = random.randint(0, len(subset_idx_list_D)-2)
                             subset_idx_list_E = deepcopy(subset_idx_list_D)

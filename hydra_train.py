@@ -161,9 +161,15 @@ class _Workplace(object):
         # model.load_state_dict(state_dict)
         self.method = ObjTestMethod(model=model, datamodule=clevr_datamodule, params=cfg)
 
-        logger_name = cfg.model+"/"+self.dataset+"/s-" + str(seed)+"-dup-"+str(cfg.dup_threshold)
+        if cfg.model == "slot-attn":
+            logger_name = cfg.model+"-occ/"+self.dataset+"/dup-"+str(cfg.dup_threshold)
+            if not cfg.rm_invisible:
+                logger_name = logger_name+"-inv"
+        elif cfg.model == "btc-vae":
+            logger_name = cfg.model+"/"+self.dataset+"/s-" + str(seed)+"-beta-"+str(cfg.beta)
+        else:
+            raise NotImplementedError
         logger = pl_loggers.WandbLogger(project="objectness-test-final", name=logger_name)
-
         self.trainer = Trainer(
             logger=logger if cfg.is_logger_enabled else False,
             accelerator="ddp" if cfg.gpus > 1 else None,
