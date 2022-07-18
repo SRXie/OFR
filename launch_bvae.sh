@@ -1,1 +1,0 @@
-python hydra_train.py sweep_name="ae_final" data_mix_idx=1,2,3,4,5 decoder_type=deconv beta=2,4 hydra/launcher=submitit_slurm hydra.launcher.timeout_min=3200 hydra.launcher.gpus_per_task=1 hydra.launcher.max_num_timeout=100 hydra.launcher.partition="learnlab" hydra.launcher.cpus_per_gpu=10 -m

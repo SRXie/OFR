@@ -33,7 +33,7 @@ n_samples: 4
 warmup_steps: 10000
 decay_steps: 100000
 test_type: obj
-dup_threshold: 0.0
+dup_threshold: 0.15
 rm_invisible: False
 num_checkpoints: 10
 resume: False

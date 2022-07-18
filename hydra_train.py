@@ -126,24 +126,6 @@ class _Workplace(object):
                 beta=cfg.beta,
                 gamma=cfg.gamma,
             )
-        elif cfg.model == "iodine":
-            from models.iodine import IODINE
-            model = IODINE(
-                latent_dim = cfg.latent_dim,
-                num_iterations = cfg.num_iterations,
-                num_slots = cfg.num_slots,
-                resolution = cfg.resolution,
-                sigma = cfg.sigma,
-                use_layernorm=cfg.use_layernorm,
-            )
-        elif cfg.model == "iodine-v2":
-            from models.iodine_v2 import IODINE
-            model = IODINE(
-                z_size= cfg.latent_dim,
-                resolution= cfg.resolution,
-                num_slots = cfg.num_slots,
-                num_iters= cfg.num_iterations,
-            )
         else:
             raise NotImplementedError
 
