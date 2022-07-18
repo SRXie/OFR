@@ -5,6 +5,3 @@ __pycache__/
 outputs/
 multirun/
 core
-figures/
-generate_spreadsheet.py
-violin_plot.py
