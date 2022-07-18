@@ -1,6 +1,7 @@
 # COAT: Measuring Object Compositionality in Emergent Representations
 
 The official code repository for ICML 2022 paper "COAT: Measuring Object Compositionality in Emergent Representations".
+
 [[Paper](https://proceedings.mlr.press/v162/xie22b.html)] [[Code](https://github.com/facebookresearch/objectness_score)] [[Data](https://dl.fbapipublicfiles.com/coat_data)]
 
 <img src="figures/teaser.png" alt="teaser" width="100%" />
@@ -46,14 +47,21 @@ python hydra_train.py
 ### Logging
 We use [wandb](https://wandb.ai/site) to output logging. Logs should contain COAT metrics and test visualization. 
 
-The COAT metrics include the COAT-l2 and the COAT-acos scores which are normalized and corrected for chance, as well as the empirical probability of P(Loss(A, B, C, D)<Loss(A, B, C, D')), where D' is the hard negative. Here are some example training curves. 
-<img src=“figures/coat_curves.png” alt=“curvesr” width=“100%” />
+The COAT metrics include the COAT-l2 and the COAT-acos scores which are normalized and corrected for chance, as well as the empirical probability of P(Loss(A, B, C, D)<Loss(A, B, C, D')), where D' is the hard negative. Here are some example training curves.
 
-The visualization shows how well the models reconstructs the images, as well as how well the slots are matched for Slot Attention. Here are some examples. 
-<img src=“figures/bvae_viz.png” alt=“vae” width=“100%” />
-<img src=“figures/slot-attn-viz.png” alt=“slot-attn-viz” width=“100%” />
-<img src=“figures/slot-attn-no-dup-viz.png” alt=“slot-attn-no-dup-viz” width=“100%” />
-<img src=“figures/slot-attn-no-dup-no-inv-viz.png” alt=“slot-attn-no-dup-no-inv-viz” width=“100%” />
+<img src="figures/curves.png" alt="curves" width="100%" />
+
+The visualization shows how well the models reconstructs the images, as well as how well the slots are matched for Slot Attention. 
+
+Here are some examples. 
+
+<img src="figures/bvae-viz.png" alt="bvae-viz" width="100%" />
+
+<img src="figures/slot-attn-viz.png" alt="slot-attn-viz" width="100%" />
+
+<img src="figures/slot-attn-no-dup-viz.png" alt="slot-attn-no-dup-viz" width="100%" />
+
+<img src="figures/slot-attn-no-dup-no-inv-viz.png" alt="lot-attn-no-dup-no-inv-viz" width="100%" />
 
 
 ## Citation
