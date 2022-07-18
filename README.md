@@ -24,7 +24,7 @@ This repository contains
 - Pytorch implementation of [Slot Attention](https://arxiv.org/abs/2006.15055) and [beta-TC-VAE](https://arxiv.org/abs/1802.04942), modified based on repositories from [Untitled-AI](https://github.com/untitled-ai/slot_attention) and [AntixK](https://github.com/AntixK/PyTorch-VAE) respectively. 
  
 ### Data generation
-To generate the test or the training data, check `./coat_generation/`. 
+The generated training and test data is available at [here](https://dl.fbapipublicfiles.com/coat_data). To generate the test or the training data, check `./coat_generation/`. 
 
 ### Training
 Configuration files for models and training can be found in `./hydra_cfg/`, and should be linked to `hydra_train.py` with

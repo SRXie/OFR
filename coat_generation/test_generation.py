@@ -153,36 +153,3 @@ def obj_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0, decomposed=No
 
     return tuples
 
-def attr_algebra_test(test_root, main_scene_idx=0, sub_scene_idx=0):
-    # there are four attributes of interest, we edit at most 3
-
-    # We first create scene from json
-    scene = create_scene_from_path(test_root, main_scene_idx, sub_scene_idx)
-    tuples = [] # path tuples
-
-    # create algebra tuples A-B+C=D: Scene - Edit_complementary + Edit_all = Edit_selected
-    image_A_path = create_path(test_root, main_scene_idx)
-    for num_edit in range(1, len(scene.get_obj_attrs())):
-        # iterate through attribute combinations of the scene
-        for attr_subset in combinations(scene.get_obj_attrs(), num_edit):
-            attr_complementary = scene.get_obj_attrs().difference(attr_subset)
-
-            image_D_idxs = scene.objects[0].edit_attrs(list(attr_subset), return_imgs=True) # convert set to list to enforce order for matching itertools.prod(D, B) and C
-            image_B_idxs = scene.objects[0].edit_attrs(list(attr_complementary), return_imgs=True)
-            image_C_idxs = scene.objects[0].edit_attrs(list(attr_subset)+list(attr_complementary), return_imgs=True)
-            # Hard negatives
-            image_E_idxs = image_C_idxs.copy()
-            random.shuffle(image_E_idxs)
-            i = 0
-            for d_idx in image_D_idxs:
-                for b_idx  in image_B_idxs:
-                    c_idx = image_C_idxs[i]
-                    e_idx = image_E_idxs[i]
-                    image_B_path = create_path(test_root, main_scene_idx, b_idx)
-                    image_C_path = create_path(test_root, main_scene_idx, c_idx)
-                    image_D_path = create_path(test_root, main_scene_idx, d_idx)
-                    image_E_path = create_path(test_root, main_scene_idx, e_idx)
-                    tuples.append((image_A_path, image_B_path, image_C_path, image_D_path, image_E_path))
-                    i+=1
-            assert i == len(image_C_idxs)
-    return tuples
