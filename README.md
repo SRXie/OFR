@@ -46,7 +46,17 @@ In the training data we provide, `data_mix.csv` is a meta file for different com
 
 To generate the test or the training data, check `./coat_generation/`. 
 
-Our COAT measure can be expanded to domains other than CLEVR, the Dataset class `CLEVRAlgebraTestset` in `data.py` is reusable. Send us a PR to add your dataset! 
+Our COAT measure can be expanded to domains other than CLEVR, the Dataset class `CLEVRAlgebraTestset` in `data.py` is reusable. It takes a list of tuples of images as input `test_cases: List[List[Optional[str]]]`. In `train_hydra.py`, such a list is loaded from `/test_root/obj_test_final/CLEVR_test_cases_hard.csv`, which is contained in our released data, with the following code:
+
+```python
+if os.path.exists(os.path.join(cfg.test_root, "obj_test_final", "CLEVR_test_cases_hard.csv")):
+    with open(os.path.join(cfg.test_root, "obj_test_final", "CLEVR_test_cases_hard.csv"), "r") as f:
+        csv_reader = reader(f)
+        self.obj_algebra_test_cases = list(csv_reader)
+else:
+    self.obj_algebra_test_cases = None
+    print(os.path.join(cfg.test_root, "obj_test_final", "CLEVR_test_cases_hard.csv")+" does not exist.")
+```
 
 ### Training
 Configuration files for models and training can be found in `./hydra_cfg/`, and should be linked to `hydra_train.py` with
