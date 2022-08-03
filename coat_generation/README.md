@@ -13,7 +13,7 @@ This is the code used to generate the testing corpus of [COAT](https://proceedin
 
 It is developed based on the original repo of [CLEVR](https://github.com/facebookresearch/clevr-dataset-gen). You can use this code to render synthetic images and construct testing corpus. 
 
-The testing corpus consists of tuples with strongly occluded multi-object scenes. They are obtained through a rejection sampling with certain occlusion threshold. 
+The testing corpus consists of tuples with strongly occluded multi-object scenes. They are obtained through a rejection sampling with certain occlusion threshold. The images in each tuple are correlated in a way that A and C have different sets of objects and different backgrounds, and B and D are the results of adding the same set of objects to A and C, respectively. 
 
 <img src="../figures/coat_examples.png" alt="coat" width="100%" />
 
@@ -75,4 +75,44 @@ You can find [more details about image rendering here](image_generation/README.m
 Next we generate testing tuples for the rendered images generated in the previous step.
 This step takes as input the single JSON file containing all ground-truth scene information, and outputs a list of tuples of image paths.
 
-You can generate testing tuples with `obj_algebra_test` in `test_generation.py`
+You can generate testing tuples with `obj_algebra_test` in `test_generation.py`. Given the images for all possible subsets of objects in a scene, this function exhaustively searches through all valid object combinations of image A, B, C, D, rejects tuples with insufficient occlusion, and collects corresponding hard negatives: 
+
+```python
+   # convert masks to 0-1 value
+   mask_A = np.array(Image.open(mask_A_path))[:,:,0]
+   mask_A = np.where(mask_A==64, 0.0, mask_A)
+   mask_A = np.where(mask_A==255, 1.0, mask_A)
+   mask_B = np.array(Image.open(mask_B_path))[:,:,0]
+   mask_B = np.where(mask_B==64, 0.0, mask_B)
+   mask_B = np.where(mask_B==255, 1.0, mask_B)
+   mask_C = np.array(Image.open(mask_C_path))[:,:,0]
+   mask_C = np.where(mask_C==64, 0.0, mask_C)
+   mask_C = np.where(mask_C==255, 1.0, mask_C)
+   mask_D = np.array(Image.open(mask_D_path))[:,:,0]
+   mask_D = np.where(mask_D==64, 0.0, mask_D)
+   mask_D = np.where(mask_D==255, 1.0, mask_D)
+
+   if np.abs(mask_A-mask_B+mask_C-mask_D).sum() > OCCLUSION_THRESHOLD: 
+       # hard negative
+       drop_idx_d = random.randint(0, len(subset_idx_list_D)-2)
+       subset_idx_list_E = deepcopy(subset_idx_list_D)
+       subset_idx_list_E =  subset_idx_list_E[:drop_idx_d]+list(subset_idx_list_E[drop_idx_d+1:])
+       subset_idx_E = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_E)]
+       image_E_path = create_path(test_root, main_scene_idx, subset_idx_E, file_type="bgs")
+
+       replace_idx_b = random.randint(0, len(subset_idx_list_B)-1)
+       replace_idx_d = random.randint(0, len(subset_idx_list_D)-1)
+       subset_idx_list_F = deepcopy(subset_idx_list_D)
+       subset_idx_list_F[replace_idx_d] =  subset_idx_list_B[replace_idx_b]
+       subset_idx_list_F = sorted(subset_idx_list_F)
+       subset_idx_F = scene.objs2img["-".join( str(idx) for idx in subset_idx_list_F)]
+       image_F_path = create_path(test_root, main_scene_idx, subset_idx_F, file_type="bgs")
+
+       image_G_path = image_D_path.replace("/bgs/", "/color/")
+       image_H_path = image_D_path.replace("/bgs/", "/material/")
+       image_I_path = image_D_path.replace("/bgs/", "/shape/")
+       image_J_path = image_D_path.replace("/bgs/", "/size/")
+
+       tuples.append((image_A_path, image_B_path, image_C_path, image_D_path, image_E_path, image_F_path, image_G_path, image_H_path, image_I_path, image_J_path))
+```
+
