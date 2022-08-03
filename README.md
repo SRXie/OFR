@@ -1,6 +1,13 @@
 # COAT: Measuring Object Compositionality in Emergent Representations
 
-The official code repository for ICML 2022 paper "COAT: Measuring Object Compositionality in Emergent Representations".
+The official code repository for "COAT: Measuring Object Compositionality in Emergent Representations"  
+<br>
+ <a href='https://siruixie.com'>Sirui Xie</a>,
+ <a href='http://www.arimorcos.com/'>Ari Morcos</a>,
+ <a href='http://www.stat.ucla.edu/~sczhu/'>Song-Chun Zhu</a>,
+ <a href='https://vrama91.github.io/'>Ramakrishna Vedantam</a>
+ <br>
+ Presented at [ICML 2022](http://icml.cc/Conferences/2022).
 
 [[Paper](https://proceedings.mlr.press/v162/xie22b.html)] [[Code](https://github.com/facebookresearch/objectness_score)] [[Data](https://dl.fbapipublicfiles.com/coat_data)]
 
@@ -21,10 +28,23 @@ The official code repository for ICML 2022 paper "COAT: Measuring Object Composi
 This repository contains 
 - The generation code for COAT testing corpus modified based on the [CLEVR generation code](https://github.com/facebookresearch/clevr-dataset-gen) 
 - The generation code for Correlated CLEVR with colorful background based on the [CLEVR generation code](https://github.com/facebookresearch/clevr-dataset-gen)
-- Pytorch implementation of [Slot Attention](https://arxiv.org/abs/2006.15055) and [beta-TC-VAE](https://arxiv.org/abs/1802.04942), modified based on repositories from [Untitled-AI](https://github.com/untitled-ai/slot_attention) and [AntixK](https://github.com/AntixK/PyTorch-VAE) respectively. 
+- Pytorch implementation of [Slot Attention](https://arxiv.org/abs/2006.15055) and [beta-TC-VAE](https://arxiv.org/abs/1802.04942), modified based on repositories from [Untitled-AI](https://github.com/untitled-ai/slot_attention) and [AntixK](https://github.com/AntixK/PyTorch-VAE) respectively. The modification on Slot Attention mainly concerns the post-processing of deduplicating slots (controlled by `dup_threshold`) and removing invisible slots, i.e. slots with close-to-zero mask weight (controlled by `rm_invisible`). 
+- The method `validation_epoch_end` in `method.py` for applying the COAT metric to slot-based representations and slot-free representations. 
  
-### Data generation
-The generated training and test data is available at [here](https://dl.fbapipublicfiles.com/coat_data). To generate the test or the training data, check `./coat_generation/`. 
+### Data
+The generated training and test data is available at [here](https://dl.fbapipublicfiles.com/coat_data). You probably should change the following data paths in the configuration files in `./hydra_cfg/`:
+
+```python
+data_mix_idx: 1 # the index of data mixture, check data_mix.csv for details
+data_mix_csv: /your_data_root/data_mix.csv # the file for different composition of the training set
+data_root:  /your_data_root/clevr_corr/ # training data for both iid and correlated CLEVR with colorful background
+val_root: /your_data_root/clevr_with_masks/ # evaluation data from original CLEVR for mask ARI metric
+test_root: /your_data_root/coat_test/ # testing data for our COAT metric
+```
+
+To generate the test or the training data, check `./coat_generation/`. 
+
+Our COAT measure can be expanded to domains other than CLEVR, the Dataset class `CLEVRAlgebraTestset` in `data.py` is reusable. Send us a PR to add your dataset! 
 
 ### Training
 Configuration files for models and training can be found in `./hydra_cfg/`, and should be linked to `hydra_train.py` with
