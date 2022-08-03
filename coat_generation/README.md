@@ -15,15 +15,15 @@ It is developed based on the original repo of [CLEVR](https://github.com/faceboo
 
 The testing corpus consists of tuples with strongly occluded multi-object scenes. They are obtained through a rejection sampling with certain occlusion threshold. 
 
-<img src="figures/coat_examples.png" alt="coat" width="100%" />
+<img src="../figures/coat_examples.png" alt="coat" width="100%" />
 
 For image generation, we modified the original CLEVR generation code to introduce a colorful background and a spatially denser object distribution.
 
-<img src="figures/iid_examples.png" alt="iid" width="100%" />
+<img src="../figures/iid_examples.png" alt="iid" width="100%" />
 
 We also introduce correlation between objects to go beyond the i.i.d. prior in objects. 
 
-<img src="figures/corr_examples.png" alt="corr" width="100%" />
+<img src="../figures/corr_examples.png" alt="corr" width="100%" />
 
 
 ## Step 1: Generating Images
@@ -64,7 +64,7 @@ To render images for testing corpus instead of training, use:
 ```bash
 blender --background --python render_test_images.py -- --use_gpu 1
 ```
-This program ouputs scene images at `ROOT+'/images/'`, scene images with a different background at `ROOT+'/bgs/'`, object masks at `ROOT+'/masks/'`, ground-truth information for all objects at `ROOT+'/scenes/'`, and an index-to-object mapping for each scene at `ROOT+'/meta/'`. The method `render_subscene_obj` renders images of all possible object subsets for `scene_struct`. 
+This program outputs scene images at `ROOT+'/images/'`, scene images with a different background at `ROOT+'/bgs/'`, object masks at `ROOT+'/masks/'`, ground-truth information for all objects at `ROOT+'/scenes/'`, and an index-to-object mapping for each scene at `ROOT+'/meta/'`. The method `render_subscene_obj` renders images of all possible object subsets for `scene_struct`. 
 
 
 You can find [more details about image rendering here](image_generation/README.md).
