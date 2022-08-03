@@ -42,6 +42,8 @@ val_root: /your_data_root/clevr_with_masks/ # evaluation data from original CLEV
 test_root: /your_data_root/coat_test/ # testing data for our COAT metric
 ```
 
+In the training data we provide, `data_mix.csv` is a meta file for different composition of training sets with different correlations. Set `data_mix_idx=1,2,3,4,5` for i.i.d. dataset; set `data_mix_idx=13,14,15,16,17` for the correlated dataset in our paper. 
+
 To generate the test or the training data, check `./coat_generation/`. 
 
 Our COAT measure can be expanded to domains other than CLEVR, the Dataset class `CLEVRAlgebraTestset` in `data.py` is reusable. Send us a PR to add your dataset! 
