@@ -13,7 +13,7 @@ This is the code used to generate the testing corpus of [COAT](https://proceedin
 
 It is developed based on the original repo of [CLEVR](https://github.com/facebookresearch/clevr-dataset-gen). You can use this code to render synthetic images and construct testing corpus. 
 
-The testing corpus consists of tuples with strongly occluded multi-object scenes. They are obtained through a rejection sampling with certain occlusion threshold. The images in each tuple are correlated in a way that A and C have different sets of objects and different backgrounds, and B and D are the results of adding the same set of objects to A and C, respectively. 
+The testing corpus consists of tuples with strongly occluded multi-object scenes. They are obtained through a rejection sampling with certain occlusion threshold (`OCCLUSION_THRESHOLD` in `test_generation.py`). The images in each positive tuple are correlated in a way that A and C have different sets of objects and different backgrounds, and B and D are the results of adding the same set of objects to A and C, respectively. And all hard negatives D' are results of some semantic transformations on image D. 
 
 <img src="../figures/coat_examples.png" alt="coat" width="100%" />
 
