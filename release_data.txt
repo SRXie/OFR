@@ -1,0 +1,8 @@
+data_mix_csv: /checkpoint/siruixie/data_mix.csv
+data_root:  /checkpoint/siruixie/clevr_corr/ 
+val_root: /checkpoint/siruixie/clevr_with_masks/
+test_root: /checkpoint/siruixie/clevr_obj_test/output/obj_test_final/ # There should be a CLEVR_test_cases_hard.csv there
+
+checkpoints for slot-attn: 
+/checkpoint/siruixie/runs/objectness/hydra_train_corr_new/data_mix_idx=1,lr=0.0002,sweep_name=corr_new/objectness-test-corr/31c8iux8/checkpoints/epoch=299-step=107999.ckpt
+/checkpoint/siruixie/runs/objectness/hydra_train_corr_new/data_mix_idx=13,lr=0.0002,sweep_name=corr_new/objectness-test-corr/2rx0xfji/checkpoints/epoch=299-step=216000.ckpt
