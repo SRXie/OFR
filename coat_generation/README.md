@@ -60,6 +60,8 @@ If you have an NVIDIA GPU with CUDA installed then you can use the GPU to accele
 blender --background --python render_images.py -- --use_gpu 1
 ```
 
+Correlations between objects' attributes can be set with flags `--size_correlated`, `--shape_correlated`, `--color_correlated`, `--material_correlated`, `--appr_correlated`, `--intr_correlated` and `--pos_margin`. 
+
 To render images for testing corpus instead of training, use:
 ```bash
 blender --background --python render_test_images.py -- --use_gpu 1
