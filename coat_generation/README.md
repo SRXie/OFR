@@ -116,3 +116,16 @@ You can generate testing tuples with `obj_algebra_test` in `test_generation.py`.
        tuples.append((image_A_path, image_B_path, image_C_path, image_D_path, image_E_path, image_F_path, image_G_path, image_H_path, image_I_path, image_J_path))
 ```
 
+
+## Citation
+
+```
+@inproceedings{xie2022coat,
+  title={COAT: Measuring Object Compositionality in Emergent Representations},
+  author={Xie, Sirui and Morcos, Ari S and Zhu, Song-Chun and Vedantam, Ramakrishna},
+  booktitle={International Conference on Machine Learning},
+  pages={24388--24413},
+  year={2022},
+  organization={PMLR}
+}
+```
