@@ -43,6 +43,7 @@ test_type: obj
 dup_threshold: 0.15
 rm_invisible: True
 result_csv: /checkpoint/siruixie/data_mix_result.csv
+load_path: null
 
 hydra:
   sweep:
